@@ -6,6 +6,7 @@
 
 import numpy as np
 import random
+import functools
 from collections import defaultdict
 from truth.truth import AssertThat
 
@@ -88,11 +89,12 @@ def describe_move(move):
         position(v),
     )
 
+@functools.cache
 def rotation_matrix(move):
     [v, direction] = move
     # The rotational axis is the dimension into which `v` is pointing.
     fixed_dim = [i for i in range(3) if v[i]][0]
-    # The rotation takes place in ther other two dimensions.
+    # The rotation takes place in the other two dimensions.
     [r1, r2] = [i for i in range(3) if i != fixed_dim]
 
     M = np.zeros([3, 3])
@@ -102,9 +104,11 @@ def rotation_matrix(move):
     M[r1, r2], M[r2, r1] = direction, -direction
     return M
 
+@functools.cache
 def apply_move_to_vector(move, vector):
     return tuple(rotation_matrix(move) @ vector)
 
+@functools.cache
 def apply_move_to_cubelet(move, cubelet):
     # print("applying '%s' to %s" % (describe_move(move()move), describe_cubelet(cubelet)))
     [v, direction] = move
@@ -168,7 +172,7 @@ def run_tests():
     AssertThat(apply_move_to_vector(counterclockwise, front)).IsEqualTo(front)
     AssertThat(apply_move_to_vector(counterclockwise, back)).IsEqualTo(back)
 
-def shuffle(cube, iterations=1000, seed=42):
+def shuffle(cube, iterations=10_000, seed=42):
     random.seed(seed)
     new_cube = cube
     for _ in range(iterations):
