@@ -96,7 +96,7 @@ def rotation_matrix(move):
             elif i == j:
                 M[i][j] = 0
             else:
-                M[i][j] = direction if i > j else -direction
+                M[i][j] = (1 if i > j else -1) * direction * v[fixed_dim]
     return M
 
 def apply_move_to_vector(move, vector):
@@ -108,10 +108,10 @@ def apply_move_to_cubelet(move, cubelet):
     return cubelet
 
 def apply_move_to_cube(move, cube):
-    print(move_description(move))
+    print("\n\n== " + move_description(move) + " " + 20 * "=")
     new_cube = dict()
     for cubelet, faces in cube.items():
-        new_cubelet = apply_move_to_vector(move, cubelet)
+        new_cubelet = apply_move_to_cubelet(move, cubelet)
         print("before: %s -> after: %s" %
               (cubelet_description(cubelet), cubelet_description(new_cubelet)))
         if new_cubelet == cubelet:
