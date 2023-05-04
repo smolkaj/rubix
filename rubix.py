@@ -90,29 +90,17 @@ def describe_move(move):
 
 def rotation_matrix(move):
     [v, direction] = move
-    fixed_dim = 0 if v[0] else 1 if v[1] else 2
-    assert v[fixed_dim] != 0
-    rotated_dims = [i for i in range(3) if i != fixed_dim]
+    # The rotational axis is the dimension into which `v` is pointing.
+    fixed_dim = [i for i in range(3) if v[i]][0]
+    # The rotation takes place in ther other two dimensions.
+    [r1, r2] = [i for i in range(3) if i != fixed_dim]
 
-    M = np.identity(3)
-    M[np.ix_(rotated_dims, rotated_dims)] = [[0, direction], [-direction, 0]]
+    M = np.zeros([3, 3])
+    M[fixed_dim, fixed_dim] = 1
+    # The 90 degree rotation matrix [[0, 1], [-1,0]], adjusted by direction.
+    # https://en.wikipedia.org/wiki/Rotation_matrix#Common_rotations
+    M[r1, r2], M[r2, r1] = direction, -direction
     return M
-    
-# Uglier, but faster.
-# def rotation_matrix(move):
-#     [v, direction] = move
-#     fixed_dim = 0 if v[0] else 1 if v[1] else 2
-#     assert v[fixed_dim] != 0
-#     M = np.zeros([3, 3])
-#     for i in range(3):
-#         for j in range(3):
-#             if i == fixed_dim or j == fixed_dim:
-#                 M[i][j] = 1 if i == j else 0
-#             elif i == j:
-#                 M[i][j] = 0
-#             else:
-#                 M[i][j] = (1 if i < j else -1) * direction
-#     return M
 
 def apply_move_to_vector(move, vector):
     return tuple(rotation_matrix(move) @ vector)
