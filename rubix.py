@@ -11,7 +11,6 @@ from collections import defaultdict
 from truth.truth import AssertThat
 
 
-
 def norm1(vec): return sum(abs(x) for x in vec)
 def projx(vec): return (vec[0], 0, 0)
 def projy(vec): return (0, vec[1], 0)
@@ -49,14 +48,10 @@ color_names = {
 assert all(v in color_names for v in unit_vectors)
 
 def cubelet_type(cubelet):
-    if norm1(cubelet) == 0:
-        return "hidden"
-    if norm1(cubelet) == 1:
-        return "center"
-    if norm1(cubelet) == 2:
-        return "edge"
-    if norm1(cubelet) == 3:
-        return "corner"
+    if norm1(cubelet) == 0: return "hidden"
+    if norm1(cubelet) == 1: return "center"
+    if norm1(cubelet) == 2: return "edge"
+    if norm1(cubelet) == 3: return "corner"
     assert False
 
 def position(vector):
@@ -116,27 +111,13 @@ def apply_move_to_cubelet(move, cubelet):
     return cubelet
 
 def apply_move_to_cube(move, cube):
-    # print("\n\n== " + describe_move(move()move) + " " + 20 * "=")
-    new_cube = dict()
-    for cubelet, faces in cube.items():
-        new_cubelet = apply_move_to_cubelet(move, cubelet)
-        # print("before: %s -> after: %s" %
-        #       (describe_cubelet(cubelet), describe_cubelet(new_cubelet)))
-        if new_cubelet == cubelet:
-            new_cube[new_cubelet] = faces
-            continue
-        
-        new_faces = dict()
-        for face, color in faces.items():
-            new_face = apply_move_to_vector(move, face)
-            # print(" - before: %s -> after: %s" % (position(face), position(new_face)))
-            assert new_face not in new_faces
-            new_faces[new_face] = color
-        assert new_cubelet not in new_cube
-        new_cube[new_cubelet] = new_faces
-        # new_cube[new_cubelet] = {apply_move_to_vector(move, face): color
-        #                          for face, color in faces.items()}
-    return new_cube
+  return {
+    (new_cubelet := apply_move_to_cubelet(move, cubelet)) :
+    faces if new_cubelet == cubelet else {
+      apply_move_to_vector(move, face): color for face, color in faces.items()
+    }
+    for cubelet, faces in cube.items()
+  }
 
 def run_tests():
   # Check that every move is a permutation with cyle length 4.
