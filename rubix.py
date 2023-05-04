@@ -96,13 +96,14 @@ def rotation_matrix(move):
             elif i == j:
                 M[i][j] = 0
             else:
-                M[i][j] = (1 if i > j else -1) * direction * v[fixed_dim]
+                M[i][j] = (1 if i < j else -1) * direction
     return M
 
 def apply_move_to_vector(move, vector):
     return tuple(rotation_matrix(move) @ vector)
 
 def apply_move_to_cubelet(move, cubelet):
+    # print("applying '%s' to %s" % (move_description(move), cubelet_description(cubelet)))
     [v, direction] = move
     if np.dot(cubelet, v) > 0: return apply_move_to_vector(move, cubelet)
     return cubelet
