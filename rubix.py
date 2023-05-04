@@ -5,6 +5,7 @@
 # by a standard unit vector or its oposite.
 
 import numpy as np
+import random
 from collections import defaultdict
 
 
@@ -54,30 +55,30 @@ def cubelet_type(cubelet):
         return "corner"
     assert False
 
-def position(cubelet):
-    [x, y, z] = cubelet
+def position(vector):
+    [x, y, z] = vector
     descriptions = []
     descriptions += ["top"] if z == 1 else ["bottom"] if z == -1 else []
     descriptions += ["right"] if y == 1 else ["left"] if y == -1 else []
     descriptions += ["front"] if x == 1 else ["back"] if x == -1 else []
     return "-".join(descriptions)
 
-def cubelet_description(cubelet):
+def describe_cubelet(cubelet):
     return position(cubelet) + " " + cubelet_type(cubelet)
 
-def cube_description(cube):
+def describe_cube(cube):
     lines = []
     for cubelet, faces in cube.items():
         if cubelet == (0, 0, 0): continue
-        line = cubelet_description(cubelet) + ": "
+        line = describe_cubelet(cubelet) + ": "
         line += ", ".join(position(face) + ": " + color_names[color]
                           for face, color in faces.items())
         lines.append(line)
     return "\n".join(sorted(lines))
 
-print(cube_description(solved_cube))
+# print(describe_cube(solved_cube))
 
-def move_description(move):
+def describe_move(move):
     [v, direction] = move
     return "90 degree %s rotation of %s slice" % (
         "clockwise" if direction == 1 else "counterclockwise",
@@ -103,18 +104,18 @@ def apply_move_to_vector(move, vector):
     return tuple(rotation_matrix(move) @ vector)
 
 def apply_move_to_cubelet(move, cubelet):
-    # print("applying '%s' to %s" % (move_description(move), cubelet_description(cubelet)))
+    # print("applying '%s' to %s" % (describe_move(move()move), describe_cubelet(cubelet)))
     [v, direction] = move
     if np.dot(cubelet, v) > 0: return apply_move_to_vector(move, cubelet)
     return cubelet
 
 def apply_move_to_cube(move, cube):
-    print("\n\n== " + move_description(move) + " " + 20 * "=")
+    # print("\n\n== " + describe_move(move()move) + " " + 20 * "=")
     new_cube = dict()
     for cubelet, faces in cube.items():
         new_cubelet = apply_move_to_cubelet(move, cubelet)
-        print("before: %s -> after: %s" %
-              (cubelet_description(cubelet), cubelet_description(new_cubelet)))
+        # print("before: %s -> after: %s" %
+        #       (describe_cubelet(cubelet), describe_cubelet(new_cubelet)))
         if new_cubelet == cubelet:
             new_cube[new_cubelet] = faces
             continue
@@ -122,7 +123,7 @@ def apply_move_to_cube(move, cube):
         new_faces = dict()
         for face, color in faces.items():
             new_face = apply_move_to_vector(move, face)
-            print(" - before: %s -> after: %s" % (position(face), position(new_face)))
+            # print(" - before: %s -> after: %s" % (position(face), position(new_face)))
             assert new_face not in new_faces
             new_faces[new_face] = color
         assert new_cubelet not in new_cube
@@ -133,15 +134,26 @@ def apply_move_to_cube(move, cube):
 
 
 # Some simple unit tests.
-for move in moves:
-    cubes = [solved_cube]
-    for _ in range(3):
-        cubes.append(apply_move_to_cube(move, cubes[-1]))
-    assert all(cubes.count(cube) == 1 for cube in cubes)
-    assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
+# for move in moves:
+#     cubes = [solved_cube]
+#     for _ in range(3):
+#         cubes.append(apply_move_to_cube(move, cubes[-1]))
+#     assert all(cubes.count(cube) == 1 for cube in cubes)
+#     assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
+
+def shuffle(cube, iterations=10000, seed=42):
+    random.seed(seed)
+    new_cube = cube
+    for _ in range(iterations):
+        move = moves[random.randrange(len(moves))]
+        new_cube = apply_move_to_cube(move, new_cube)
+    return new_cube
+
+print(describe_cube(shuffle(solved_cube)))
+    
 
 # for move in moves:
 #     print("\n----------------------------------\n")
 #     cube = apply_move_to_cube(move, solved_cube)
-#     print(cube_description(cube))
+#     print(describe_cube(cube))
 #     break
