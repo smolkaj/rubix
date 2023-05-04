@@ -1,8 +1,8 @@
 # A rubix cube is a discrete object in 3-dimensional space.
-# It sits in [-1, 1]^3.
-# Each *cubelet* has coordinates (+-1, +-1, +-1).
-# Each *move* is a 90 degree hyperplane rotation with the hyperplane given
-# by a 0/+-1-normal vector.
+# It sits in [-1, 1]^3, centered at the origin (0, 0, 0).
+# Each *cubelet* has coordinates (x, y, z) in {-1, 0, 1}^3.
+# Each *move* is a 90 degree hyperplane rotation, with the hyperplane given
+# by a standard unit vector or its oposite.
 
 import numpy as np
 from collections import defaultdict
@@ -23,14 +23,14 @@ crange = [-1, 0, 1]
 # More generally, a cubelet with 1-norm n has n colored squares.
 vectors = [(x, y, z) for x in crange for y in crange for z in crange]
 
-# Normal vectors correspond to center cubelets.
+# Unit vectors correspond to center cubelets.
 # Since we restrict ourselves to moves that leave all center cubelets in place,
 # the center cubelets are fixed points and correspond 1-to-1 to the colors.
-normal_vectors = [v for v in vectors if norm1(v) == 1]
+unit_vectors = [v for v in vectors if norm1(v) == 1]
 
 # A move is a clockwise or counterclockwise 90 degree rotation of the
-# slice pointed at by a normal vector.
-moves = [(v, direction) for v in normal_vectors for direction in [-1, 1]]
+# slice pointed at by a unit vector.
+moves = [(v, direction) for v in unit_vectors for direction in [-1, 1]]
 
 solved_cube = {cubelet: {f: f for f in faces(cubelet)} for cubelet in vectors}
 
@@ -68,8 +68,7 @@ def cubelet_description(cubelet):
 def cube_description(cube):
     lines = []
     for cubelet, faces in cube.items():
-        if cubelet == (0, 0, 0):
-            continue
+        if cubelet == (0, 0, 0): continue
         line = cubelet_description(cubelet) + ": "
         line += ", ".join(position(face) + ": " + color_names[color]
                           for face, color in faces.items())
@@ -87,12 +86,12 @@ def move_description(move):
 
 def rotation_matrix(move):
     [v, direction] = move
-    k = 0 if v[0] else 1 if v[1] else 2
-    assert v[k] != 0
+    fixed_dim = 0 if v[0] else 1 if v[1] else 2
+    assert v[fixed_dim] != 0
     M = np.zeros([3, 3])
     for i in range(3):
         for j in range(3):
-            if i == k or j == k:
+            if i == fixed_dim or j == fixed_dim:
                 M[i][j] = 1 if i == j else 0
             elif i == j:
                 M[i][j] = 0
