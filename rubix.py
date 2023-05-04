@@ -7,6 +7,8 @@
 import numpy as np
 import random
 from collections import defaultdict
+from truth.truth import AssertThat
+
 
 
 def norm1(vec): return sum(abs(x) for x in vec)
@@ -43,6 +45,7 @@ color_names = {
     (0, -1, 0): "ORANGE",
     (0, 0, -1): "YELLOW"
 }
+assert all(v in color_names for v in unit_vectors)
 
 def cubelet_type(cubelet):
     if norm1(cubelet) == 0:
@@ -89,16 +92,27 @@ def rotation_matrix(move):
     [v, direction] = move
     fixed_dim = 0 if v[0] else 1 if v[1] else 2
     assert v[fixed_dim] != 0
-    M = np.zeros([3, 3])
-    for i in range(3):
-        for j in range(3):
-            if i == fixed_dim or j == fixed_dim:
-                M[i][j] = 1 if i == j else 0
-            elif i == j:
-                M[i][j] = 0
-            else:
-                M[i][j] = (1 if i < j else -1) * direction
+    rotated_dims = [i for i in range(3) if i != fixed_dim]
+
+    M = np.identity(3)
+    M[np.ix_(rotated_dims, rotated_dims)] = [[0, direction], [-direction, 0]]
     return M
+    
+# Uglier, but faster.
+# def rotation_matrix(move):
+#     [v, direction] = move
+#     fixed_dim = 0 if v[0] else 1 if v[1] else 2
+#     assert v[fixed_dim] != 0
+#     M = np.zeros([3, 3])
+#     for i in range(3):
+#         for j in range(3):
+#             if i == fixed_dim or j == fixed_dim:
+#                 M[i][j] = 1 if i == j else 0
+#             elif i == j:
+#                 M[i][j] = 0
+#             else:
+#                 M[i][j] = (1 if i < j else -1) * direction
+#     return M
 
 def apply_move_to_vector(move, vector):
     return tuple(rotation_matrix(move) @ vector)
@@ -132,16 +146,41 @@ def apply_move_to_cube(move, cube):
         #                          for face, color in faces.items()}
     return new_cube
 
+def run_tests():
+  # Check that every move is a permutation with cyle length 4.
+  for move in moves:
+      cubes = [solved_cube]
+      for _ in range(3):
+          cubes.append(apply_move_to_cube(move, cubes[-1]))
+      assert all(cubes.count(cube) == 1 for cube in cubes)
+      assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
 
-# Some simple unit tests.
-# for move in moves:
-#     cubes = [solved_cube]
-#     for _ in range(3):
-#         cubes.append(apply_move_to_cube(move, cubes[-1]))
-#     assert all(cubes.count(cube) == 1 for cube in cubes)
-#     assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
+  # Check that faces get rotated correctly around the x (front/back) dimension.
+  move_by_name = { describe_move(move) : move for move in moves }
+  face_by_position = { position(f) : f for f in unit_vectors }
+  front_clockwise = move_by_name["90 degree clockwise rotation of front slice"]
+  back_clockwise = move_by_name["90 degree clockwise rotation of back slice"]
+  front_counterclockwise = move_by_name["90 degree counterclockwise rotation of front slice"]
+  back_counterclockwise = move_by_name["90 degree counterclockwise rotation of back slice"]
+  top, bottom = face_by_position["top"], face_by_position["bottom"]
+  left, right = face_by_position["left"], face_by_position["right"]
+  front, back = face_by_position["front"], face_by_position["back"]
+  for clockwise in [front_clockwise, back_clockwise]:
+    AssertThat(apply_move_to_vector(clockwise, top)).IsEqualTo(right)
+    AssertThat(apply_move_to_vector(clockwise, right)).IsEqualTo(bottom)
+    AssertThat(apply_move_to_vector(clockwise, bottom)).IsEqualTo(left)
+    AssertThat(apply_move_to_vector(clockwise, left)).IsEqualTo(top)
+    AssertThat(apply_move_to_vector(clockwise, front)).IsEqualTo(front)
+    AssertThat(apply_move_to_vector(clockwise, back)).IsEqualTo(back)
+  for counterclockwise in [front_counterclockwise, back_counterclockwise]:
+    AssertThat(apply_move_to_vector(counterclockwise, top)).IsEqualTo(left)
+    AssertThat(apply_move_to_vector(counterclockwise, right)).IsEqualTo(top)
+    AssertThat(apply_move_to_vector(counterclockwise, bottom)).IsEqualTo(right)
+    AssertThat(apply_move_to_vector(counterclockwise, left)).IsEqualTo(bottom)
+    AssertThat(apply_move_to_vector(counterclockwise, front)).IsEqualTo(front)
+    AssertThat(apply_move_to_vector(counterclockwise, back)).IsEqualTo(back)
 
-def shuffle(cube, iterations=10000, seed=42):
+def shuffle(cube, iterations=1000, seed=42):
     random.seed(seed)
     new_cube = cube
     for _ in range(iterations):
@@ -149,11 +188,5 @@ def shuffle(cube, iterations=10000, seed=42):
         new_cube = apply_move_to_cube(move, new_cube)
     return new_cube
 
+run_tests()
 print(describe_cube(shuffle(solved_cube)))
-    
-
-# for move in moves:
-#     print("\n----------------------------------\n")
-#     cube = apply_move_to_cube(move, solved_cube)
-#     print(describe_cube(cube))
-#     break
