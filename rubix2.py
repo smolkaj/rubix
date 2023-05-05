@@ -7,7 +7,7 @@
 import numpy as np
 import random
 import functools
-from collections import defaultdict
+from collections import defaultdict, deque
 from truth.truth import AssertThat
 
 def norm1(v): return sum(abs(x) for x in v)
@@ -105,6 +105,7 @@ def apply_move_to_cube(move, cube):
   )
 
 def shuffle(cube, iterations=100_000, seed=42):
+    if seed: random.seed(seed)
     random.seed(seed)
     new_cube = cube
     for _ in range(iterations):
@@ -125,7 +126,71 @@ def run_tests():
       assert all(cubes.count(cube) == 1 for cube in cubes)
       assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
 
-run_tests()
-print(describe_cube(shuffle(solved_cube)))
+# run_tests()
+# print(describe_cube(shuffle(solved_cube)))
 # print("rotation_matrix: ", rotation_matrix.cache_info())
 # print("apply_move_to_cubelet_rotation: ", apply_move_to_cubelet_rotation.cache_info())
+
+
+def bfs(source, is_dst, get_moves, apply_move):
+  state = (source, ())
+  if is_dst(source): return state
+  seen = set([source])
+  frontier = deque([state])
+  while frontier:
+    [src, path] = frontier.popleft()
+    # print("expanding path of length %d" % len(path))
+    for i, move in enumerate(get_moves(src)):
+      dst = apply_move(move, src)
+      if dst in seen:
+        # print(" -> extension %d already seen" % i)
+        continue
+      seen.add(dst)
+      state = (dst, path + (move,))
+      if is_dst(dst):
+        # print(" -> extension %d reached the destination!" % i)
+        return state
+      # print(" -> extension %d added to frontier" % i)
+      frontier.append(state)
+  assert False
+
+def solve_top_slice_cross(cube):
+  solution = None
+  def num_solved_cubelets(cube):
+    return sum(1 for cubelet, rotation in cube
+                if cubelet[2] == 1 and norm1(cubelet) == 2 
+                and rotation == tupled(np.eye(3)))
+  for solved_cubelets in range(4):
+    print("solving top edge #%d" % (solved_cubelets + 1))
+    def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
+    def get_moves(_): return range(len(moves))
+    def apply_move(m, c): return apply_move_to_cube(moves[m], c)
+    solution = [cube, path] = bfs(cube, is_dst, get_moves, apply_move)
+    print("found solution with %d moves" % len(path))
+  return solution
+
+def solve_top_slice_complete(cube):
+  solution = None
+  def num_solved_cubelets(cube):
+    return sum(1 for c, r in cube if c[2] == 1 and r == tupled(np.eye(3)))
+  for solved_cubelets in range(9):
+    print("solving top cubelet #%d" % (solved_cubelets + 1))
+    def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
+    def get_moves(_): return range(len(moves))
+    def apply_move(m, c): return apply_move_to_cube(moves[m], c)
+    solution = [cube, path] = bfs(cube, is_dst, get_moves, apply_move)
+    print("found solution with %d moves" % len(path))
+  return solution
+  
+
+def solve(cube):
+   [cube, path1] = solve_top_slice_cross(cube)
+   [cube, path2] = solve_top_slice_complete(cube)
+   path = path1 + path2
+   print("Solved cube in %d moves. Final cube:" % len(path))
+   print(describe_cube(cube))
+   return path
+   
+
+random_cube = shuffle(solved_cube, seed=1)
+solve(random_cube)
