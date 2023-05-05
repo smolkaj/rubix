@@ -42,6 +42,7 @@ def describe_position(vector):
   descriptions += ["top"] if z == 1 else ["bottom"] if z == -1 else []
   descriptions += ["right"] if y == 1 else ["left"] if y == -1 else []
   descriptions += ["front"] if x == 1 else ["back"] if x == -1 else []
+  # assert descriptions
   return "-".join(descriptions)
 
 def describe_config(cubelet, rotation):
@@ -90,7 +91,12 @@ def rotation_matrix(move):
 def apply_move_to_cubelet_rotation(move, cubelet, rotation):
   [v, direction] = move
   if np.dot(v, np.matmul(rotation, cubelet)) <= 0: return rotation
-  return tupled(rotation_matrix(move) @ rotation)
+  new_rotation = tupled(rotation_matrix(move) @ rotation)
+  print("- position before: %s\n- position after: %s\n", % (
+     describe_position(np.matmul(rotation, cubelet)),
+     describe_position(np.matmul(new_rotation, cubelet))
+  ))
+  return new_rotation
 
 def apply_move_to_cube(move, cube):
   return { 
@@ -106,11 +112,10 @@ def shuffle(cube, iterations=1_000_000, seed=42):
         new_cube = apply_move_to_cube(move, new_cube)
     return new_cube
 
-# for move in moves:
-#   print("\n\n== " + describe_move(move) + "==============")
-#   cube = apply_move_to_cube(move, solved_cube)
-#   # print(cube)
-#   print(describe_cube(apply_move_to_cube(move, solved_cube)))
+for move in moves[::-1]:
+  print("\n\n== " + describe_move(move) + "==============")
+  print(describe_cube(apply_move_to_cube(move, solved_cube)))
+  break
 
 def run_tests():
   # Check that every move is a permutation with cyle length 4.
@@ -121,5 +126,5 @@ def run_tests():
       assert all(cubes.count(cube) == 1 for cube in cubes)
       assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
 
-run_tests()
-print(describe_cube(shuffle(solved_cube)))
+# run_tests()
+# print(describe_cube(shuffle(solved_cube)))
