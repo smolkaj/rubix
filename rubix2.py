@@ -10,6 +10,9 @@ import functools
 from collections import deque
 from truth.truth import AssertThat
 from datetime import datetime
+from dataclasses import dataclass, field
+from typing import Any
+import heapq
 
 startup_time = datetime.now()
 
@@ -132,26 +135,53 @@ run_tests()
 
 
 def bfs(source, is_dst, get_moves, apply_move):
-  state = (source, ())
-  if is_dst(source): return state
-  seen = set([source])
-  frontier = deque([state])
+  if is_dst(source): return (source, ())
+  frontier, seen = deque([(source, ())]), set([source])
   while frontier:
     [src, path] = frontier.popleft()
-    # print("expanding path of length %d" % len(path))
     for i, move in enumerate(get_moves(src)):
       dst = apply_move(move, src)
-      if dst in seen:
-        # print(" -> extension %d already seen" % i)
-        continue
+      if dst in seen: continue
       seen.add(dst)
       state = (dst, path + (move,))
-      if is_dst(dst):
-        # print(" -> extension %d reached the destination!" % i)
-        return state
-      # print(" -> extension %d added to frontier" % i)
+      if is_dst(dst): return state
       frontier.append(state)
   assert False
+
+@dataclass(order=True, frozen=True)
+class PrioritizedItem:
+  item: Any = field(compare=False)
+  priority: int
+
+def astar(start, is_goal, get_moves, apply_move, heuristic):
+  if is_goal(start): return (start, ())
+  frontier = [PrioritizedItem(start, 0)]
+  came_from = {}
+  cost_so_far = { start : 0 }
+  priority = 0
+
+  def reconstruct_solution(dst):
+    path = []
+    current = dst
+    while current in came_from:
+      src = came_from[current]
+      move = next(m for m in get_moves(src) if apply_move(m, src) == current)
+      path.append(move)
+      current = src
+    return (dst, tuple(reversed(path)))
+
+  while frontier:
+    src = heapq.heappop(frontier).item
+    for i, move in enumerate(get_moves(src)):
+      dst, cost = apply_move(move, src), cost_so_far[src] + 1
+      if dst in cost_so_far and cost_so_far[dst] <= cost: continue
+      cost_so_far[dst], came_from[src] = cost, src
+      if is_goal(dst): return reconstruct_solution(dst)
+      # priority = cost + heuristic(dst)
+      priority += 1
+      heapq.heappush(frontier, PrioritizedItem(dst, priority))
+  assert False
+
 
 def solve_top_layer_cross(cube):
   path = ()
@@ -162,9 +192,11 @@ def solve_top_layer_cross(cube):
     print("solving top edge #%d" % (solved_cubelets + 1))
     def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
     def get_moves(_): return moves
+    def heuristic(cube): return solved_cubelets + 1 - num_solved_cubelets(cube) 
     [cube, path_extension] = bfs(cube, is_dst, get_moves, apply_move_to_cube)
+    # [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube, heuristic)
+    print("found solution with %d moves" % len(path_extension))
     path += path_extension
-    print("found solution with %d moves" % len(path))
   return (cube, path)
 
 def solve_top_layer_complete(cube):
@@ -175,9 +207,11 @@ def solve_top_layer_complete(cube):
     print("solving top cubelet #%d" % (solved_cubelets + 1))
     def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
     def get_moves(_): return moves
-    [cube, path_extension] = bfs(cube, is_dst, get_moves, apply_move_to_cube)
+    def heuristic(cube): return solved_cubelets + 1 - num_solved_cubelets(cube)
+    # [cube, path_extension] = bfs(cube, is_dst, get_moves, apply_move_to_cube)
+    [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube, heuristic)
+    print("found solution with %d moves" % len(path_extension))
     path += path_extension
-    print("found solution with %d moves" % len(path))
   return (cube, path)
 
 def solve(cube):
