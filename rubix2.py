@@ -9,6 +9,9 @@ import random
 import functools
 from collections import deque
 from truth.truth import AssertThat
+from datetime import datetime
+
+startup_time = datetime.now()
 
 def norm1(v): return sum(abs(x) for x in v)
 
@@ -185,5 +188,16 @@ def solve(cube):
   print(describe_cube(cube))
   return path
 
+def print_stats():
+  secs_elapsed = (datetime.now() - startup_time).total_seconds()
+  cache_info = apply_move_to_cubelet_rotation.cache_info()
+  moves = (cache_info.hits + cache_info.misses) / len(solved_cube)
+  print("- time elapsed: %.1f sec" % secs_elapsed)
+  print("- moves simulated: %d (%.0f moves/sec) " % (
+    moves,
+    moves / secs_elapsed
+  ))
+
 random_cube = shuffle(solved_cube, iterations=100_000, seed=1)
 solve(random_cube)
+print_stats()
