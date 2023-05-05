@@ -151,32 +151,31 @@ def bfs(source, is_dst, get_moves, apply_move):
   assert False
 
 def solve_top_layer_cross(cube):
-  solution = None
+  path = ()
   def num_solved_cubelets(cube):
-    return sum(1 for cubelet, rotation in cube
-                if cubelet[2] == 1 and norm1(cubelet) == 2 
-                and rotation == tupled(np.eye(3)))
+    return sum(1 for c, r in cube
+               if c[2] == 1 and norm1(c) == 2 and r == tupled(np.eye(3)))
   for solved_cubelets in range(4):
     print("solving top edge #%d" % (solved_cubelets + 1))
     def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
-    def get_moves(_): return range(len(moves))
-    def apply_move(m, c): return apply_move_to_cube(moves[m], c)
-    solution = [cube, path] = bfs(cube, is_dst, get_moves, apply_move)
+    def get_moves(_): return moves
+    [cube, path_extension] = bfs(cube, is_dst, get_moves, apply_move_to_cube)
+    path += path_extension
     print("found solution with %d moves" % len(path))
-  return solution
+  return (cube, path)
 
 def solve_top_layer_complete(cube):
-  solution = None
+  path = ()
   def num_solved_cubelets(cube):
     return sum(1 for c, r in cube if c[2] == 1 and r == tupled(np.eye(3)))
   for solved_cubelets in range(9):
     print("solving top cubelet #%d" % (solved_cubelets + 1))
     def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
-    def get_moves(_): return range(len(moves))
-    def apply_move(m, c): return apply_move_to_cube(moves[m], c)
-    solution = [cube, path] = bfs(cube, is_dst, get_moves, apply_move)
+    def get_moves(_): return moves
+    [cube, path_extension] = bfs(cube, is_dst, get_moves, apply_move_to_cube)
+    path += path_extension
     print("found solution with %d moves" % len(path))
-  return solution
+  return (cube, path)
 
 def solve(cube):
   [cube, path1] = solve_top_layer_cross(cube)
