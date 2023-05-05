@@ -161,4 +161,4 @@ def run_tests():
     AssertThat(apply_move_to_vector(counterclockwise, back)).IsEqualTo(back)
 
 run_tests()
-print(describe_cube(shuffle(solved_cube)))
+# print(describe_cube(shuffle(solved_cube)))

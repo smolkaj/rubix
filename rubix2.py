@@ -1,3 +1,9 @@
+# We model a rubix cube as a discrete object in 3-dimensional Euclidean space,
+# centered at the origin (0, 0, 0).
+# Each *cubelet* has coordinates (x, y, z) in {-1, 0, 1}^3.
+# Each *move* is a 90 degree hyperplane rotation, with the hyperplane given
+# by a standard unit vector or its oposite.
+
 import numpy as np
 import random
 import functools
@@ -11,8 +17,8 @@ def tupled(np_mat):
 
 crange = [-1, 0, 1]
 vectors = [(x,y,z) for x in crange for y in crange for z in crange]
-# Cube = Color set (cubelet) -> Rotation.
-solved_cube = { v : tupled(np.identity(3)) for v in vectors }
+# Cube = Cubelet -> Rotation.
+solved_cube = tuple((v, tupled(np.identity(3))) for v in vectors if any(v))
 unit_vectors = [v for v in vectors if norm1(v) == 1]
 
 # A move is a clockwise or counterclockwise 90 degree rotation of the
@@ -61,8 +67,7 @@ def describe_cube(cube):
       describe_cubelet_type(cubelet),
       describe_config(cubelet, rotation)
     )
-    for cubelet, rotation in cube.items()
-    if any(cubelet)
+    for cubelet, rotation in cube
   ))
 
 def describe_move(move):
@@ -92,19 +97,14 @@ def apply_move_to_cubelet_rotation(move, cubelet, rotation):
   [v, direction] = move
   if np.dot(v, np.matmul(rotation, cubelet)) <= 0: return rotation
   return tupled(rotation_matrix(move) @ rotation)
-  # print("- position before: %s\n- position after: %s\n" % (
-  #    describe_position(np.matmul(rotation, cubelet)),
-  #    describe_position(np.matmul(new_rotation, cubelet))
-  # ))
-  # return new_rotation
 
 def apply_move_to_cube(move, cube):
-  return { 
-     cubelet : apply_move_to_cubelet_rotation(move, cubelet, rotation)
-     for cubelet, rotation in cube.items()
-  }
+  return tuple(
+     (cubelet, apply_move_to_cubelet_rotation(move, cubelet, rotation))
+     for cubelet, rotation in cube
+  )
 
-def shuffle(cube, iterations=1_000_000, seed=42):
+def shuffle(cube, iterations=100_000, seed=42):
     random.seed(seed)
     new_cube = cube
     for _ in range(iterations):
@@ -125,5 +125,7 @@ def run_tests():
       assert all(cubes.count(cube) == 1 for cube in cubes)
       assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
 
-# run_tests()
+run_tests()
 print(describe_cube(shuffle(solved_cube)))
+# print("rotation_matrix: ", rotation_matrix.cache_info())
+# print("apply_move_to_cubelet_rotation: ", apply_move_to_cubelet_rotation.cache_info())
