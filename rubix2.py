@@ -158,7 +158,6 @@ def astar(start, is_goal, get_moves, apply_move, heuristic):
   frontier = [PrioritizedItem(start, 0)]
   came_from = {}
   cost_so_far = { start : 0 }
-  priority = 0
 
   def reconstruct_solution(dst):
     path = []
@@ -177,8 +176,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic):
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
       cost_so_far[dst], came_from[src] = cost, src
       if is_goal(dst): return reconstruct_solution(dst)
-      # priority = cost + heuristic(dst)
-      priority += 1
+      priority = cost + heuristic(dst)
       heapq.heappush(frontier, PrioritizedItem(dst, priority))
   assert False
 
@@ -192,9 +190,9 @@ def solve_top_layer_cross(cube):
     print("solving top edge #%d" % (solved_cubelets + 1))
     def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
     def get_moves(_): return moves
-    def heuristic(cube): return solved_cubelets + 1 - num_solved_cubelets(cube) 
-    [cube, path_extension] = bfs(cube, is_dst, get_moves, apply_move_to_cube)
-    # [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube, heuristic)
+    def heuristic(cube): return solved_cubelets + 1 - num_solved_cubelets(cube)
+    [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube,
+                                   heuristic)
     print("found solution with %d moves" % len(path_extension))
     path += path_extension
   return (cube, path)
@@ -208,8 +206,8 @@ def solve_top_layer_complete(cube):
     def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
     def get_moves(_): return moves
     def heuristic(cube): return solved_cubelets + 1 - num_solved_cubelets(cube)
-    # [cube, path_extension] = bfs(cube, is_dst, get_moves, apply_move_to_cube)
-    [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube, heuristic)
+    [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube,
+                                   heuristic)
     print("found solution with %d moves" % len(path_extension))
     path += path_extension
   return (cube, path)
