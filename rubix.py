@@ -105,7 +105,6 @@ def apply_move_to_vector(move, vector):
 
 @functools.cache
 def apply_move_to_cubelet(move, cubelet):
-    # print("applying '%s' to %s" % (describe_move(move()move), describe_cubelet(cubelet)))
     [v, direction] = move
     if np.dot(cubelet, v) > 0: return apply_move_to_vector(move, cubelet)
     return cubelet
@@ -118,6 +117,14 @@ def apply_move_to_cube(move, cube):
     }
     for cubelet, faces in cube.items()
   }
+
+def shuffle(cube, iterations=100_000, seed=42):
+    random.seed(seed)
+    new_cube = cube
+    for _ in range(iterations):
+        move = moves[random.randrange(len(moves))]
+        new_cube = apply_move_to_cube(move, new_cube)
+    return new_cube
 
 def run_tests():
   # Check that every move is a permutation with cyle length 4.
@@ -152,14 +159,6 @@ def run_tests():
     AssertThat(apply_move_to_vector(counterclockwise, left)).IsEqualTo(bottom)
     AssertThat(apply_move_to_vector(counterclockwise, front)).IsEqualTo(front)
     AssertThat(apply_move_to_vector(counterclockwise, back)).IsEqualTo(back)
-
-def shuffle(cube, iterations=10_000, seed=42):
-    random.seed(seed)
-    new_cube = cube
-    for _ in range(iterations):
-        move = moves[random.randrange(len(moves))]
-        new_cube = apply_move_to_cube(move, new_cube)
-    return new_cube
 
 run_tests()
 print(describe_cube(shuffle(solved_cube)))

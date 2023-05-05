@@ -29,7 +29,7 @@ color_names = {
 }
 assert all(v in color_names for v in unit_vectors)
 
-def cubelet_type(cubelet):
+def describe_cubelet_type(cubelet):
   if norm1(cubelet) == 0: return "hidden"
   if norm1(cubelet) == 1: return "center"
   if norm1(cubelet) == 2: return "edge"
@@ -57,7 +57,7 @@ def describe_config(cubelet, rotation):
 def describe_cube(cube):
   return "\n".join(sorted("%s %s: %s" % (
       describe_position(np.matmul(rotation, cubelet)),
-      cubelet_type(cubelet),
+      describe_cubelet_type(cubelet),
       describe_config(cubelet, rotation)
     )
     for cubelet, rotation in cube.items()
@@ -98,7 +98,7 @@ def apply_move_to_cube(move, cube):
      for cubelet, rotation in cube.items()
   }
 
-def shuffle(cube, iterations=10_000, seed=42):
+def shuffle(cube, iterations=1_000_000, seed=42):
     random.seed(seed)
     new_cube = cube
     for _ in range(iterations):
