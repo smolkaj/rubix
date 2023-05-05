@@ -17,14 +17,13 @@ def tupled(np_mat):
 
 crange = [-1, 0, 1]
 vectors = [(x,y,z) for x in crange for y in crange for z in crange]
-# Cube = Cubelet -> Rotation.
+# Cube = Cubelet -> Rotation map. Encoded as a tuple so it can be hashed.
 solved_cube = tuple((v, tupled(np.identity(3))) for v in vectors if any(v))
 unit_vectors = [v for v in vectors if norm1(v) == 1]
 
 # A move is a clockwise or counterclockwise 90 degree rotation of the
 # slice pointed at by a unit vector.
 moves = [(v, direction) for v in unit_vectors for direction in [-1, 1]]
-
 color_names = {
   (+1, 0, 0): "GREEN",
   (0, +1, 0): "RED",
@@ -81,7 +80,7 @@ def describe_move(move):
 def rotation_matrix(move):
     [v, direction] = move
     # The rotational axis is the dimension into which `v` is pointing.
-    fixed_dim = [i for i in range(3) if v[i]][0]
+    fixed_dim = next(i for i in range(3) if v[i])
     # The rotation takes place in the other two dimensions.
     [r1, r2] = [i for i in range(3) if i != fixed_dim]
 
@@ -95,8 +94,8 @@ def rotation_matrix(move):
 @functools.cache
 def apply_move_to_cubelet_rotation(move, cubelet, rotation):
   [v, direction] = move
-  if np.dot(v, np.matmul(rotation, cubelet)) <= 0: return rotation
-  return tupled(rotation_matrix(move) @ rotation)
+  move_applies = np.dot(v, np.matmul(rotation, cubelet)) > 0
+  return tupled(rotation_matrix(move) @ rotation) if move_applies else rotation
 
 def apply_move_to_cube(move, cube):
   return tuple(
@@ -106,12 +105,10 @@ def apply_move_to_cube(move, cube):
 
 def shuffle(cube, iterations=100_000, seed=42):
     if seed: random.seed(seed)
-    random.seed(seed)
-    new_cube = cube
     for _ in range(iterations):
         move = moves[random.randrange(len(moves))]
-        new_cube = apply_move_to_cube(move, new_cube)
-    return new_cube
+        cube = apply_move_to_cube(move, cube)
+    return cube
 
 # for move in moves[::-1]:
 #   print("\n\n== " + describe_move(move) + "==============")
@@ -154,7 +151,7 @@ def bfs(source, is_dst, get_moves, apply_move):
       frontier.append(state)
   assert False
 
-def solve_top_slice_cross(cube):
+def solve_top_layer_cross(cube):
   solution = None
   def num_solved_cubelets(cube):
     return sum(1 for cubelet, rotation in cube
@@ -169,7 +166,7 @@ def solve_top_slice_cross(cube):
     print("found solution with %d moves" % len(path))
   return solution
 
-def solve_top_slice_complete(cube):
+def solve_top_layer_complete(cube):
   solution = None
   def num_solved_cubelets(cube):
     return sum(1 for c, r in cube if c[2] == 1 and r == tupled(np.eye(3)))
@@ -181,16 +178,14 @@ def solve_top_slice_complete(cube):
     solution = [cube, path] = bfs(cube, is_dst, get_moves, apply_move)
     print("found solution with %d moves" % len(path))
   return solution
-  
 
 def solve(cube):
-   [cube, path1] = solve_top_slice_cross(cube)
-   [cube, path2] = solve_top_slice_complete(cube)
+   [cube, path1] = solve_top_layer_cross(cube)
+   [cube, path2] = solve_top_layer_complete(cube)
    path = path1 + path2
    print("Solved cube in %d moves. Final cube:" % len(path))
    print(describe_cube(cube))
    return path
-   
 
 random_cube = shuffle(solved_cube, seed=1)
 solve(random_cube)
