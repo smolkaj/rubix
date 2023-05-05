@@ -7,13 +7,13 @@
 import numpy as np
 import random
 import functools
-from collections import defaultdict, deque
+from collections import deque
 from truth.truth import AssertThat
 
 def norm1(v): return sum(abs(x) for x in v)
 
 def tupled(np_mat):
-   return tuple(tuple(int(x) for x in row) for row in np_mat)
+  return tuple(tuple(int(x) for x in row) for row in np_mat)
 
 crange = [-1, 0, 1]
 vectors = [(x,y,z) for x in crange for y in crange for z in crange]
