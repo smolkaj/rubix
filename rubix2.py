@@ -174,7 +174,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic):
     for i, move in enumerate(get_moves(src)):
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
-      cost_so_far[dst], came_from[src] = cost, src
+      cost_so_far[dst], came_from[dst] = cost, src
       if is_goal(dst): return reconstruct_solution(dst)
       priority = cost + heuristic(dst)
       heapq.heappush(frontier, PrioritizedItem(dst, priority))
