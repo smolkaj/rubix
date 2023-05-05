@@ -186,5 +186,5 @@ def solve(cube):
   print(describe_cube(cube))
   return path
 
-random_cube = shuffle(solved_cube, seed=1)
+random_cube = shuffle(solved_cube, iterations=100_000, seed=1)
 solve(random_cube)
