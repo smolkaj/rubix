@@ -70,26 +70,26 @@ def describe_cube(cube):
   ))
 
 def describe_move(move):
-    [v, direction] = move
-    return "90 degree %s rotation of %s slice" % (
-        "clockwise" if direction == 1 else "counterclockwise",
-        describe_position(v),
-    )
+  [v, direction] = move
+  return "90 degree %s rotation of %s slice" % (
+      "clockwise" if direction == 1 else "counterclockwise",
+      describe_position(v),
+  )
 
 @functools.cache
 def rotation_matrix(move):
-    [v, direction] = move
-    # The rotational axis is the dimension into which `v` is pointing.
-    fixed_dim = next(i for i in range(3) if v[i])
-    # The rotation takes place in the other two dimensions.
-    [r1, r2] = [i for i in range(3) if i != fixed_dim]
+  [v, direction] = move
+  # The rotational axis is the dimension into which `v` is pointing.
+  fixed_dim = next(i for i in range(3) if v[i])
+  # The rotation takes place in the other two dimensions.
+  [r1, r2] = [i for i in range(3) if i != fixed_dim]
 
-    M = np.zeros([3, 3])
-    M[fixed_dim, fixed_dim] = 1
-    # The 90 degree rotation matrix [[0, 1], [-1,0]], adjusted by direction.
-    # https://en.wikipedia.org/wiki/Rotation_matrix#Common_rotations
-    M[r1, r2], M[r2, r1] = direction, -direction
-    return M
+  M = np.zeros([3, 3])
+  M[fixed_dim, fixed_dim] = 1
+  # The 90 degree rotation matrix [[0, 1], [-1,0]], adjusted by direction.
+  # https://en.wikipedia.org/wiki/Rotation_matrix#Common_rotations
+  M[r1, r2], M[r2, r1] = direction, -direction
+  return M
 
 @functools.cache
 def apply_move_to_cubelet_rotation(move, cubelet, rotation):
@@ -99,31 +99,30 @@ def apply_move_to_cubelet_rotation(move, cubelet, rotation):
 
 def apply_move_to_cube(move, cube):
   return tuple(
-     (cubelet, apply_move_to_cubelet_rotation(move, cubelet, rotation))
-     for cubelet, rotation in cube
+    (cubelet, apply_move_to_cubelet_rotation(move, cubelet, rotation))
+    for cubelet, rotation in cube
   )
-
-def shuffle(cube, iterations=100_000, seed=42):
-    if seed: random.seed(seed)
-    for _ in range(iterations):
-        move = moves[random.randrange(len(moves))]
-        cube = apply_move_to_cube(move, cube)
-    return cube
 
 # for move in moves[::-1]:
 #   print("\n\n== " + describe_move(move) + "==============")
 #   print(describe_cube(apply_move_to_cube(move, solved_cube)))
 
+def shuffle(cube, iterations=100_000, seed=42):
+  if seed: random.seed(seed)
+  for _ in range(iterations):
+    move = moves[random.randrange(len(moves))]
+    cube = apply_move_to_cube(move, cube)
+  return cube
+
 def run_tests():
   # Check that every move is a permutation with cyle length 4.
   for move in moves:
-      cubes = [solved_cube]
-      for _ in range(3):
-          cubes.append(apply_move_to_cube(move, cubes[-1]))
-      assert all(cubes.count(cube) == 1 for cube in cubes)
-      assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
+    cubes = [solved_cube]
+    for _ in range(3): cubes.append(apply_move_to_cube(move, cubes[-1]))
+    assert len(set(cubes)) == 4
+    assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
 
-# run_tests()
+run_tests()
 # print(describe_cube(shuffle(solved_cube)))
 # print("rotation_matrix: ", rotation_matrix.cache_info())
 # print("apply_move_to_cubelet_rotation: ", apply_move_to_cubelet_rotation.cache_info())
@@ -180,12 +179,12 @@ def solve_top_layer_complete(cube):
   return solution
 
 def solve(cube):
-   [cube, path1] = solve_top_layer_cross(cube)
-   [cube, path2] = solve_top_layer_complete(cube)
-   path = path1 + path2
-   print("Solved cube in %d moves. Final cube:" % len(path))
-   print(describe_cube(cube))
-   return path
+  [cube, path1] = solve_top_layer_cross(cube)
+  [cube, path2] = solve_top_layer_complete(cube)
+  path = path1 + path2
+  print("Solved cube in %d moves. Final cube:" % len(path))
+  print(describe_cube(cube))
+  return path
 
 random_cube = shuffle(solved_cube, seed=1)
 solve(random_cube)
