@@ -14,29 +14,12 @@ from dataclasses import dataclass, field
 from typing import Any
 import heapq
 
-@functools.total_ordering
-class Tuple(tuple):
-  _instances = dict()
-
-  def __new__(cls, iterable):
-    instance_key = tuple(iterable)
-    if instance_key in cls._instances:
-      return cls._instances[instance_key]
-    else:
-      instance = super().__new__(cls, instance_key)
-      cls._instances[instance_key] = instance
-      return instance
-
-  def __eq__(self, other): return self is other
-  def __hash__(self): return id(self)
-  def __lt__(self, other): return id(self) < id(other)
-
 startup_time = datetime.now()
 
 def norm1(v): return sum(abs(x) for x in v)
 
 def tupled(np_mat):
-  return Tuple(Tuple(int(x) for x in row) for row in np_mat)
+  return tuple(tuple(int(x) for x in row) for row in np_mat)
 
 crange = [-1, 0, 1]
 vectors = [(x,y,z) for x in crange for y in crange for z in crange]
