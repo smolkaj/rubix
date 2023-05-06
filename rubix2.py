@@ -134,6 +134,15 @@ run_tests()
 # print("apply_move_to_cubelet_rotation: ", apply_move_to_cubelet_rotation.cache_info())
 
 
+@functools.cache
+def is_cubelet_solved(cubelet, rotation):
+  colors = np.diag(cubelet)
+  color_positions = rotation @ colors
+  return np.array_equal(colors, color_positions)
+
+def num_solved_with_criterion(cube, criterion):
+  return sum(is_cubelet_solved(c, r) for c,r in cube if criterion(c))
+
 def bfs(source, is_dst, get_moves, apply_move):
   if is_dst(source): return (source, ())
   frontier, seen = deque([(source, ())]), set([source])
@@ -181,8 +190,8 @@ def astar(start, is_goal, get_moves, apply_move, heuristic):
   assert False
 
 @functools.cache
-def min_moves_to_goal(rotation):
-  def is_dst(mat): return mat == tupled(np.eye(3))
+def min_moves_to_solved(cubelet, rotation):
+  def is_dst(rotation): return is_cubelet_solved(cubelet, rotation)
   def get_moves(_): return moves
   def apply_move(m, x): return tupled(rotation_matrix(m) @ x)
   _, path = bfs(rotation, is_dst, get_moves, apply_move)
@@ -190,42 +199,28 @@ def min_moves_to_goal(rotation):
 
 def top_layer_heuristic(cube):
   p = 0.5
-  d = sum(min_moves_to_goal(r)**p for c, r in cube if c[2] == 1) ** (1/p)
+  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
   return d/4
 
-def solve_top_layer_cross(cube):
+def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
+def is_top_cubelet(cubelet): return cubelet[2] == 1
+def solve_top_layer_full(cube):
   path = ()
-  def num_solved_cubelets(cube):
-    return sum(1 for c, r in cube
-               if c[2] == 1 and norm1(c) == 2 and r == tupled(np.eye(3)))
-  for solved_cubelets in range(4):
-    print("solving top edge #%d" % (solved_cubelets + 1))
-    def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
+  for num_solved in range(9):
+    print("solving top cubelet #%d" % (num_solved + 1))
+    def is_goal(cube): return all([
+      num_solved_with_criterion(cube, is_top_edge) >= min(4, num_solved + 1),
+      num_solved_with_criterion(cube, is_top_cubelet) >= num_solved + 1,
+    ])
     def get_moves(_): return moves
-    [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube,
-                                   top_layer_heuristic)
-    print("found solution with %d moves" % len(path_extension))
-    path += path_extension
-  return (cube, path)
-
-def solve_top_layer_complete(cube):
-  path = ()
-  def num_solved_cubelets(cube):
-    return sum(1 for c, r in cube if c[2] == 1 and r == tupled(np.eye(3)))
-  for solved_cubelets in range(9):
-    print("solving top cubelet #%d" % (solved_cubelets + 1))
-    def is_dst(cube): return num_solved_cubelets(cube) > solved_cubelets
-    def get_moves(_): return moves
-    [cube, path_extension] = astar(cube, is_dst, get_moves, apply_move_to_cube,
-                                   top_layer_heuristic)
+    cube, path_extension = astar(cube, is_goal, get_moves, apply_move_to_cube,
+                                  top_layer_heuristic)
     print("found solution with %d moves" % len(path_extension))
     path += path_extension
   return (cube, path)
 
 def solve(cube):
-  [cube, path1] = solve_top_layer_cross(cube)
-  [cube, path2] = solve_top_layer_complete(cube)
-  path = path1 + path2
+  [cube, path] = solve_top_layer_full(cube)
   print("Solved cube in %d moves. Final cube:" % len(path))
   print(describe_cube(cube))
   return path
@@ -239,9 +234,11 @@ def print_stats():
     moves,
     moves / secs_elapsed
   ))
-  cache_info = min_moves_to_goal.cache_info()
-  print("- min moves to goal calculations: ", cache_info.hits + cache_info.misses)
+  cache_info = min_moves_to_solved.cache_info()
+  print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
 
-random_cube = shuffle(solved_cube, iterations=100_000, seed=1)
-solve(random_cube)
-print_stats()
+for seed in range(10):
+  print("seed = ", seed)
+  random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
+  solve(random_cube)
+  print_stats()
