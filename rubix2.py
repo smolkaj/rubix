@@ -190,11 +190,9 @@ def middle_layer_heuristic(cube):
   return 1/4 * top_layer_heuristic(cube) + 3/4 * (d/n)
 
 def bottom_layer_heuristic(cube):
-  p, n = 0.5, 16
-  d = sum(min_moves_to_solved(c, r)**p 
-          for c, r in cube 
-          if norm1(c) < 3 or c[2] >= 0) ** (1/p)
-  return d/n
+  p, n = 0.5, 8
+  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == -1) ** (1/p)
+  return 2/7 * top_layer_heuristic(cube) * 3/7 * middle_layer_heuristic(cube) + 2/7 * (d/n)
 
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
@@ -228,14 +226,12 @@ def num_orange_cubelets_positioned(cube):
 
 def solve_final_layer(cube):
   solution_moves = ()
-  for i in range(4+4+4+4):
+  for i in range(9):
     print("solving bottom cubelet #%d" % (i + 1))
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
       num_orange_edges_positioned(cube) >= min(4, i + 1),
-      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i - 3),
-      num_orange_cubelets_positioned(cube) >= min(9, i - 3),
-      num_solved_with_criterion(cube, is_bottom_cubelet) >= i - 11,
+      num_orange_cubelets_positioned(cube) >= min(9, i + 1),
     ])
     def get_moves(_): return moves
     heuristic = bottom_layer_heuristic
@@ -250,8 +246,8 @@ def solve_final_layer(cube):
 
 def solve(cube):
   cube, solution1 = solve_top_and_middle_layer(cube)
-  # cube, solution2 = solve_final_layer(cube)
-  solution = solution1 #+ solution2
+  cube, solution2 = solve_final_layer(cube)
+  solution = solution1 + solution2
   print("Solved cube in %d moves. Final cube:" % len(solution))
   print(describe_cube(cube))
   return solution
