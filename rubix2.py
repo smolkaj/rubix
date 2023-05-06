@@ -62,18 +62,21 @@ def describe_config(cubelet, rotation):
      if any(color)
   ))
 
+def position(cubelet, rotation): return tuple(np.matmul(rotation, cubelet))
+
+def describe_cubelet(cubelet, rotation):
+  return "%s %s: %s" % (
+    describe_cubelet_type(cubelet),
+    describe_position(position(cubelet, rotation)),
+    describe_config(cubelet, rotation),
+  )
+
 def describe_cube(cube):
-  return "\n".join(sorted("%s %s: %s" % (
-      describe_cubelet_type(cubelet),
-      describe_position(np.matmul(rotation, cubelet)),
-      describe_config(cubelet, rotation),
-    )
-    for cubelet, rotation in cube
-  ))
+  return "\n".join(sorted(describe_cubelet(*c) for c in cube))
 
 def describe_move(move):
   v, direction = move
-  return "90 degree %s rotation of %s slice" % (
+  return "%s rotation of %s slice" % (
       "clockwise" if direction == 1 else "counterclockwise",
       describe_position(v),
   )
@@ -96,7 +99,7 @@ def rotation_matrix(move):
 @functools.cache
 def apply_move_to_cubelet_rotation(move, cubelet, rotation):
   v, direction = move
-  move_applies = np.dot(v, np.matmul(rotation, cubelet)) > 0
+  move_applies = np.dot(v, position(cubelet, rotation)) > 0
   return tupled(rotation_matrix(move) @ rotation) if move_applies else rotation
 
 def apply_move_to_cube(move, cube):
@@ -168,6 +171,8 @@ def is_cubelet_solved(cubelet, rotation):
   color_positions = rotation @ colors
   return np.array_equal(colors, color_positions)
 
+def is_cube_solved(cube): return all(is_cubelet_solved(c, r) for c, r in cube)
+
 def num_solved_with_criterion(cube, criterion):
   return sum(is_cubelet_solved(c, r) for c,r in cube if criterion(c))
 
@@ -216,22 +221,25 @@ def solve_top_and_middle_layer(cube):
   return (cube, solution_moves)
 
 def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
+def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
 def is_bottom_cubelet(cubelet): return cubelet[2] == -1
 def has_orange_bottom(cubelet, rotation):
   return cubelet[2] == -1 and all((rotation @ np.array([0, 0, -1])) == [0, 0, -1])
-def num_orange_edges_positioned(cube):
+def is_in_right_place(c, r):
+  return position(c, r) == c
+def num_bottom_edges_positioned(cube):
   return sum(is_bottom_edge(c) and has_orange_bottom(c, r) for c, r in cube)
-def num_orange_cubelets_positioned(cube):
-  return sum(has_orange_bottom(c, r) for c, r in cube)
+def num_bottom_corners_positioned(cube):
+  return sum(is_bottom_corner(c) and is_in_right_place(c, r) for c, r in cube)
 
-def solve_final_layer(cube):
+def solve_final_layer_edges(cube):
   solution_moves = ()
-  for i in range(9):
-    print("solving bottom cubelet #%d" % (i + 1))
+  for i in range(8):
+    print("positioning bottom cubelet #%d" % (i + 1))
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
-      num_orange_edges_positioned(cube) >= min(4, i + 1),
-      num_orange_cubelets_positioned(cube) >= min(9, i + 1),
+      num_bottom_edges_positioned(cube) >= min(4, i + 1),
+      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i-3),
     ])
     def get_moves(_): return moves
     heuristic = bottom_layer_heuristic
@@ -244,12 +252,71 @@ def solve_final_layer(cube):
     solution_moves += next_moves
   return (cube, solution_moves)
 
+def solve_final_layer(cube):
+  solution_moves = ()
+  for i in range(4):
+    print("solving bottom cubelet #%d" % (i + 1))
+    def is_goal(cube): return all([
+      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
+      num_solved_with_criterion(cube, is_bottom_edge) == 4,
+      num_bottom_corners_positioned(cube) >= min(4, i + 1),
+    ])
+    def get_moves(_): return moves
+    heuristic = bottom_layer_heuristic
+    try:
+      cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
+                                heuristic)
+    except KeyboardInterrupt:
+      return (cube, solution_moves)
+    print("-> found solution with %d moves" % len(next_moves))
+    solution_moves += next_moves
+  return (cube, solution_moves)
+
+def bottom_left_front_corner(cube):
+  return next((c,r) for c,r in cube if position(c, r) == (1, -1, -1))  
+
+def solve_endgame(cube):
+  solution = []
+  move_by_name = { describe_move(move) : move for move in moves }
+  def apply_move(m, cunbe):
+    move = move_by_name[m]
+    solution.append(m)
+    return apply_move_to_cube(move, cube)
+  routine = 2 * [
+    "counterclockwise rotation of left slice",
+    "counterclockwise rotation of top slice",
+    "clockwise rotation of left slice",
+    "clockwise rotation of top slice",
+  ]
+  def is_bottom_left_front_corner_ok(cube):
+    c, r = bottom_left_front_corner(cube)
+    move = move_by_name["clockwise rotation of bottom slice"]
+    for i in range(4):
+      if is_cubelet_solved(c, r): return True
+      r = apply_move_to_cubelet_rotation(move, c, r)
+    return False
+  
+  for _ in range(4):
+    while not is_bottom_left_front_corner_ok(cube):
+      for move in routine: cube = apply_move(move, cube)
+    cube = apply_move("clockwise rotation of bottom slice", cube)
+  
+  while not is_cube_solved(cube):
+    cube = apply_move("clockwise rotation of bottom slice", cube)
+
+  return (cube, tuple(solution))
+
+
 def solve(cube):
   cube, solution1 = solve_top_and_middle_layer(cube)
-  cube, solution2 = solve_final_layer(cube)
-  solution = solution1 + solution2
+  cube, solution2 = solve_final_layer_edges(cube)
+  cube, solution3 = solve_final_layer(cube)
+  cube, solution4 = solve_endgame(cube)
+  solution = solution1 + solution2 + solution3 + solution4
   print("Solved cube in %d moves. Final cube:" % len(solution))
   print(describe_cube(cube))
+  print("is_cube_solved: ", is_cube_solved(cube))
+  print("cube == solved_cube: ", cube == solved_cube)
   return solution
 
 def print_stats():
@@ -268,7 +335,7 @@ tough_seeds_for_top_layer = [17, 33]
 tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
 tough_seeds_for_bottom_layer = [6]
 
-for seed in tough_seeds_for_middle_layer:
+for seed in [1]:
   print("seed = ", seed)
   random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
   solve(random_cube)
