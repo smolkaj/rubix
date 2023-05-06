@@ -68,8 +68,8 @@ def describe_config(cubelet, rotation):
 
 def describe_cube(cube):
   return "\n".join(sorted("%s %s: %s" % (
-      describe_position(np.matmul(rotation, cubelet)),
       describe_cubelet_type(cubelet),
+      describe_position(np.matmul(rotation, cubelet)),
       describe_config(cubelet, rotation)
     )
     for cubelet, rotation in cube
