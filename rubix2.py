@@ -180,14 +180,14 @@ def min_moves_to_solved(cubelet, rotation):
   return len(path)
 
 def top_layer_heuristic(cube):
-  p, n = 0.5, 6
+  p, n = 0.5, 8
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
   return d/n
 
 def middle_layer_heuristic(cube):
-  p, n = 0.5, 6
+  p, n = 0.5, 4
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 0) ** (1/p)
-  return 1/3 * top_layer_heuristic(cube) + 2/3 * (d/n)
+  return 1/4 * top_layer_heuristic(cube) + 3/4 * (d/n)
 
 def bottom_layer_heuristic(cube):
   p, n = 0.5, 16
