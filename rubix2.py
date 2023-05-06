@@ -202,25 +202,33 @@ def top_layer_heuristic(cube):
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
   return d/6
 
+def middle_layer_heuristic(cube):
+  p = 0.5
+  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] >= 0) ** (1/p)
+  return d/12
+
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
-def solve_top_layer_full(cube):
+def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
+def solve_top_and_middle_layer(cube):
   path = ()
-  for num_solved in range(9):
-    print("solving top cubelet #%d" % (num_solved + 1))
+  for num_solved in range(17):
+    print("solving cubelet #%d" % (num_solved + 1))
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_edge) >= min(4, num_solved + 1),
-      num_solved_with_criterion(cube, is_top_cubelet) >= num_solved + 1,
+      num_solved_with_criterion(cube, is_top_cubelet) >= min(9, num_solved + 1),
+      num_solved_with_criterion(cube, is_top_or_middle_cubelet) >= min(17, num_solved + 1),
     ])
     def get_moves(_): return moves
+    heuristic = top_layer_heuristic if num_solved < 9 else middle_layer_heuristic
     cube, path_extension = astar(cube, is_goal, get_moves, apply_move_to_cube,
-                                  top_layer_heuristic)
-    print("found solution with %d moves" % len(path_extension))
+                                  heuristic)
+    print("-> found solution with %d moves" % len(path_extension))
     path += path_extension
   return (cube, path)
 
 def solve(cube):
-  [cube, path] = solve_top_layer_full(cube)
+  [cube, path] = solve_top_and_middle_layer(cube)
   print("Solved cube in %d moves. Final cube:" % len(path))
   print(describe_cube(cube))
   return path
@@ -238,6 +246,8 @@ def print_stats():
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
 
 tough_seeds_for_top_layer = [17, 33]
+tough_seeds_for_middle_layer = [3, 4, 7, 8]
+
 
 for seed in range(100):
   print("seed = ", seed)
