@@ -185,9 +185,9 @@ def top_layer_heuristic(cube):
   return d/n
 
 def middle_layer_heuristic(cube):
-  p, n = 0.5, 12
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] >= 0) ** (1/p)
-  return d/n
+  p, n = 0.5, 6
+  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 0) ** (1/p)
+  return 1/3 * top_layer_heuristic(cube) + 2/3 * (d/n)
 
 def bottom_layer_heuristic(cube):
   p, n = 0.5, 16
@@ -222,18 +222,20 @@ def is_bottom_cubelet(cubelet): return cubelet[2] == -1
 def has_orange_bottom(cubelet, rotation):
   return cubelet[2] == -1 and all((rotation @ np.array([0, 0, -1])) == [0, 0, -1])
 def num_orange_edges_positioned(cube):
+  return sum(is_bottom_edge(c) and has_orange_bottom(c, r) for c, r in cube)
+def num_orange_cubelets_positioned(cube):
   return sum(has_orange_bottom(c, r) for c, r in cube)
 
 def solve_final_layer(cube):
   solution_moves = ()
-  for num_solved in range(-4, 4):
-    num_positioned = num_solved + 4
-    print("solving bottom cubelet #%d" % (num_solved + 1))
+  for i in range(4+4+4+4):
+    print("solving bottom cubelet #%d" % (i + 1))
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
-      num_orange_edges_positioned(cube) >= min(4, num_positioned + 1),
-      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, num_solved + 1),
-      # num_solved_with_criterion(cube, is_bottom_cubelet) > num_solved + 1,
+      num_orange_edges_positioned(cube) >= min(4, i + 1),
+      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i - 3),
+      num_orange_cubelets_positioned(cube) >= min(9, i - 3),
+      num_solved_with_criterion(cube, is_bottom_cubelet) >= i - 11,
     ])
     def get_moves(_): return moves
     heuristic = bottom_layer_heuristic
@@ -248,8 +250,8 @@ def solve_final_layer(cube):
 
 def solve(cube):
   cube, solution1 = solve_top_and_middle_layer(cube)
-  cube, solution2 = solve_final_layer(cube)
-  solution = solution1 + solution2
+  # cube, solution2 = solve_final_layer(cube)
+  solution = solution1 #+ solution2
   print("Solved cube in %d moves. Final cube:" % len(solution))
   print(describe_cube(cube))
   return solution
@@ -270,7 +272,7 @@ tough_seeds_for_top_layer = [17, 33]
 tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
 tough_seeds_for_bottom_layer = [6]
 
-for seed in range(2, 100):
+for seed in tough_seeds_for_middle_layer:
   print("seed = ", seed)
   random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
   solve(random_cube)
