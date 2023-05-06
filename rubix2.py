@@ -200,7 +200,7 @@ def min_moves_to_solved(cubelet, rotation):
 def top_layer_heuristic(cube):
   p = 0.5
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
-  return d/4
+  return d/6
 
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
@@ -237,7 +237,9 @@ def print_stats():
   cache_info = min_moves_to_solved.cache_info()
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
 
-for seed in range(10):
+tough_seeds_for_top_layer = [17, 33]
+
+for seed in range(100):
   print("seed = ", seed)
   random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
   solve(random_cube)
