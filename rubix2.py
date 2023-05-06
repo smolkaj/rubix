@@ -14,15 +14,12 @@ from dataclasses import dataclass, field
 from typing import Any
 import heapq
 
-startup_time = datetime.now()
-
 def norm1(v): return sum(abs(x) for x in v)
+def tupled(np_mat): return tuple(tuple(int(x) for x in row) for row in np_mat)
 
-def tupled(np_mat):
-  return tuple(tuple(int(x) for x in row) for row in np_mat)
-
+startup_time = datetime.now()
 crange = [-1, 0, 1]
-vectors = [(x,y,z) for x in crange for y in crange for z in crange]
+vectors = tuple((x,y,z) for x in crange for y in crange for z in crange)
 # Cube = Cubelet -> Rotation map. Encoded as a tuple so it can be hashed.
 solved_cube = tuple((v, tupled(np.identity(3))) for v in vectors if any(v))
 unit_vectors = [v for v in vectors if norm1(v) == 1]
@@ -36,7 +33,7 @@ color_names = {
   (0, 0, +1): "WHITE",
   (-1, 0, 0): "BLUE",
   (0, -1, 0): "ORANGE",
-  (0, 0, -1): "YELLOW"
+  (0, 0, -1): "YELLOW",
 }
 assert all(v in color_names for v in unit_vectors)
 
@@ -48,7 +45,7 @@ def describe_cubelet_type(cubelet):
   assert False
 
 def describe_position(vector):
-  [x, y, z] = vector
+  x, y, z = vector
   descriptions = []
   descriptions += ["top"] if z == 1 else ["bottom"] if z == -1 else []
   descriptions += ["right"] if y == 1 else ["left"] if y == -1 else []
@@ -59,24 +56,23 @@ def describe_position(vector):
 def describe_config(cubelet, rotation):
   colors = np.diag(cubelet)
   color_positions = rotation @ colors
-  descriptions = (
+  return ", ".join(sorted(
      describe_position(pos) + ": " + color_names[tuple(color)]
      for color, pos in zip(colors.T, color_positions.T)
      if any(color)
-  )
-  return ", ".join(sorted(descriptions))
+  ))
 
 def describe_cube(cube):
   return "\n".join(sorted("%s %s: %s" % (
       describe_cubelet_type(cubelet),
       describe_position(np.matmul(rotation, cubelet)),
-      describe_config(cubelet, rotation)
+      describe_config(cubelet, rotation),
     )
     for cubelet, rotation in cube
   ))
 
 def describe_move(move):
-  [v, direction] = move
+  v, direction = move
   return "90 degree %s rotation of %s slice" % (
       "clockwise" if direction == 1 else "counterclockwise",
       describe_position(v),
@@ -84,11 +80,11 @@ def describe_move(move):
 
 @functools.cache
 def rotation_matrix(move):
-  [v, direction] = move
+  v, direction = move
   # The rotational axis is the dimension into which `v` is pointing.
   fixed_dim = next(i for i in range(3) if v[i])
   # The rotation takes place in the other two dimensions.
-  [r1, r2] = [i for i in range(3) if i != fixed_dim]
+  r1, r2 = (i for i in range(3) if i != fixed_dim)
 
   M = np.zeros([3, 3])
   M[fixed_dim, fixed_dim] = 1
@@ -99,7 +95,7 @@ def rotation_matrix(move):
 
 @functools.cache
 def apply_move_to_cubelet_rotation(move, cubelet, rotation):
-  [v, direction] = move
+  v, direction = move
   move_applies = np.dot(v, np.matmul(rotation, cubelet)) > 0
   return tupled(rotation_matrix(move) @ rotation) if move_applies else rotation
 
@@ -109,7 +105,7 @@ def apply_move_to_cube(move, cube):
     for cubelet, rotation in cube
   )
 
-# for move in moves[::-1]:
+# for move iall_n moves[::-1]:
 #   print("\n\n== " + describe_move(move) + "==============")
 #   print(describe_cube(apply_move_to_cube(move, solved_cube)))
 
@@ -134,35 +130,12 @@ run_tests()
 # print("apply_move_to_cubelet_rotation: ", apply_move_to_cubelet_rotation.cache_info())
 
 
-@functools.cache
-def is_cubelet_solved(cubelet, rotation):
-  colors = np.diag(cubelet)
-  color_positions = rotation @ colors
-  return np.array_equal(colors, color_positions)
-
-def num_solved_with_criterion(cube, criterion):
-  return sum(is_cubelet_solved(c, r) for c,r in cube if criterion(c))
-
-def bfs(source, is_dst, get_moves, apply_move):
-  if is_dst(source): return (source, ())
-  frontier, seen = deque([(source, ())]), set([source])
-  while frontier:
-    [src, path] = frontier.popleft()
-    for i, move in enumerate(get_moves(src)):
-      dst = apply_move(move, src)
-      if dst in seen: continue
-      seen.add(dst)
-      state = (dst, path + (move,))
-      if is_dst(dst): return state
-      frontier.append(state)
-  assert False
-
 @dataclass(order=True, frozen=True)
 class PrioritizedItem:
   item: Any = field(compare=False)
   priority: int
 
-def astar(start, is_goal, get_moves, apply_move, heuristic):
+def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0):
   if is_goal(start): return (start, ())
   frontier = [PrioritizedItem(start, 0)]
   came_from = {}
@@ -180,38 +153,55 @@ def astar(start, is_goal, get_moves, apply_move, heuristic):
 
   while frontier:
     src = heapq.heappop(frontier).item
-    for i, move in enumerate(get_moves(src)):
+    for move in get_moves(src):
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
       cost_so_far[dst], came_from[dst] = cost, src
       if is_goal(dst): return reconstruct_solution(dst)
       priority = cost + heuristic(dst)
       heapq.heappush(frontier, PrioritizedItem(dst, priority))
-  assert False
+  return None
+
+@functools.cache
+def is_cubelet_solved(cubelet, rotation):
+  colors = np.diag(cubelet)
+  color_positions = rotation @ colors
+  return np.array_equal(colors, color_positions)
+
+def num_solved_with_criterion(cube, criterion):
+  return sum(is_cubelet_solved(c, r) for c,r in cube if criterion(c))
 
 @functools.cache
 def min_moves_to_solved(cubelet, rotation):
   def is_dst(rotation): return is_cubelet_solved(cubelet, rotation)
   def get_moves(_): return moves
   def apply_move(m, x): return tupled(rotation_matrix(m) @ x)
-  _, path = bfs(rotation, is_dst, get_moves, apply_move)
+  _, path = astar(rotation, is_dst, get_moves, apply_move)
   return len(path)
 
 def top_layer_heuristic(cube):
-  p = 0.5
+  p, n = 0.5, 6
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
-  return d/6
+  return d/n
 
 def middle_layer_heuristic(cube):
-  p = 0.5
+  p, n = 0.5, 12
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] >= 0) ** (1/p)
-  return d/12
+  return d/n
+
+def bottom_layer_heuristic(cube):
+  p, n = 0.5, 16
+  d = sum(min_moves_to_solved(c, r)**p 
+          for c, r in cube 
+          if norm1(c) < 3 or c[2] >= 0) ** (1/p)
+  return d/n
 
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
 def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
+
 def solve_top_and_middle_layer(cube):
-  path = ()
+  solution_moves = ()
   for num_solved in range(17):
     print("solving cubelet #%d" % (num_solved + 1))
     def is_goal(cube): return all([
@@ -221,17 +211,48 @@ def solve_top_and_middle_layer(cube):
     ])
     def get_moves(_): return moves
     heuristic = top_layer_heuristic if num_solved < 9 else middle_layer_heuristic
-    cube, path_extension = astar(cube, is_goal, get_moves, apply_move_to_cube,
-                                  heuristic)
-    print("-> found solution with %d moves" % len(path_extension))
-    path += path_extension
-  return (cube, path)
+    cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
+                              heuristic)
+    print("-> found solution with %d moves" % len(next_moves))
+    solution_moves += next_moves
+  return (cube, solution_moves)
+
+def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
+def is_bottom_cubelet(cubelet): return cubelet[2] == -1
+def has_orange_bottom(cubelet, rotation):
+  return cubelet[2] == -1 and all((rotation @ np.array([0, 0, -1])) == [0, 0, -1])
+def num_orange_edges_positioned(cube):
+  return sum(has_orange_bottom(c, r) for c, r in cube)
+
+def solve_final_layer(cube):
+  solution_moves = ()
+  for num_solved in range(-4, 4):
+    num_positioned = num_solved + 4
+    print("solving bottom cubelet #%d" % (num_solved + 1))
+    def is_goal(cube): return all([
+      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
+      num_orange_edges_positioned(cube) >= min(4, num_positioned + 1),
+      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, num_solved + 1),
+      # num_solved_with_criterion(cube, is_bottom_cubelet) > num_solved + 1,
+    ])
+    def get_moves(_): return moves
+    heuristic = bottom_layer_heuristic
+    try:
+      cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
+                                heuristic)
+    except KeyboardInterrupt:
+      return (cube, solution_moves)
+    print("-> found solution with %d moves" % len(next_moves))
+    solution_moves += next_moves
+  return (cube, solution_moves)
 
 def solve(cube):
-  [cube, path] = solve_top_and_middle_layer(cube)
-  print("Solved cube in %d moves. Final cube:" % len(path))
+  cube, solution1 = solve_top_and_middle_layer(cube)
+  cube, solution2 = solve_final_layer(cube)
+  solution = solution1 + solution2
+  print("Solved cube in %d moves. Final cube:" % len(solution))
   print(describe_cube(cube))
-  return path
+  return solution
 
 def print_stats():
   secs_elapsed = (datetime.now() - startup_time).total_seconds()
@@ -246,10 +267,10 @@ def print_stats():
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
 
 tough_seeds_for_top_layer = [17, 33]
-tough_seeds_for_middle_layer = [3, 4, 7, 8]
+tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
+tough_seeds_for_bottom_layer = [6]
 
-
-for seed in range(100):
+for seed in range(2, 100):
   print("seed = ", seed)
   random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
   solve(random_cube)
