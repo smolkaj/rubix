@@ -17,6 +17,8 @@ import heapq
 def norm1(v): return sum(abs(x) for x in v)
 def tupled(np_mat): return tuple(tuple(int(x) for x in row) for row in np_mat)
 
+RANDOMIZE_SEARCH = False
+
 startup_time = datetime.now()
 crange = [-1, 0, 1]
 vectors = tuple((x,y,z) for x in crange for y in crange for z in crange)
@@ -161,7 +163,8 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0, random
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
       cost_so_far[dst], came_from[dst] = cost, src
       if is_goal(dst): return reconstruct_solution(dst)
-      priority = cost + random.gauss(1, sigma=random_weight) * heuristic(dst)
+      h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
+      priority = cost + h_weight * heuristic(dst)
       heapq.heappush(frontier, PrioritizedItem(dst, priority))
   return None
 
@@ -265,7 +268,7 @@ def solve_final_layer(cube):
     heuristic = bottom_layer_heuristic
     try:
       cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
-                                heuristic)
+                                heuristic, random_weight=0.35)
     except KeyboardInterrupt:
       return (cube, solution_moves)
     print("-> found solution with %d moves" % len(next_moves))
