@@ -138,7 +138,7 @@ class PrioritizedItem:
   item: Any = field(compare=False)
   priority: int
 
-def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0):
+def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0, random_weight=0):
   if is_goal(start): return (start, ())
   frontier = [PrioritizedItem(start, 0)]
   came_from = {}
@@ -161,7 +161,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0):
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
       cost_so_far[dst], came_from[dst] = cost, src
       if is_goal(dst): return reconstruct_solution(dst)
-      priority = cost + heuristic(dst)
+      priority = cost + random.gauss(1, sigma=random_weight) * heuristic(dst)
       heapq.heappush(frontier, PrioritizedItem(dst, priority))
   return None
 
@@ -215,7 +215,7 @@ def solve_top_and_middle_layer(cube):
     def get_moves(_): return moves
     heuristic = top_layer_heuristic if num_solved < 9 else middle_layer_heuristic
     cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
-                              heuristic)
+                              heuristic, random_weight=0.25)
     print("-> found solution with %d moves" % len(next_moves))
     solution_moves += next_moves
   return (cube, solution_moves)
@@ -314,7 +314,7 @@ def solve(cube):
   cube, solution4 = solve_endgame(cube)
   solution = solution1 + solution2 + solution3 + solution4
   print("Solved cube in %d moves. Final cube:" % len(solution))
-  print(describe_cube(cube))
+  # print(describe_cube(cube))
   print("is_cube_solved: ", is_cube_solved(cube))
   print("cube == solved_cube: ", cube == solved_cube)
   return solution
@@ -335,7 +335,7 @@ tough_seeds_for_top_layer = [17, 33]
 tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
 tough_seeds_for_bottom_layer = [6]
 
-for seed in [1]:
+for seed in range(3):
   print("seed = ", seed)
   random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
   solve(random_cube)
