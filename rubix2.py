@@ -14,10 +14,13 @@ from dataclasses import dataclass, field
 from typing import Any
 import heapq
 
+RANDOMIZE_SEARCH = True
+
+_print = print
+def print(*args, **kw): 
+  _print("[%s]" % (datetime.now().strftime('%H:%M:%S')), *args, **kw)
 def norm1(v): return sum(abs(x) for x in v)
 def tupled(np_mat): return tuple(tuple(int(x) for x in row) for row in np_mat)
-
-RANDOMIZE_SEARCH = False
 
 startup_time = datetime.now()
 crange = [-1, 0, 1]
@@ -338,7 +341,7 @@ tough_seeds_for_top_layer = [17, 33]
 tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
 tough_seeds_for_bottom_layer = [6]
 
-for seed in range(3):
+for seed in range(10):
   print("seed = ", seed)
   random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
   solve(random_cube)
