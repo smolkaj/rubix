@@ -208,9 +208,11 @@ def bottom_layer_edge_heuristic(cube):
   return d/n
 
 def bottom_layer_corner_heuristic(cube):
-  p, n = 0.5, 4
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube) ** (1/p)
-  return d/n
+  p, n1, n2, n3 = 0.5, 5, 3, 8
+  d1 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
+  d2 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 0) ** (1/p)
+  d3 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == -1) ** (1/p)
+  return d1/n1 + d2/n2 + d3/n3
 
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
@@ -336,8 +338,11 @@ def solve_endgame(cube):
 
 def solve(cube):
   cube, solution1 = with_restarts(30, solve_top_and_middle_layer, cube)
+  print(50 * "-")
   cube, solution2 = solve_bottom_layer_edges(cube)
+  print(50 * "-")
   cube, solution3 = with_restarts(30, solve_bottom_layer_corners, cube)
+  print(50 * "-")
   cube, solution4 = solve_endgame(cube)
   solution = solution1 + solution2 + solution3 + solution4
   print("Solved cube in %d moves. Final cube:" % len(solution))
