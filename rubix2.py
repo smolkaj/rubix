@@ -229,7 +229,7 @@ def with_restarts(timeout, f, *args, **kwargs):
       return result
     except TimeoutError:
       print("timed out after %d seconds; restarting" % timeout)
-      timeout *= 2
+      timeout = min(2 * timeout, 300)
       signal.alarm(timeout)
 
 def solve_top_and_middle_layer(cube):
@@ -294,7 +294,7 @@ def solve_bottom_layer_corners(cube):
     heuristic = bottom_layer_corner_heuristic
     try:
       cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
-                                heuristic, random_weight=0.35)
+                                heuristic, random_weight=0.3)
     except KeyboardInterrupt:
       return (cube, solution_moves)
     print("-> found solution with %d moves" % len(next_moves))
@@ -337,7 +337,7 @@ def solve_endgame(cube):
 
 
 def solve(cube):
-  cube, solution1 = with_restarts(30, solve_top_and_middle_layer, cube)
+  cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube)
   print(50 * "-")
   cube, solution2 = solve_bottom_layer_edges(cube)
   print(50 * "-")
