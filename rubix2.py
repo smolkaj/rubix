@@ -202,7 +202,7 @@ def middle_layer_heuristic(cube):
   return d/n
 
 def bottom_layer_edge_heuristic(cube):
-  p, n = 0.5, 4
+  p, n = 0.5, 3
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube 
           if not (c[2] == -1 and norm1(c) == 3)) ** (1/p)
   return d/n
