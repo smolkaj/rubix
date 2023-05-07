@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 import heapq
 import signal
+import math
 
 RANDOMIZE_SEARCH = True
 
@@ -144,7 +145,8 @@ class PrioritizedItem:
   item: Any = field(compare=False)
   priority: int
 
-def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0, random_weight=0):
+def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0, 
+          random_weight=0):
   if is_goal(start): return (start, ())
   frontier = [PrioritizedItem(start, 0)]
   came_from = {}
@@ -170,6 +172,40 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0, random
       h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
       priority = cost + h_weight * heuristic(dst)
       heapq.heappush(frontier, PrioritizedItem(dst, priority))
+  return None
+
+def idastar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
+            random_weight=0):
+  class FoundSolution(Exception):
+    def __init__(self, solution): self.solution = solution
+
+  def reconstruct_solution(path):
+    moves = []
+    for i in range(len(path) - 1):
+      src, dst = path[i:i+2]
+      move = next(m for m in get_moves(src) if apply_move(m, src) == dst)
+      moves.append(move)
+    return (path[-1], tuple(moves))
+  
+  def search(path, cost, bound):
+    node = path[-1]
+    h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
+    estimate = cost + h_weight * heuristic(node)
+    if is_goal(node): raise FoundSolution(reconstruct_solution(path))
+    if estimate > bound: return estimate
+    min_estimate = math.inf
+    for move in get_moves(node):
+      succ = apply_move(move, node)
+      if succ in path: continue
+      estimate = search(path + (succ,), cost+1, bound)
+      min_estimate = min(min_estimate, estimate)
+    return min_estimate
+
+  bound = heuristic(start)
+  while bound < math.inf:
+    try: bound = search((start,), 0, bound)
+    except FoundSolution as e:  return e.solution
+  
   return None
 
 @functools.cache
@@ -367,7 +403,7 @@ tough_seeds_for_top_layer = [17, 33]
 tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
 tough_seeds_for_bottom_layer = [6]
 
-for seed in range(10):
+for seed in range(100):
   print("== SEED:", seed, "==========================================")
   random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
   solve(random_cube)
