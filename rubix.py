@@ -1,46 +1,64 @@
-# We model a rubix cube as a discrete object in 3-dimensional Euclidean space,
-# centered at the origin (0, 0, 0).
-# Each *cubelet* has coordinates (x, y, z) in {-1, 0, 1}^3.
-# Each *move* is a 90 degree hyperplane rotation, with the hyperplane given
-# by a standard unit vector or its oposite.
+""" A minimalstic Rubik's cube solver.
+
+We model a rubix cube as a discrete object in 3-dimensional Euclidean space,
+centered at the origin (0, 0, 0).
+Each *cubelet* has coordinates (x, y, z) in {-1, 0, 1}^3.
+Each *move* is a 90 degree hyperplane rotation, with the hyperplane given
+by a standard unit vector or its opposite.
+"""
 
 import numpy as np
-import random
-import functools
-from collections import deque
-from truth.truth import AssertThat
-from datetime import datetime
-from dataclasses import dataclass, field
-from typing import Any
 import heapq
 import signal
 import math
+import random
+import functools
+from collections import deque
+from datetime import datetime
+from dataclasses import dataclass, field
+from typing import Any
 
+# Whether or not to use randomization during search.
 RANDOMIZE_SEARCH = True
 
+# Remember start up time for stats.
+STARTUP_TIME = datetime.now()
+
+# Redefine print to include timestamps.
 _print = print
-def print(*args, **kw): 
+def print(*args, **kw):
   _print("[%s]" % (datetime.now().strftime('%H:%M:%S')), *args, **kw)
+
+# Returns the 1-norm of a vector.
 def norm1(v): return sum(abs(x) for x in v)
+
+# Returns a 2-dimensional matrix as a tuple.
 def tupled(np_mat): return tuple(tuple(int(x) for x in row) for row in np_mat)
 
-startup_time = datetime.now()
+# We are interested in x, y, z coordinates ranging over {-1, 0, 1}.
 crange = [-1, 0, 1]
 vectors = tuple((x,y,z) for x in crange for y in crange for z in crange)
-# Cube = Cubelet -> Rotation map. Encoded as a tuple so it can be hashed.
-solved_cube = tuple((v, tupled(np.identity(3))) for v in vectors if any(v))
 unit_vectors = [v for v in vectors if norm1(v) == 1]
+
+# A cube is encoded as a finite map from cubelets to 3-by-3 rotation matrices
+# `r`, where each cubelet is encoded as the 3D vector `c` that indicates the
+# position of the cubelet in the solved cube.
+# The cubelets current position is given by the matrix-vector product `c*r`.
+solved_cube = tuple((c, tupled(np.identity(3))) for c in vectors if any(c))
 
 # A move is a clockwise or counterclockwise 90 degree rotation of the
 # slice pointed at by a unit vector.
 moves = [(v, direction) for v in unit_vectors for direction in [-1, 1]]
+
+# Each color is encoded by the unit vector corresponding to the direction that
+# faces of that color point to in a solved cube.
 color_names = {
-  (+1, 0, 0): "GREEN",
-  (0, +1, 0): "RED",
-  (0, 0, +1): "WHITE",
-  (-1, 0, 0): "BLUE",
-  (0, -1, 0): "ORANGE",
-  (0, 0, -1): "YELLOW",
+  (+1, 0, 0): "GREEN",   # front
+  (0, +1, 0): "RED",     # right
+  (0, 0, +1): "WHITE",   # top
+  (-1, 0, 0): "BLUE",    # back
+  (0, -1, 0): "ORANGE",  # left
+  (0, 0, -1): "YELLOW",  # bottom
 }
 assert all(v in color_names for v in unit_vectors)
 
@@ -115,10 +133,6 @@ def apply_move_to_cube(move, cube):
     for cubelet, rotation in cube
   )
 
-# for move iall_n moves[::-1]:
-#   print("\n\n== " + describe_move(move) + "==============")
-#   print(describe_cube(apply_move_to_cube(move, solved_cube)))
-
 def shuffle(cube, iterations=100_000, seed=42):
   if seed: random.seed(seed)
   for _ in range(iterations):
@@ -145,7 +159,7 @@ class PrioritizedItem:
   item: Any = field(compare=False)
   priority: int
 
-def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0, 
+def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
           random_weight=0):
   if is_goal(start): return (start, ())
   frontier = [PrioritizedItem(start, 0)]
@@ -172,40 +186,6 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
       h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
       priority = cost + h_weight * heuristic(dst)
       heapq.heappush(frontier, PrioritizedItem(dst, priority))
-  return None
-
-def idastar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
-            random_weight=0):
-  class FoundSolution(Exception):
-    def __init__(self, solution): self.solution = solution
-
-  def reconstruct_solution(path):
-    moves = []
-    for i in range(len(path) - 1):
-      src, dst = path[i:i+2]
-      move = next(m for m in get_moves(src) if apply_move(m, src) == dst)
-      moves.append(move)
-    return (path[-1], tuple(moves))
-  
-  def search(path, cost, bound):
-    node = path[-1]
-    h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
-    estimate = cost + h_weight * heuristic(node)
-    if is_goal(node): raise FoundSolution(reconstruct_solution(path))
-    if estimate > bound: return estimate
-    min_estimate = math.inf
-    for move in get_moves(node):
-      succ = apply_move(move, node)
-      if succ in path: continue
-      estimate = search(path + (succ,), cost+1, bound)
-      min_estimate = min(min_estimate, estimate)
-    return min_estimate
-
-  bound = heuristic(start)
-  while bound < math.inf:
-    try: bound = search((start,), 0, bound)
-    except FoundSolution as e:  return e.solution
-  
   return None
 
 @functools.cache
@@ -239,7 +219,7 @@ def middle_layer_heuristic(cube):
 
 def bottom_layer_edge_heuristic(cube):
   p, n = 0.5, 3
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube 
+  d = sum(min_moves_to_solved(c, r)**p for c, r in cube
           if not (c[2] == -1 and norm1(c) == 3)) ** (1/p)
   return d/n
 
@@ -338,7 +318,7 @@ def solve_bottom_layer_corners(cube):
   return (cube, solution_moves)
 
 def bottom_left_front_corner(cube):
-  return next((c,r) for c,r in cube if position(c, r) == (1, -1, -1))  
+  return next((c,r) for c,r in cube if position(c, r) == (1, -1, -1))
 
 def solve_endgame(cube):
   solution = []
@@ -360,12 +340,12 @@ def solve_endgame(cube):
       if is_cubelet_solved(c, r): return True
       r = apply_move_to_cubelet_rotation(move, c, r)
     return False
-  
+
   for _ in range(4):
     while not is_bottom_left_front_corner_ok(cube):
       for move in routine: cube = apply_move(move, cube)
     cube = apply_move("clockwise rotation of bottom slice", cube)
-  
+
   while not is_cube_solved(cube):
     cube = apply_move("clockwise rotation of bottom slice", cube)
 
@@ -388,7 +368,7 @@ def solve(cube):
   return solution
 
 def print_stats():
-  secs_elapsed = (datetime.now() - startup_time).total_seconds()
+  secs_elapsed = (datetime.now() - STARTUP_TIME).total_seconds()
   cache_info = apply_move_to_cubelet_rotation.cache_info()
   moves = (cache_info.hits + cache_info.misses) / len(solved_cube)
   print("- time elapsed: %.1f sec" % secs_elapsed)
