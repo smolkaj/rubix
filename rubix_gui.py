@@ -7,13 +7,13 @@ pygame.init()
 pygame.display.set_caption("Rubik's Cube Solver")
 pygame.key.set_repeat(300, 50)  # delay, interval
 
-WIDTH, HEIGHT = 875, 875
+WIDTH, HEIGHT = 875, 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 # Load fonts
 try:
     font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=19)
-    font_bold = pygame.freetype.Font("fonts/Roboto-Regular.ttf", size=19)
+    font_bold = pygame.freetype.Font("fonts/Roboto-Medium.ttf", size=19)
 except:
     print("Could not load custom font. Falling back to default font.")
     font_regular = pygame.freetype.SysFont("Arial", size=19)
@@ -43,7 +43,7 @@ BUBBLE_BORDER = COLORS["BUBBLE_BORDER"]
 
 CUBE_SIZE = 55
 CUBE_GAP = 3
-FACE_GAP = 25
+FACE_GAP = 20
 CUBE_OFFSET_X = 70
 CUBE_OFFSET_Y = 100
 
@@ -60,10 +60,8 @@ def get_face_offset(face_index):
     return (x * (3 * CUBE_SIZE + FACE_GAP) + CUBE_OFFSET_X, 
             y * (3 * CUBE_SIZE + FACE_GAP) + CUBE_OFFSET_Y)
 
-def draw_rounded_rect(surface, color, rect, radius=10, border_color=None):
+def draw_rounded_rect(surface, color, rect, radius=10):
     pygame.draw.rect(surface, color, rect, border_radius=radius)
-    if border_color:
-        pygame.draw.rect(surface, border_color, rect, width=1, border_radius=radius)
 
 def draw_cube(cube):
     face_normals = [
@@ -140,7 +138,7 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
 
     return rect_height
 
-def draw_instructions():
+def draw_instructions(y):
     instructions = [
         "Right Arrow: step forward",
         "Left Arrow: step backward",
@@ -148,7 +146,7 @@ def draw_instructions():
         "R: reset"
     ]
     for i, instruction in enumerate(instructions):
-        draw_text_bubble(instruction, 10, HEIGHT - 180 + i * 45, width=270, bold_part=instruction.split(':')[0] + ':')
+        draw_text_bubble(instruction, x = 600, y = y + i * 45, width=265, bold_part=instruction.split(':')[0] + ':')
 
 def draw_move_info(move_index, total_moves, current_move):
     move_text = f"Move: {move_index}/{total_moves}"
@@ -198,9 +196,9 @@ def main():
                     current_move = None
 
         screen.fill(BACKGROUND)
-        draw_move_info(move_index, len(solution), current_move)
+        height = draw_move_info(move_index, len(solution), current_move)
         draw_cube(cube)
-        draw_instructions()
+        draw_instructions(y = height + MAX_TEXT_HEIGHT)
         pygame.display.flip()
 
         if auto_solve and move_index < len(solution):
