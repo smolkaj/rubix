@@ -21,6 +21,7 @@ except:
 
 COLORS = {
     "GREEN": (46, 204, 113),
+    "PROGRESS_BAR": (11, 77, 70),
     "RED": (231, 76, 60),
     "WHITE": (236, 240, 241),
     "BLUE": (52, 152, 219),
@@ -127,7 +128,7 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
     # Draw progress bar if provided
     if progress is not None:
         progress_width = int(width * progress)
-        progress_color = COLORS["GREEN"]
+        progress_color = COLORS["PROGRESS_BAR"]
         pygame.draw.rect(screen, progress_color, (x, y, progress_width, rect_height))
     
     # Draw border
