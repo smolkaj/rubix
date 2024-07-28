@@ -7,16 +7,16 @@ pygame.init()
 pygame.display.set_caption("Rubik's Cube Solver")
 pygame.key.set_repeat(300, 50)  # delay, interval
 
-WIDTH, HEIGHT = 875, 700
+WIDTH, HEIGHT, TEXT_SIZE = 875, 700, 19
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 # Load fonts
 try:
-    font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=19)
-    font_bold = pygame.freetype.Font("fonts/Roboto-Medium.ttf", size=19)
+    font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=TEXT_SIZE)
+    font_bold = pygame.freetype.Font("fonts/Roboto-Medium.ttf", size=TEXT_SIZE)
 except:
     print("Could not load custom font. Falling back to default font.")
-    font_regular = pygame.freetype.SysFont("Arial", size=19)
+    font_regular = pygame.freetype.SysFont("Arial", size=TEXT_SIZE)
     font_bold = font_regular
 
 COLORS = {
@@ -111,12 +111,7 @@ def draw_cube_animated(cube, next_cube, progress):
                 draw_rounded_rect(screen, color, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 5)
                 pygame.draw.rect(screen, BUBBLE_BORDER, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 1, border_radius=5)
 
-def calculate_max_text_height():
-    sample_text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
-    _, rect = font_bold.render(sample_text, TEXT_COLOR)
-    return rect.height
-
-MAX_TEXT_HEIGHT = calculate_max_text_height()
+MAX_TEXT_HEIGHT = font_bold.get_sized_height(TEXT_SIZE)
 
 def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
     padding_x = 10
@@ -149,7 +144,7 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
     pygame.draw.rect(screen, BUBBLE_BORDER, (x, y, width, rect_height), 1)
     
     # Draw text at a fixed position, centered vertically
-    text_y = y + (rect_height - MAX_TEXT_HEIGHT) // 2
+    text_y = y + (rect_height - MAX_TEXT_HEIGHT) // 2 + 2
     screen.blit(text_surface, (x + padding_x, text_y))
 
     return rect_height
