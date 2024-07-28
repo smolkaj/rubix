@@ -45,6 +45,7 @@ unit_vectors = [v for v in vectors if norm1(v) == 1]
 # position of the cubelet in the solved cube.
 # The cubelets current position is given by the matrix-vector product `c*r`.
 solved_cube = tuple((c, tupled(np.identity(3))) for c in vectors if any(c))
+NUM_CUBELETS = len(solved_cube)
 
 # A move is a clockwise or counterclockwise 90 degree rotation of the
 # slice pointed at by a unit vector.
@@ -248,9 +249,10 @@ def with_restarts(timeout, f, *args, **kwargs):
       timeout = min(2 * timeout, 300)
       signal.alarm(timeout)
 
-def solve_top_and_middle_layer(cube):
+def solve_top_and_middle_layer(cube, report_progress_callback):
   solution_moves = ()
   for num_solved in range(17):
+    report_progress_callback(cube)
     print("solving cubelet #%d" % (num_solved + 1))
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_edge) >= min(4, num_solved + 1),
@@ -277,9 +279,10 @@ def num_bottom_edges_positioned(cube):
 def num_bottom_corners_positioned(cube):
   return sum(is_bottom_corner(c) and is_in_right_place(c, r) for c, r in cube)
 
-def solve_bottom_layer_edges(cube):
+def solve_bottom_layer_edges(cube, report_progress_callback):
   solution_moves = ()
   for i in range(8):
+    report_progress_callback(cube)
     print("solving bottom cross #%d" % (i + 1))
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
@@ -297,9 +300,10 @@ def solve_bottom_layer_edges(cube):
     solution_moves += next_moves
   return (cube, solution_moves)
 
-def solve_bottom_layer_corners(cube):
+def solve_bottom_layer_corners(cube, report_progress_callback):
   solution_moves = ()
   for i in range(4):
+    report_progress_callback(cube)
     print("positioning bottom corners #%d" % (i + 1))
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
@@ -320,7 +324,7 @@ def solve_bottom_layer_corners(cube):
 def bottom_left_front_corner(cube):
   return next((c,r) for c,r in cube if position(c, r) == (1, -1, -1))
 
-def solve_endgame(cube):
+def solve_endgame(cube, report_progress_callback):
   solution = []
   move_by_name = { describe_move(move) : move for move in moves }
   def apply_move(m, cunbe):
@@ -342,6 +346,7 @@ def solve_endgame(cube):
     return False
 
   for _ in range(4):
+    report_progress_callback(cube)
     while not is_bottom_left_front_corner_ok(cube):
       for move in routine: cube = apply_move(move, cube)
     cube = apply_move("clockwise rotation of bottom slice", cube)
@@ -351,15 +356,14 @@ def solve_endgame(cube):
 
   return (cube, tuple(solution))
 
-
-def solve(cube):
-  cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube)
+def solve(cube, report_progress_callback=lambda cube: None):
+  cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube, report_progress_callback)
   print(50 * "-")
-  cube, solution2 = solve_bottom_layer_edges(cube)
+  cube, solution2 = solve_bottom_layer_edges(cube, report_progress_callback)
   print(50 * "-")
-  cube, solution3 = with_restarts(30, solve_bottom_layer_corners, cube)
+  cube, solution3 = with_restarts(30, solve_bottom_layer_corners, cube, report_progress_callback)
   print(50 * "-")
-  cube, solution4 = solve_endgame(cube)
+  cube, solution4 = solve_endgame(cube, report_progress_callback)
   solution = solution1 + solution2 + solution3 + solution4
   print("Solved cube in %d moves. Final cube:" % len(solution))
   # print(describe_cube(cube))
