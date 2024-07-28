@@ -8,7 +8,7 @@ pygame.init()
 pygame.display.set_caption("Rubik's Cube Solver")
 pygame.key.set_repeat(300, 50)  # delay, interval
 
-WIDTH, HEIGHT, TEXT_SIZE = 875, 700, 19
+WIDTH, HEIGHT, TEXT_SIZE = 875, 750, 19
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 # Load fonts
@@ -150,15 +150,27 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
 
     return rect_height
 
-def draw_move_info(move_index, total_moves, current_move):
+def create_button(text, x, y, width, height, color, text_color):
+    button_surface = pygame.Surface((width, height))
+    button_surface.fill(color)
+    text_surface, _ = font_bold.render(text, text_color)
+    text_rect = text_surface.get_rect(center=(width/2, height/2))
+    button_surface.blit(text_surface, text_rect)
+    button_rect = pygame.Rect(x, y, width, height)
+    return (button_surface, button_rect)
+
+def draw_move_info(move_index, solution, current_move):
+    total_moves = len(solution) if solution else 0
     move_text = f"Move: {move_index}/{total_moves}"
     if current_move:
         move_text += f" - {describe_move(current_move)}"
+    elif solution:
+        move_text += " - Initial state"
     else:
-        move_text += " - No move"  # Add placeholder text when there's no current move
+        move_text += " - Press \"Solve\" to compute solution."
     
     progress = move_index / total_moves if total_moves > 0 else 0
-    bubble_height = draw_text_bubble(move_text, 10, 10, WIDTH - 20, progress=progress, bold_part="Move:")
+    bubble_height = draw_text_bubble(move_text, 10, HEIGHT - 50, WIDTH - 20, progress=progress, bold_part="Move:")
     
     return bubble_height
 
@@ -169,12 +181,12 @@ def draw_instructions(y):
         "R: reset"
     ]
     for i, instruction in enumerate(instructions):
-        draw_text_bubble(instruction, x = 600, y = y + i * 45, width=265, bold_part=instruction.split(':')[0] + ':')
+        draw_text_bubble(instruction, x = WIDTH - 275, y = y - (len(instructions) - i) * 45, width=265, bold_part=instruction.split(':')[0] + ':')
 
 def main():
     cube = shuffle(solved_cube, iterations=20)
     original_cube = cube
-    solution = solve(cube)
+    solution = None
     
     clock = pygame.time.Clock()
     move_index = 0
@@ -187,15 +199,41 @@ def main():
     speed_up_factor = 1
     key_hold_time = 0
 
+    # Create buttons
+    button_width, button_height = 150, 40
+    button_y = 10
+    button_spacing = (WIDTH - 3 * button_width) / 4
+    scan_button = create_button("Scan my cube", button_spacing, button_y, button_width, button_height, COLORS["BLUE"], WHITE)
+    shuffle_button = create_button("Shuffle", 2 * button_spacing + button_width, button_y, button_width, button_height, COLORS["ORANGE"], WHITE)
+    solve_button = create_button("Solve", 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, COLORS["GREEN"], WHITE)
+
     while running:
         dt = clock.tick(60) / 1000.0  # Delta time in seconds
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left mouse button
+                    if scan_button[1].collidepoint(event.pos):
+                        print("Scan my cube button clicked (no-op for now)")
+                    elif shuffle_button[1].collidepoint(event.pos):
+                        cube = shuffle(solved_cube, iterations=20)
+                        solution = None
+                        move_index = 0
+                        current_move = None
+                        next_cube = None
+                        animation_progress = 0
+                    elif solve_button[1].collidepoint(event.pos):
+                        solution = solve(cube)
+                        move_index = 0
+                        current_move = None
+                        next_cube = None
+                        animation_progress = 0
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     cube = original_cube
+                    solution = None
                     move_index = 0
                     current_move = None
                     next_cube = None
@@ -211,7 +249,7 @@ def main():
             key_hold_time = 0
             speed_up_factor = 1
 
-        if next_cube is None:
+        if solution and next_cube is None:
             if keys[pygame.K_RIGHT] and move_index < len(solution):
                 current_move = solution[move_index]
                 next_cube = apply_move_to_cube(current_move, cube)
@@ -225,9 +263,8 @@ def main():
                 current_move = inverse_move
 
         screen.fill(BACKGROUND)
-        height = draw_move_info(move_index, len(solution), current_move)
-        draw_instructions(y = height + MAX_TEXT_HEIGHT)
         
+        # Draw cube
         if next_cube:
             draw_cube_animated(cube, next_cube, animation_progress)
             animation_speed = base_animation_speed * speed_up_factor
@@ -240,6 +277,15 @@ def main():
                 animation_progress = 0
         else:
             draw_cube_animated(cube, cube, 1)  # Draw the static cube when not animating
+
+        # Draw buttons
+        screen.blit(scan_button[0], scan_button[1])
+        screen.blit(shuffle_button[0], shuffle_button[1])
+        screen.blit(solve_button[0], solve_button[1])
+
+        # Draw instructions and move info
+        draw_instructions(HEIGHT - 60)
+        draw_move_info(move_index, solution, current_move)
 
         pygame.display.flip()
 
