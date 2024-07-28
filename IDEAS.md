@@ -1,7 +1,6 @@
 * The GUI should start with a random, unsolved cube.
 * There should be three buttons:
-  1. Scan my cube: Invokes a webcam-based scanner and updates the displayed cube
-     accordingly.
+  1. Scan my cube: Invokes a webcam-based scanner to input real-world cubes.
   2. Shuffle: Randomly shuffles the displayed cube.
   3. Solve: Invokes the solver and visualizes its progress using a progress bar.
      Then shows the solution using the existing GUI.
@@ -14,7 +13,7 @@
   * The center cubelets are always known.
   * Scanning should infer all cubelets simulataneously instead of scanning faces
     one-by-one. (It may be useful to model the color of each cubelet as a 
-    probability distribution over all possible colors. A Cubelet is then 
+    probability distribution over all possible colors. A cubelet is then 
     considered "known" once its distribution is sufficiently concentrated on one
     color, say >= 99%.)
   * In the GUI, perhaps the confidene can be visualized using color intensities.
