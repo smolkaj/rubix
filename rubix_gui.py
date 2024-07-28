@@ -185,39 +185,55 @@ def main():
     running = True
     current_move = None
     animation_progress = 0
-    animation_speed = 0.08
+    base_animation_speed = 0.06
+    animation_speed = base_animation_speed
     next_cube = None
+    speed_up_factor = 1
+    key_hold_time = 0
 
     while running:
+        dt = clock.tick(60) / 1000.0  # Delta time in seconds
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RIGHT:
-                    if move_index < len(solution) and next_cube is None:
-                        current_move = solution[move_index]
-                        next_cube = apply_move_to_cube(current_move, cube)
-                        animation_progress = 0
-                elif event.key == pygame.K_LEFT:
-                    if move_index > 0 and next_cube is None:
-                        move_index -= 1
-                        current_move = solution[move_index]
-                        inverse_move = (current_move[0], -current_move[1])
-                        next_cube = apply_move_to_cube(inverse_move, cube)
-                        animation_progress = 0
-                        current_move = inverse_move
-                elif event.key == pygame.K_r:
+                if event.key == pygame.K_r:
                     cube = original_cube
                     move_index = 0
                     current_move = None
                     next_cube = None
                     animation_progress = 0
+                    speed_up_factor = 1
+                    key_hold_time = 0
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_RIGHT] or keys[pygame.K_LEFT]:
+            key_hold_time += dt
+            speed_up_factor = min(10, 1 + key_hold_time * 2)  # Increase speed up to 10x
+        else:
+            key_hold_time = 0
+            speed_up_factor = 1
+
+        if next_cube is None:
+            if keys[pygame.K_RIGHT] and move_index < len(solution):
+                current_move = solution[move_index]
+                next_cube = apply_move_to_cube(current_move, cube)
+                animation_progress = 0
+            elif keys[pygame.K_LEFT] and move_index > 0:
+                move_index -= 1
+                current_move = solution[move_index]
+                inverse_move = (current_move[0], -current_move[1])
+                next_cube = apply_move_to_cube(inverse_move, cube)
+                animation_progress = 0
+                current_move = inverse_move
 
         screen.fill(BACKGROUND)
         height = draw_move_info(move_index, len(solution), current_move)
         
         if next_cube:
             draw_cube_animated(cube, next_cube, animation_progress)
+            animation_speed = base_animation_speed * speed_up_factor
             animation_progress += animation_speed
             if animation_progress >= 1:
                 cube = next_cube
@@ -230,8 +246,6 @@ def main():
 
         draw_instructions(y = height + MAX_TEXT_HEIGHT)
         pygame.display.flip()
-
-        clock.tick(60)
 
     pygame.quit()
 
