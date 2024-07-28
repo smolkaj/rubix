@@ -6,7 +6,7 @@ from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_
 pygame.init()
 pygame.key.set_repeat(300, 100)
 
-WIDTH, HEIGHT = 800, 800  # Slightly larger window for more whitespace
+WIDTH, HEIGHT = 850, 850
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Rubik's Cube Solver")
 
@@ -38,6 +38,8 @@ BACKGROUND = COLORS["BACKGROUND"]
 CUBE_SIZE = 55
 CUBE_GAP = 3
 FACE_GAP = 25
+CUBE_OFFSET_X = 70  # Increased offset for more space on the right
+CUBE_OFFSET_Y = 70  # Increased offset for more space on the top
 
 def get_face_offset(face_index):
     offsets = [
@@ -49,7 +51,8 @@ def get_face_offset(face_index):
         (1, 2),  # Bottom
     ]
     x, y = offsets[face_index]
-    return (x * (3 * CUBE_SIZE + FACE_GAP) + 50, y * (3 * CUBE_SIZE + FACE_GAP) + 50)
+    return (x * (3 * CUBE_SIZE + FACE_GAP) + CUBE_OFFSET_X, 
+            y * (3 * CUBE_SIZE + FACE_GAP) + CUBE_OFFSET_Y)
 
 def draw_rounded_rect(surface, color, rect, radius=10):
     pygame.draw.rect(surface, color, rect, border_radius=radius)
@@ -70,7 +73,8 @@ def draw_cube(cube, current_move=None):
     ]
 
     if current_move:
-        draw_text(f"Move: {describe_move(current_move)}", font_regular, BLACK, 20, HEIGHT - 150, bold=True)
+        draw_text(f"Move: {describe_move(current_move)}", font_regular, BLACK, 20, HEIGHT - 180, bold=True)
+
     
     for face_index, face_normal in enumerate(face_normals):
         face_offset_x, face_offset_y = get_face_offset(face_index)
@@ -95,14 +99,27 @@ def draw_cube(cube, current_move=None):
 
 def draw_instructions():
     instructions = [
-        "→: Step forward",
-        "←: Step backward",
+        "Right Arrow: Step forward",
+        "Left Arrow: Step backward",
         "Space: Toggle auto-solve",
         "R: Reset"
     ]
     for i, instruction in enumerate(instructions):
-        draw_rounded_rect(screen, WHITE, (10, HEIGHT - 140 + i * 35, 200, 30), 15)
-        draw_text(instruction, font_regular, BLACK, 20, HEIGHT - 135 + i * 35)
+        draw_rounded_rect(screen, WHITE, (10, HEIGHT - 150 + i * 37, 270, 34), 15)
+        draw_text(instruction, font_regular, BLACK, 25, HEIGHT - 142 + i * 37)
+
+def draw_move_info(move_index, total_moves, current_move):
+    move_text = f"Move: {move_index}/{total_moves}"
+    if current_move:
+        move_text += f" - {describe_move(current_move)}"
+    
+    text_surface, _ = font_bold.render(move_text, BLACK, size=20)
+    text_width, text_height = text_surface.get_size()
+    padding = 25  # Increased padding
+    rect_width = text_width + padding * 2
+    rect_height = text_height + padding
+    draw_rounded_rect(screen, WHITE, (10, 10, rect_width, rect_height), 20)
+    screen.blit(text_surface, (10 + padding, 10 + padding // 2))
 
 def main():
     cube = shuffle(solved_cube, iterations=20)
@@ -140,11 +157,8 @@ def main():
                     current_move = None
 
         screen.fill(BACKGROUND)
-        draw_cube(cube, current_move)
-
-        draw_rounded_rect(screen, WHITE, (10, 10, 200, 40), 20)
-        draw_text(f"Move: {move_index}/{len(solution)}", font_regular, BLACK, 20, 20, bold=True)
-
+        draw_cube(cube)
+        draw_move_info(move_index, len(solution), current_move)
         draw_instructions()
         pygame.display.flip()
 
