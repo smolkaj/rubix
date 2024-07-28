@@ -237,7 +237,7 @@ def main():
         keys = pygame.key.get_pressed()
         if keys[pygame.K_RIGHT] or keys[pygame.K_LEFT]:
             key_hold_time += dt
-            speed_up_factor = min(10, 1 + key_hold_time * 2)  # Increase speed up to 10x
+            speed_up_factor = 15 if key_hold_time > .6 else 1
         else:
             key_hold_time = 0
             speed_up_factor = 1
@@ -257,6 +257,7 @@ def main():
 
         screen.fill(BACKGROUND)
         height = draw_move_info(move_index, len(solution), current_move)
+        draw_instructions(y = height + MAX_TEXT_HEIGHT)
         
         if next_cube:
             draw_cube_animated(cube, next_cube, animation_progress)
@@ -271,7 +272,6 @@ def main():
         else:
             draw_cube_animated(cube, cube, 1)  # Draw the static cube when not animating
 
-        draw_instructions(y = height + MAX_TEXT_HEIGHT)
         pygame.display.flip()
 
     pygame.quit()

@@ -1,8 +1,13 @@
 * The GUI should start with a random, unsolved cube.
 * There should be three buttons:
-  1. Scan my cube: Invokes the scanner and updates the displayed cube accordingly.
+  1. Scan my cube: Invokes a webcam-based scanner and updates the displayed cube
+     accordingly.
   2. Shuffle: Randomly shuffles the displayed cube.
-  3. Solve: Runs the solver and shows the solution using the existing GUI.
+  3. Solve: Invokes the solver and visualizes its progress using a progress bar.
+     Then shows the solution using the existing GUI.
+     * For extra credit, it would be nice to visualize important imermediate
+       states of the cube during the solve, to better visualize the solver's
+       progress.
 * When scanning the cube, the GUI should provide interactive feedback about
   which cubelets are yet unknown and which cubelets have already been
   successfully scanned.
