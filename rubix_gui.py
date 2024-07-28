@@ -138,16 +138,6 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
 
     return rect_height
 
-def draw_instructions(y):
-    instructions = [
-        "Right Arrow: step forward",
-        "Left Arrow: step backward",
-        "Space: toggle auto-solve",
-        "R: reset"
-    ]
-    for i, instruction in enumerate(instructions):
-        draw_text_bubble(instruction, x = 600, y = y + i * 45, width=265, bold_part=instruction.split(':')[0] + ':')
-
 def draw_move_info(move_index, total_moves, current_move):
     move_text = f"Move: {move_index}/{total_moves}"
     if current_move:
@@ -160,6 +150,15 @@ def draw_move_info(move_index, total_moves, current_move):
     
     return bubble_height
 
+def draw_instructions(y):
+    instructions = [
+        "Right Arrow: step forward",
+        "Left Arrow: step backward",
+        "R: reset"
+    ]
+    for i, instruction in enumerate(instructions):
+        draw_text_bubble(instruction, x = 600, y = y + i * 45, width=265, bold_part=instruction.split(':')[0] + ':')
+
 def main():
     cube = shuffle(solved_cube, iterations=20)
     original_cube = cube
@@ -168,7 +167,6 @@ def main():
     clock = pygame.time.Clock()
     move_index = 0
     running = True
-    auto_solve = False
     current_move = None
 
     while running:
@@ -188,8 +186,6 @@ def main():
                         inverse_move = (current_move[0], -current_move[1])
                         cube = apply_move_to_cube(inverse_move, cube)
                         current_move = inverse_move
-                elif event.key == pygame.K_SPACE:
-                    auto_solve = not auto_solve
                 elif event.key == pygame.K_r:
                     cube = original_cube
                     move_index = 0
@@ -200,12 +196,6 @@ def main():
         draw_cube(cube)
         draw_instructions(y = height + MAX_TEXT_HEIGHT)
         pygame.display.flip()
-
-        if auto_solve and move_index < len(solution):
-            current_move = solution[move_index]
-            cube = apply_move_to_cube(current_move, cube)
-            move_index += 1
-            pygame.time.wait(300)  # Slightly faster animation
 
         clock.tick(60)
 
