@@ -1,30 +1,43 @@
 import pygame
-import pygame.font
+import pygame.freetype
 import numpy as np
 from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move
 
 pygame.init()
-pygame.key.set_repeat(300, 100)  # Set key repeat: 300ms delay, 100ms interval
+pygame.key.set_repeat(300, 100)
 
-WIDTH, HEIGHT = 675, 700
+WIDTH, HEIGHT = 800, 800  # Slightly larger window for more whitespace
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Rubik's Cube Solver")
 
+# Load fonts
+try:
+    font_regular = pygame.freetype.Font("fonts/Roboto-Regular.ttf", 24)
+    font_bold = pygame.freetype.Font("fonts/Roboto-Bold.ttf", 24)
+except:
+    print("Could not load custom font. Falling back to default font.")
+    font_regular = pygame.freetype.SysFont("Arial", 24)
+    font_bold = font_regular
+
+# Modern color palette
 COLORS = {
-    "GREEN": (0, 255, 0),
-    "RED": (255, 0, 0),
+    "GREEN": (76, 175, 80),
+    "RED": (244, 67, 54),
     "WHITE": (255, 255, 255),
-    "BLUE": (0, 0, 255),
-    "ORANGE": (255, 165, 0),
-    "YELLOW": (255, 255, 0),
-    "BLACK": (0, 0, 0),
+    "BLUE": (33, 150, 243),
+    "ORANGE": (255, 152, 0),
+    "YELLOW": (255, 235, 59),
+    "BLACK": (33, 33, 33),
+    "BACKGROUND": (245, 245, 245),
 }
+
 BLACK = COLORS["BLACK"]
 WHITE = COLORS["WHITE"]
+BACKGROUND = COLORS["BACKGROUND"]
 
-CUBE_SIZE = 50
-CUBE_GAP = 5
-FACE_GAP = 20
+CUBE_SIZE = 55
+CUBE_GAP = 3
+FACE_GAP = 25
 
 def get_face_offset(face_index):
     offsets = [
@@ -36,7 +49,15 @@ def get_face_offset(face_index):
         (1, 2),  # Bottom
     ]
     x, y = offsets[face_index]
-    return (x * (3 * CUBE_SIZE + FACE_GAP), y * (3 * CUBE_SIZE + FACE_GAP))
+    return (x * (3 * CUBE_SIZE + FACE_GAP) + 50, y * (3 * CUBE_SIZE + FACE_GAP) + 50)
+
+def draw_rounded_rect(surface, color, rect, radius=10):
+    pygame.draw.rect(surface, color, rect, border_radius=radius)
+
+def draw_text(text, font, color, x, y, bold=False):
+    font_to_use = font_bold if bold else font_regular
+    text_surface, _ = font_to_use.render(text, color, size=20)
+    screen.blit(text_surface, (x, y))
 
 def draw_cube(cube, current_move=None):
     face_normals = [
@@ -49,16 +70,13 @@ def draw_cube(cube, current_move=None):
     ]
 
     if current_move:
-        font = pygame.font.Font(None, 36)
-        move_text = font.render(f"Move: {describe_move(current_move)}", True, BLACK)
-        screen.blit(move_text, (10, HEIGHT - 150))
+        draw_text(f"Move: {describe_move(current_move)}", font_regular, BLACK, 20, HEIGHT - 150, bold=True)
     
     for face_index, face_normal in enumerate(face_normals):
         face_offset_x, face_offset_y = get_face_offset(face_index)
         for cubelet, rotation in cube:
             pos = tuple(np.matmul(rotation, cubelet))
             if np.dot(pos, face_normal) == 1:
-                # Calculate 2D coordinates based on the face
                 if face_normal[0] != 0:  # Front or Back face
                     x, y = pos[1] + 1, -pos[2] + 1
                 elif face_normal[1] != 0:  # Left or Right face
@@ -69,32 +87,27 @@ def draw_cube(cube, current_move=None):
                 draw_x = face_offset_x + x * (CUBE_SIZE + CUBE_GAP)
                 draw_y = face_offset_y + y * (CUBE_SIZE + CUBE_GAP)
                 
-                # Calculate the color of this face
                 color_normal = tuple(np.dot(np.array(rotation).T, face_normal))
                 color = COLORS[color_names[color_normal]]
                 
-                pygame.draw.rect(screen, color, 
-                    (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE))
-                pygame.draw.rect(screen, BLACK, 
-                    (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 2)
+                draw_rounded_rect(screen, color, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 5)
+                pygame.draw.rect(screen, BLACK, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 1, border_radius=5)
 
 def draw_instructions():
-    font = pygame.font.Font(None, 24)
     instructions = [
-        "Right Arrow: Step forward",
-        "Left Arrow: Step backward",
+        "→: Step forward",
+        "←: Step backward",
         "Space: Toggle auto-solve",
-        "R: Reset to original state"
+        "R: Reset"
     ]
     for i, instruction in enumerate(instructions):
-        text = font.render(instruction, True, BLACK)
-        screen.blit(text, (10, HEIGHT - 100 + i * 25))
+        draw_rounded_rect(screen, WHITE, (10, HEIGHT - 140 + i * 35, 200, 30), 15)
+        draw_text(instruction, font_regular, BLACK, 20, HEIGHT - 135 + i * 35)
 
 def main():
     cube = shuffle(solved_cube, iterations=20)
-    original_cube = cube  # Store the original shuffled state
+    original_cube = cube
     solution = solve(cube)
-    print("Solution:", solution)
     
     clock = pygame.time.Clock()
     move_index = 0
@@ -107,32 +120,30 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RIGHT:  # Step forward
+                if event.key == pygame.K_RIGHT:
                     if move_index < len(solution):
                         current_move = solution[move_index]
                         cube = apply_move_to_cube(current_move, cube)
                         move_index += 1
-                elif event.key == pygame.K_LEFT:  # Step backward
+                elif event.key == pygame.K_LEFT:
                     if move_index > 0:
                         move_index -= 1
                         current_move = solution[move_index]
                         inverse_move = (current_move[0], -current_move[1])
                         cube = apply_move_to_cube(inverse_move, cube)
                         current_move = inverse_move
-                elif event.key == pygame.K_SPACE:  # Toggle auto-solve
+                elif event.key == pygame.K_SPACE:
                     auto_solve = not auto_solve
-                elif event.key == pygame.K_r:  # Reset to original state
+                elif event.key == pygame.K_r:
                     cube = original_cube
                     move_index = 0
                     current_move = None
 
-        screen.fill(WHITE)
+        screen.fill(BACKGROUND)
         draw_cube(cube, current_move)
 
-        # Display current move number
-        font = pygame.font.Font(None, 36)
-        text = font.render(f"Move: {move_index}/{len(solution)}", True, BLACK)
-        screen.blit(text, (10, 10))
+        draw_rounded_rect(screen, WHITE, (10, 10, 200, 40), 20)
+        draw_text(f"Move: {move_index}/{len(solution)}", font_regular, BLACK, 20, 20, bold=True)
 
         draw_instructions()
         pygame.display.flip()
@@ -141,7 +152,7 @@ def main():
             current_move = solution[move_index]
             cube = apply_move_to_cube(current_move, cube)
             move_index += 1
-            pygame.time.wait(500)  # Wait 500ms between moves
+            pygame.time.wait(300)  # Slightly faster animation
 
         clock.tick(60)
 
