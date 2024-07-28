@@ -325,7 +325,7 @@ def solve_endgame(cube):
   move_by_name = { describe_move(move) : move for move in moves }
   def apply_move(m, cunbe):
     move = move_by_name[m]
-    solution.append(m)
+    solution.append(move)
     return apply_move_to_cube(move, cube)
   routine = 2 * [
     "counterclockwise rotation of left slice",
@@ -383,8 +383,9 @@ tough_seeds_for_top_layer = [17, 33]
 tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
 tough_seeds_for_bottom_layer = [6]
 
-for seed in range(100):
-  print("== SEED:", seed, "==========================================")
-  random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
-  solve(random_cube)
-  print_stats()
+if __name__ == "__main__":
+  for seed in range(100):
+    print("== SEED:", seed, "==========================================")
+    random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
+    solve(random_cube)
+    print_stats()
