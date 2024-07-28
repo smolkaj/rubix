@@ -242,6 +242,7 @@ def main():
                         current_move = None
                         next_cube = None
                         animation_progress = 0
+                        original_cube = cube
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_RIGHT] or keys[pygame.K_LEFT]:
