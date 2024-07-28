@@ -63,7 +63,16 @@ def get_face_offset(face_index):
 def draw_rounded_rect(surface, color, rect, radius=10):
     pygame.draw.rect(surface, color, rect, border_radius=radius)
 
-def draw_cube(cube):
+def lerp(a, b, t):
+    return a + (b - a) * t
+
+def rotate_cubelet(cubelet, rotation, target_rotation, progress):
+    current = np.array(rotation)
+    target = np.array(target_rotation)
+    interpolated = lerp(current, target, progress)
+    return tuple(map(tuple, interpolated))
+
+def draw_cube_animated(cube, next_cube, progress):
     face_normals = [
         ( 1,  0,  0),  # Front
         ( 0,  1,  0),  # Right
@@ -75,8 +84,9 @@ def draw_cube(cube):
     
     for face_index, face_normal in enumerate(face_normals):
         face_offset_x, face_offset_y = get_face_offset(face_index)
-        for cubelet, rotation in cube:
-            pos = tuple(np.matmul(rotation, cubelet))
+        for (cubelet, rotation), (_, target_rotation) in zip(cube, next_cube):
+            interpolated_rotation = rotate_cubelet(cubelet, rotation, target_rotation, progress)
+            pos = tuple(np.matmul(interpolated_rotation, cubelet))
             if np.dot(pos, face_normal) == 1:
                 if face_normal[0] != 0:  # Front or Back face
                     x, y = pos[1] + 1, -pos[2] + 1
@@ -88,13 +98,19 @@ def draw_cube(cube):
                 draw_x = face_offset_x + x * (CUBE_SIZE + CUBE_GAP)
                 draw_y = face_offset_y + y * (CUBE_SIZE + CUBE_GAP)
                 
-                color_normal = tuple(np.dot(np.array(rotation).T, face_normal))
-                color = COLORS[color_names[color_normal]]
+                color_normal = tuple(np.round(np.dot(np.array(interpolated_rotation).T, face_normal)).astype(int))
+                
+                # Handle the edge case where color_normal is (0, 0, 0)
+                if all(v == 0 for v in color_normal):
+                    # Use the original color (non-interpolated)
+                    original_color_normal = tuple(np.round(np.dot(np.array(rotation).T, face_normal)).astype(int))
+                    color = COLORS[color_names[original_color_normal]]
+                else:
+                    color = COLORS[color_names[color_normal]]
 
                 draw_rounded_rect(screen, color, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 5)
                 pygame.draw.rect(screen, BUBBLE_BORDER, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 1, border_radius=5)
 
-# Add this at the beginning of your script, after font initialization
 def calculate_max_text_height():
     sample_text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
     _, rect = font_bold.render(sample_text, TEXT_COLOR)
@@ -168,6 +184,9 @@ def main():
     move_index = 0
     running = True
     current_move = None
+    animation_progress = 0
+    animation_speed = 0.08
+    next_cube = None
 
     while running:
         for event in pygame.event.get():
@@ -175,25 +194,40 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RIGHT:
-                    if move_index < len(solution):
+                    if move_index < len(solution) and next_cube is None:
                         current_move = solution[move_index]
-                        cube = apply_move_to_cube(current_move, cube)
-                        move_index += 1
+                        next_cube = apply_move_to_cube(current_move, cube)
+                        animation_progress = 0
                 elif event.key == pygame.K_LEFT:
-                    if move_index > 0:
+                    if move_index > 0 and next_cube is None:
                         move_index -= 1
                         current_move = solution[move_index]
                         inverse_move = (current_move[0], -current_move[1])
-                        cube = apply_move_to_cube(inverse_move, cube)
+                        next_cube = apply_move_to_cube(inverse_move, cube)
+                        animation_progress = 0
                         current_move = inverse_move
                 elif event.key == pygame.K_r:
                     cube = original_cube
                     move_index = 0
                     current_move = None
+                    next_cube = None
+                    animation_progress = 0
 
         screen.fill(BACKGROUND)
         height = draw_move_info(move_index, len(solution), current_move)
-        draw_cube(cube)
+        
+        if next_cube:
+            draw_cube_animated(cube, next_cube, animation_progress)
+            animation_progress += animation_speed
+            if animation_progress >= 1:
+                cube = next_cube
+                next_cube = None
+                if current_move == solution[move_index]:
+                    move_index += 1
+                animation_progress = 0
+        else:
+            draw_cube_animated(cube, cube, 1)  # Draw the static cube when not animating
+
         draw_instructions(y = height + MAX_TEXT_HEIGHT)
         pygame.display.flip()
 
