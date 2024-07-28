@@ -64,12 +64,7 @@ def draw_rounded_rect(surface, color, rect, radius=10, border_color=None):
     if border_color:
         pygame.draw.rect(surface, border_color, rect, width=1, border_radius=radius)
 
-def draw_text(text, font, x, y, bold=False):
-    font_to_use = font_bold if bold else font_regular
-    text_surface, _ = font_to_use.render(text, TEXT_COLOR, size=20)
-    screen.blit(text_surface, (x, y))
-
-def draw_cube(cube, current_move=None):
+def draw_cube(cube):
     face_normals = [
         ( 1,  0,  0),  # Front
         ( 0,  1,  0),  # Right
@@ -78,10 +73,6 @@ def draw_cube(cube, current_move=None):
         (-1,  0,  0),  # Back
         ( 0,  0, -1),  # Bottom
     ]
-
-    if current_move:
-        draw_text(f"Move: {describe_move(current_move)}", font_regular, BLACK, 20, HEIGHT - 180, bold=True)
-
     
     for face_index, face_normal in enumerate(face_normals):
         face_offset_x, face_offset_y = get_face_offset(face_index)
@@ -171,7 +162,7 @@ def draw_move_info(move_index, total_moves, current_move):
     return bubble_height
 
 def main():
-    cube = shuffle(solved_cube, iterations=1200)
+    cube = shuffle(solved_cube, iterations=20)
     original_cube = cube
     solution = solve(cube)
     
