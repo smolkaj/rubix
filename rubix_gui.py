@@ -19,21 +19,26 @@ except:
     font_regular = pygame.freetype.SysFont("Arial", 24)
     font_bold = font_regular
 
-# Modern color palette
 COLORS = {
-    "GREEN": (76, 175, 80),
-    "RED": (244, 67, 54),
-    "WHITE": (255, 255, 255),
-    "BLUE": (33, 150, 243),
-    "ORANGE": (255, 152, 0),
-    "YELLOW": (255, 235, 59),
-    "BLACK": (33, 33, 33),
-    "BACKGROUND": (245, 245, 245),
+    "GREEN": (46, 204, 113),
+    "RED": (231, 76, 60),
+    "WHITE": (236, 240, 241),
+    "BLUE": (52, 152, 219),
+    "ORANGE": (230, 126, 34),
+    "YELLOW": (241, 196, 15),
+    "BLACK": (7, 54, 66),  # Solarized base02
+    "BACKGROUND": (0, 43, 54),  # Solarized base03
+    "TEXT": (131, 148, 150),  # Solarized base0
+    "BUBBLE_BG": (7, 54, 66),  # Solarized base02
+    "BUBBLE_BORDER": (88, 110, 117),  # Solarized base01
 }
 
 BLACK = COLORS["BLACK"]
 WHITE = COLORS["WHITE"]
 BACKGROUND = COLORS["BACKGROUND"]
+TEXT_COLOR = COLORS["TEXT"]
+BUBBLE_BG = COLORS["BUBBLE_BG"]
+BUBBLE_BORDER = COLORS["BUBBLE_BORDER"]
 
 CUBE_SIZE = 55
 CUBE_GAP = 3
@@ -54,12 +59,14 @@ def get_face_offset(face_index):
     return (x * (3 * CUBE_SIZE + FACE_GAP) + CUBE_OFFSET_X, 
             y * (3 * CUBE_SIZE + FACE_GAP) + CUBE_OFFSET_Y)
 
-def draw_rounded_rect(surface, color, rect, radius=10):
+def draw_rounded_rect(surface, color, rect, radius=10, border_color=None):
     pygame.draw.rect(surface, color, rect, border_radius=radius)
+    if border_color:
+        pygame.draw.rect(surface, border_color, rect, width=1, border_radius=radius)
 
-def draw_text(text, font, color, x, y, bold=False):
+def draw_text(text, font, x, y, bold=False):
     font_to_use = font_bold if bold else font_regular
-    text_surface, _ = font_to_use.render(text, color, size=20)
+    text_surface, _ = font_to_use.render(text, TEXT_COLOR, size=20)
     screen.blit(text_surface, (x, y))
 
 def draw_cube(cube, current_move=None):
@@ -93,42 +100,43 @@ def draw_cube(cube, current_move=None):
                 
                 color_normal = tuple(np.dot(np.array(rotation).T, face_normal))
                 color = COLORS[color_names[color_normal]]
-                
-                draw_rounded_rect(screen, color, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 5)
-                pygame.draw.rect(screen, BLACK, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 1, border_radius=5)
 
-def draw_instruction(instruction, y):
-    key, action = instruction
-    draw_rounded_rect(screen, WHITE, (10, y, 270, 34), 15)
+                draw_rounded_rect(screen, color, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 5)
+                pygame.draw.rect(screen, BUBBLE_BORDER, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 1, border_radius=5)
+
+def draw_text_bubble(text, x, y, width=None, bold_part=None):
+    if bold_part:
+        bold_surface, _ = font_bold.render(bold_part, TEXT_COLOR, size=20)
+        regular_surface, _ = font_regular.render(text[len(bold_part):], TEXT_COLOR, size=20)
+        text_surface = pygame.Surface((bold_surface.get_width() + regular_surface.get_width(), max(bold_surface.get_height(), regular_surface.get_height())), pygame.SRCALPHA)
+        text_surface.blit(bold_surface, (0, 0))
+        text_surface.blit(regular_surface, (bold_surface.get_width(), 0))
+    else:
+        text_surface, _ = font_regular.render(text, TEXT_COLOR, size=20)
     
-    key_surface, _ = font_bold.render(key, BLACK, size=20)
-    action_surface, _ = font_regular.render(action, BLACK, size=20)
-    
-    screen.blit(key_surface, (25, y + 7))
-    screen.blit(action_surface, (25 + key_surface.get_width() + 10, y + 7))
+    text_width, text_height = text_surface.get_size()
+    padding = 25
+    rect_width = width if width else text_width + padding * 2
+    rect_height = text_height + padding
+    draw_rounded_rect(screen, BUBBLE_BG, (x, y, rect_width, rect_height), 20, BUBBLE_BORDER)
+    screen.blit(text_surface, (x + padding, y + padding // 2))
 
 def draw_instructions():
     instructions = [
-        ("Right Arrow:", "step forward"),
-        ("Left Arrow:", "step backward"),
-        ("Space:", "toggle auto-solve"),
-        ("R:", "reset")
+        "Right Arrow: step forward",
+        "Left Arrow: step backward",
+        "Space: toggle auto-solve",
+        "R: reset"
     ]
     for i, instruction in enumerate(instructions):
-        draw_instruction(instruction, HEIGHT - 150 + i * 37)
+        draw_text_bubble(instruction, 10, HEIGHT - 180 + i * 45, width=270, bold_part=instruction.split(':')[0] + ':')
 
 def draw_move_info(move_index, total_moves, current_move):
     move_text = f"Move: {move_index}/{total_moves}"
     if current_move:
         move_text += f" - {describe_move(current_move)}"
     
-    text_surface, _ = font_bold.render(move_text, BLACK, size=20)
-    text_width, text_height = text_surface.get_size()
-    padding = 25  # Increased padding
-    rect_width = text_width + padding * 2
-    rect_height = text_height + padding
-    draw_rounded_rect(screen, WHITE, (10, 10, rect_width, rect_height), 20)
-    screen.blit(text_surface, (10 + padding, 10 + padding // 2))
+    draw_text_bubble(move_text, 10, 10, bold_part="Move:")
 
 def main():
     cube = shuffle(solved_cube, iterations=20)
@@ -170,6 +178,7 @@ def main():
         draw_move_info(move_index, len(solution), current_move)
         draw_instructions()
         pygame.display.flip()
+        
 
         if auto_solve and move_index < len(solution):
             current_move = solution[move_index]
