@@ -4,7 +4,7 @@ import numpy as np
 from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move
 
 pygame.init()
-pygame.key.set_repeat(300, 100)
+pygame.key.set_repeat(300, 50)
 
 WIDTH, HEIGHT = 875, 875
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -171,7 +171,7 @@ def draw_move_info(move_index, total_moves, current_move):
     return bubble_height
 
 def main():
-    cube = shuffle(solved_cube, iterations=20)
+    cube = shuffle(solved_cube, iterations=1200)
     original_cube = cube
     solution = solve(cube)
     
