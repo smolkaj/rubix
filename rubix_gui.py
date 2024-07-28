@@ -12,11 +12,11 @@ pygame.display.set_caption("Rubik's Cube Solver")
 
 # Load fonts
 try:
-    font_regular = pygame.freetype.Font("fonts/Roboto-Regular.ttf", 24)
-    font_bold = pygame.freetype.Font("fonts/Roboto-Bold.ttf", 24)
+    font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=19)
+    font_bold = pygame.freetype.Font("fonts/Roboto-Bold.ttf", size=19)
 except:
     print("Could not load custom font. Falling back to default font.")
-    font_regular = pygame.freetype.SysFont("Arial", 24)
+    font_regular = pygame.freetype.SysFont("Arial", size=19)
     font_bold = font_regular
 
 COLORS = {
@@ -98,7 +98,7 @@ def draw_cube(cube):
 # Add this at the beginning of your script, after font initialization
 def calculate_max_text_height():
     sample_text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
-    _, rect = font_bold.render(sample_text, TEXT_COLOR, size=20)
+    _, rect = font_bold.render(sample_text, TEXT_COLOR)
     return rect.height
 
 MAX_TEXT_HEIGHT = calculate_max_text_height()
@@ -108,8 +108,8 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
     rect_height = MAX_TEXT_HEIGHT + 20  # Fixed height based on max possible text height plus some padding
 
     # Pre-render both bold and regular parts to ensure consistent spacing
-    bold_surface, _ = font_bold.render(bold_part or "", TEXT_COLOR, size=20)
-    regular_surface, _ = font_regular.render(text[len(bold_part or ""):], TEXT_COLOR, size=20)
+    bold_surface, _ = font_bold.render(bold_part or "", TEXT_COLOR)
+    regular_surface, _ = font_regular.render(text[len(bold_part or ""):], TEXT_COLOR)
     
     text_width = bold_surface.get_width() + regular_surface.get_width()
     text_surface = pygame.Surface((text_width, MAX_TEXT_HEIGHT), pygame.SRCALPHA)
