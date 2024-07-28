@@ -6,7 +6,7 @@ from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_
 pygame.init()
 pygame.key.set_repeat(300, 100)
 
-WIDTH, HEIGHT = 850, 850
+WIDTH, HEIGHT = 875, 875
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Rubik's Cube Solver")
 
@@ -43,8 +43,8 @@ BUBBLE_BORDER = COLORS["BUBBLE_BORDER"]
 CUBE_SIZE = 55
 CUBE_GAP = 3
 FACE_GAP = 25
-CUBE_OFFSET_X = 70  # Increased offset for more space on the right
-CUBE_OFFSET_Y = 70  # Increased offset for more space on the top
+CUBE_OFFSET_X = 70
+CUBE_OFFSET_Y = 100
 
 def get_face_offset(face_index):
     offsets = [
@@ -104,22 +104,49 @@ def draw_cube(cube, current_move=None):
                 draw_rounded_rect(screen, color, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 5)
                 pygame.draw.rect(screen, BUBBLE_BORDER, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 1, border_radius=5)
 
-def draw_text_bubble(text, x, y, width=None, bold_part=None):
-    if bold_part:
-        bold_surface, _ = font_bold.render(bold_part, TEXT_COLOR, size=20)
-        regular_surface, _ = font_regular.render(text[len(bold_part):], TEXT_COLOR, size=20)
-        text_surface = pygame.Surface((bold_surface.get_width() + regular_surface.get_width(), max(bold_surface.get_height(), regular_surface.get_height())), pygame.SRCALPHA)
-        text_surface.blit(bold_surface, (0, 0))
-        text_surface.blit(regular_surface, (bold_surface.get_width(), 0))
-    else:
-        text_surface, _ = font_regular.render(text, TEXT_COLOR, size=20)
+# Add this at the beginning of your script, after font initialization
+def calculate_max_text_height():
+    sample_text = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
+    _, rect = font_bold.render(sample_text, TEXT_COLOR, size=20)
+    return rect.height
+
+MAX_TEXT_HEIGHT = calculate_max_text_height()
+
+def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
+    padding_x = 10
+    rect_height = MAX_TEXT_HEIGHT + 20  # Fixed height based on max possible text height plus some padding
+
+    # Pre-render both bold and regular parts to ensure consistent spacing
+    bold_surface, _ = font_bold.render(bold_part or "", TEXT_COLOR, size=20)
+    regular_surface, _ = font_regular.render(text[len(bold_part or ""):], TEXT_COLOR, size=20)
     
-    text_width, text_height = text_surface.get_size()
-    padding = 25
-    rect_width = width if width else text_width + padding * 2
-    rect_height = text_height + padding
-    draw_rounded_rect(screen, BUBBLE_BG, (x, y, rect_width, rect_height), 20, BUBBLE_BORDER)
-    screen.blit(text_surface, (x + padding, y + padding // 2))
+    text_width = bold_surface.get_width() + regular_surface.get_width()
+    text_surface = pygame.Surface((text_width, MAX_TEXT_HEIGHT), pygame.SRCALPHA)
+    text_surface.blit(bold_surface, (0, 0))
+    text_surface.blit(regular_surface, (bold_surface.get_width(), 0))
+
+    # Optional: Add a subtle glow effect
+    glow_surface = pygame.Surface((width + 4, rect_height + 4), pygame.SRCALPHA)
+    pygame.draw.rect(glow_surface, (*BUBBLE_BORDER, 100), (0, 0, width + 4, rect_height + 4))
+    screen.blit(glow_surface, (x - 2, y - 2))
+
+    # Draw background
+    pygame.draw.rect(screen, BUBBLE_BG, (x, y, width, rect_height))
+    
+    # Draw progress bar if provided
+    if progress is not None:
+        progress_width = int(width * progress)
+        progress_color = COLORS["GREEN"]
+        pygame.draw.rect(screen, progress_color, (x, y, progress_width, rect_height))
+    
+    # Draw border
+    pygame.draw.rect(screen, BUBBLE_BORDER, (x, y, width, rect_height), 1)
+    
+    # Draw text at a fixed position, centered vertically
+    text_y = y + (rect_height - MAX_TEXT_HEIGHT) // 2
+    screen.blit(text_surface, (x + padding_x, text_y))
+
+    return rect_height
 
 def draw_instructions():
     instructions = [
@@ -135,8 +162,13 @@ def draw_move_info(move_index, total_moves, current_move):
     move_text = f"Move: {move_index}/{total_moves}"
     if current_move:
         move_text += f" - {describe_move(current_move)}"
+    else:
+        move_text += " - No move"  # Add placeholder text when there's no current move
     
-    draw_text_bubble(move_text, 10, 10, bold_part="Move:")
+    progress = move_index / total_moves if total_moves > 0 else 0
+    bubble_height = draw_text_bubble(move_text, 10, 10, WIDTH - 20, progress=progress, bold_part="Move:")
+    
+    return bubble_height
 
 def main():
     cube = shuffle(solved_cube, iterations=20)
@@ -174,11 +206,10 @@ def main():
                     current_move = None
 
         screen.fill(BACKGROUND)
-        draw_cube(cube)
         draw_move_info(move_index, len(solution), current_move)
+        draw_cube(cube)
         draw_instructions()
         pygame.display.flip()
-        
 
         if auto_solve and move_index < len(solution):
             current_move = solution[move_index]
