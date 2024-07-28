@@ -2,7 +2,6 @@ import pygame
 import pygame.freetype
 import numpy as np
 from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move
-from rubix_scanner import scan_cube, cube_state_to_solver_format
 
 
 pygame.init()
@@ -173,37 +172,7 @@ def draw_instructions(y):
         draw_text_bubble(instruction, x = 600, y = y + i * 45, width=265, bold_part=instruction.split(':')[0] + ':')
 
 def main():
-    cube = None
-    while cube is None:
-        print("1. Use a randomly shuffled cube")
-        print("2. Scan a real cube using webcam")
-        choice = input("Enter your choice (1 or 2): ")
-        
-        if choice == '1':
-            cube = shuffle(solved_cube, iterations=20)
-        elif choice == '2':
-            print("Attempting to scan cube...")
-            cube_state = scan_cube()
-            if cube_state:
-                # Check if all colors are valid
-                all_colors_valid = all(color is not None for face_colors in cube_state.values() for color in face_colors)
-                if all_colors_valid:
-                    cube = cube_state_to_solver_format(cube_state)
-                    print("Cube scanned successfully!")
-                else:
-                    print("Scanning incomplete. Some colors could not be detected.")
-                    cube = None
-            else:
-                print("Scanning failed.")
-            
-            if cube is None:
-                print("Would you like to try again or use a randomly shuffled cube?")
-                retry = input("Enter 'r' to retry scanning, or any other key to use a random cube: ")
-                if retry.lower() != 'r':
-                    cube = shuffle(solved_cube, iterations=20)
-        else:
-            print("Invalid choice. Please try again.")
-    
+    cube = shuffle(solved_cube, iterations=20)
     original_cube = cube
     solution = solve(cube)
     
