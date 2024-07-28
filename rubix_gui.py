@@ -97,16 +97,25 @@ def draw_cube(cube, current_move=None):
                 draw_rounded_rect(screen, color, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 5)
                 pygame.draw.rect(screen, BLACK, (draw_x, draw_y, CUBE_SIZE, CUBE_SIZE), 1, border_radius=5)
 
+def draw_instruction(instruction, y):
+    key, action = instruction
+    draw_rounded_rect(screen, WHITE, (10, y, 270, 34), 15)
+    
+    key_surface, _ = font_bold.render(key, BLACK, size=20)
+    action_surface, _ = font_regular.render(action, BLACK, size=20)
+    
+    screen.blit(key_surface, (25, y + 7))
+    screen.blit(action_surface, (25 + key_surface.get_width() + 10, y + 7))
+
 def draw_instructions():
     instructions = [
-        "Right Arrow: Step forward",
-        "Left Arrow: Step backward",
-        "Space: Toggle auto-solve",
-        "R: Reset"
+        ("Right Arrow:", "step forward"),
+        ("Left Arrow:", "step backward"),
+        ("Space:", "toggle auto-solve"),
+        ("R:", "reset")
     ]
     for i, instruction in enumerate(instructions):
-        draw_rounded_rect(screen, WHITE, (10, HEIGHT - 150 + i * 37, 270, 34), 15)
-        draw_text(instruction, font_regular, BLACK, 25, HEIGHT - 142 + i * 37)
+        draw_instruction(instruction, HEIGHT - 150 + i * 37)
 
 def draw_move_info(move_index, total_moves, current_move):
     move_text = f"Move: {move_index}/{total_moves}"
