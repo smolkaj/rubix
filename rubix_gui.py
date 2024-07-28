@@ -218,7 +218,8 @@ def main():
                     if scan_button[1].collidepoint(event.pos):
                         print("Scan my cube button clicked (no-op for now)")
                     elif shuffle_button[1].collidepoint(event.pos):
-                        cube = shuffle(solved_cube, iterations=20)
+                        cube = shuffle(solved_cube, iterations=999, seed=None)
+                        original_cube = cube
                         solution = None
                         move_index = 0
                         current_move = None
