@@ -4,16 +4,16 @@ import numpy as np
 from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move
 
 pygame.init()
-pygame.key.set_repeat(300, 50)
+pygame.display.set_caption("Rubik's Cube Solver")
+pygame.key.set_repeat(300, 50)  # delay, interval
 
 WIDTH, HEIGHT = 875, 875
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Rubik's Cube Solver")
 
 # Load fonts
 try:
     font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=19)
-    font_bold = pygame.freetype.Font("fonts/Roboto-Bold.ttf", size=19)
+    font_bold = pygame.freetype.Font("fonts/Roboto-Regular.ttf", size=19)
 except:
     print("Could not load custom font. Falling back to default font.")
     font_regular = pygame.freetype.SysFont("Arial", size=19)
@@ -27,10 +27,10 @@ COLORS = {
     "ORANGE": (230, 126, 34),
     "YELLOW": (241, 196, 15),
     "BLACK": (7, 54, 66),  # Solarized base02
-    "BACKGROUND": (0, 43, 54),  # Solarized base03
+    "BACKGROUND": (39, 40, 35),  # Solarized base03
     "TEXT": (131, 148, 150),  # Solarized base0
-    "BUBBLE_BG": (7, 54, 66),  # Solarized base02
-    "BUBBLE_BORDER": (88, 110, 117),  # Solarized base01
+    "BUBBLE_BG": (30, 31, 28),  # Solarized base02
+    "BUBBLE_BORDER": (34, 35, 31),  # Solarized base01
 }
 
 BLACK = COLORS["BLACK"]
