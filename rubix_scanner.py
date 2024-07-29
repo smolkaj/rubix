@@ -1,148 +1,147 @@
 import cv2
 import numpy as np
-from rubix import solved_cube, color_names
+import open3d as o3d
+from typing import List, Tuple, Optional
+import time
 
-# Define color ranges in HSV
-COLOR_RANGES = {
-    'RED': ([0, 100, 100], [10, 255, 255]),
-    'ORANGE': ([10, 100, 100], [25, 255, 255]),
-    'YELLOW': ([25, 100, 100], [35, 255, 255]),
-    'GREEN': ([35, 100, 100], [85, 255, 255]),
-    'BLUE': ([85, 100, 100], [130, 255, 255]),
-    'WHITE': ([0, 0, 200], [180, 30, 255])
-}
+class RubiksCube3DScanner:
+    def __init__(self):
+        self.cap = cv2.VideoCapture(0)
+        self.frames = []
+        self.feature_matcher = cv2.FlannBasedMatcher_create()
+        self.reconstruction = None
+        self.camera_matrix = None
 
-def get_color(hsv):
-    for color, (lower, upper) in COLOR_RANGES.items():
-        if cv2.inRange(hsv, np.array(lower), np.array(upper)).any():
-            return color
-    return None
-
-def detect_cube(frame):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 50, 150)
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    for contour in contours:
-        epsilon = 0.1 * cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, epsilon, True)
-        
-        if len(approx) == 4:
-            return approx
-    
-    return None
-
-def extract_face_colors(frame, contour):
-    try:
-        rect = cv2.minAreaRect(contour)
-        box = cv2.boxPoints(rect)
-        box = np.int32(box)
-        
-        width = int(rect[1][0])
-        height = int(rect[1][1])
-        
-        src_pts = box.astype("float32")
-        dst_pts = np.array([[0, height-1],
-                            [0, 0],
-                            [width-1, 0],
-                            [width-1, height-1]], dtype="float32")
-        
-        M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-        warped = cv2.warpPerspective(frame, M, (width, height))
-        
-        cell_width = width // 3
-        cell_height = height // 3
-        
-        colors = []
-        for i in range(3):
-            for j in range(3):
-                cell = warped[j*cell_height:(j+1)*cell_height, i*cell_width:(i+1)*cell_width]
-                hsv = cv2.cvtColor(cell, cv2.COLOR_BGR2HSV)
-                color = get_color(hsv)
-                colors.append(color)
-        
-        return colors
-    except Exception as e:
-        print(f"Error in extract_face_colors: {str(e)}")
-        return None
-
-def scan_cube():
-    try:
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            print("Error: Could not open webcam.")
-            return None
-    except Exception as e:
-        print(f"Error: Failed to initialize webcam. {str(e)}")
-        return None
-
-    cube_state = {}
-    face_count = 0
-    
-    print("Scanning cube. Press 'q' to quit at any time.")
-
-    while face_count < 6:
-        ret, frame = cap.read()
-        if not ret:
-            print("Error: Failed to capture frame from webcam.")
-            break
-        
-        cube_contour = detect_cube(frame)
-        if cube_contour is not None:
-            cv2.drawContours(frame, [cube_contour], 0, (0, 255, 0), 2)
-            
-            colors = extract_face_colors(frame, cube_contour)
-            if colors is None:
-                print("Error: Failed to extract face colors. Skipping this frame.")
-                cv2.imshow("Cube Scanner", frame)
-                cv2.waitKey(1)
-                continue
-            cv2.putText(frame, f"Face {face_count + 1}: Press SPACE to capture", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            
-            cv2.imshow("Cube Scanner", frame)
-            key = cv2.waitKey(1) & 0xFF
-            
-            if key == ord(' '):
-                face_normal = list(color_names.keys())[face_count]
-                cube_state[face_normal] = colors
-                face_count += 1
-                print(f"Face {face_count} captured.")
-            elif key == ord('q'):
-                print("Scanning aborted by user.")
-                break
-        else:
-            cv2.putText(frame, "No cube detected", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            cv2.imshow("Cube Scanner", frame)
-            cv2.waitKey(1)
-    
-    cap.release()
-    cv2.destroyAllWindows()
-    
-    if face_count < 6:
-        print("Scanning incomplete. Not all faces were captured.")
-        return None
-    
-    return cube_state
-
-def cube_state_to_solver_format(cube_state):
-    solver_cube = list(solved_cube)
-    for face_normal, colors in cube_state.items():
-        for i, color in enumerate(colors):
-            cubelet = tuple(c * face_normal[i] for i, c in enumerate(face_normal))
-            if color is None:
-                # Use a default rotation for unknown colors
-                rotation = tuple(tuple(int(i == j) for i in range(3)) for j in range(3))
+    def capture_frames(self, num_frames: int = 30):
+        print("Capturing frames...")
+        for i in range(num_frames):
+            print(f"-> frame {i}")
+            time.sleep(15/num_frames)  # Capture for 15 seconds.
+            ret, frame = self.cap.read()
+            if ret:
+                self.frames.append(frame)
             else:
-                rotation = tuple(tuple(int(c == color_names[color]) for c in face_normal) for _ in range(3))
-            solver_cube[solver_cube.index((cubelet, solved_cube[0][1]))] = (cubelet, rotation)
-    return tuple(solver_cube)
+                break
+        print(f"Captured {len(self.frames)} frames.")
+
+    def detect_features(self) -> List[Tuple[np.ndarray, np.ndarray]]:
+        print("Detecting features...")
+        sift = cv2.SIFT_create()
+        features = []
+        for frame in self.frames:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            kp, des = sift.detectAndCompute(gray, None)
+            features.append((kp, des))
+        print(f"Detected features in {len(features)} frames.")
+        return features
+
+    def match_features(self, features: List[Tuple[np.ndarray, np.ndarray]]) -> List[List[cv2.DMatch]]:
+        print("Matching features...")
+        matches = []
+        for i in range(len(features) - 1):
+            matches_pair = self.feature_matcher.knnMatch(features[i][1], features[i+1][1], k=2)
+            good_matches = []
+            for m, n in matches_pair:
+                if m.distance < 0.7 * n.distance:
+                    good_matches.append(m)
+            matches.append(good_matches)
+        print(f"Matched features between {len(matches)} pairs of frames.")
+        return matches
+
+    def estimate_camera_poses(self, features: List[Tuple[np.ndarray, np.ndarray]], matches: List[List[cv2.DMatch]]) -> List[Optional[Tuple[np.ndarray, np.ndarray]]]:
+        print("Estimating camera poses...")
+        camera_poses = []
+        prev_points = None
+        prev_pose = np.eye(4)
+
+        # Estimate camera matrix (assuming fixed camera parameters)
+        if self.camera_matrix is None:
+            frame_size = self.frames[0].shape[:2][::-1]
+            self.camera_matrix = np.array([
+                [frame_size[0], 0, frame_size[0]/2],
+                [0, frame_size[0], frame_size[1]/2],
+                [0, 0, 1]
+            ], dtype=np.float32)
+
+        for i, (feature_pair, match_list) in enumerate(zip(zip(features[:-1], features[1:]), matches)):
+            kp1, _ = feature_pair[0]
+            kp2, _ = feature_pair[1]
+
+            points1 = np.float32([kp1[m.queryIdx].pt for m in match_list]).reshape(-1, 1, 2)
+            points2 = np.float32([kp2[m.trainIdx].pt for m in match_list]).reshape(-1, 1, 2)
+
+            E, mask = cv2.findEssentialMat(points2, points1, self.camera_matrix, cv2.RANSAC, 0.999, 1.0)
+            _, R, t, mask = cv2.recoverPose(E, points2, points1, self.camera_matrix, mask=mask)
+
+            # Compose the transformation with the previous pose
+            current_pose = np.eye(4)
+            current_pose[:3, :3] = R
+            current_pose[:3, 3] = t.reshape(-1)
+            composed_pose = prev_pose @ current_pose
+            
+            camera_poses.append((composed_pose[:3, :3], composed_pose[:3, 3]))
+            prev_pose = composed_pose
+            prev_points = points2
+
+        print(f"Estimated {len(camera_poses)} camera poses.")
+        return camera_poses
+
+    def triangulate_points(self, features: List[Tuple[np.ndarray, np.ndarray]], camera_poses: List[Tuple[np.ndarray, np.ndarray]]):
+        print("Triangulating points...")
+        points_3d = []
+        colors = []
+
+        for i in range(len(camera_poses) - 1):
+            kp1, _ = features[i]
+            kp2, _ = features[i+1]
+            matches = self.match_features([features[i], features[i+1]])[0]
+
+            points1 = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+            points2 = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+
+            R1, t1 = camera_poses[i]
+            R2, t2 = camera_poses[i+1]
+
+            P1 = self.camera_matrix @ np.hstack((R1, t1.reshape(-1, 1)))
+            P2 = self.camera_matrix @ np.hstack((R2, t2.reshape(-1, 1)))
+
+            points_4d = cv2.triangulatePoints(P1, P2, points1, points2)
+            points_3d_homogeneous = points_4d.T
+            points_3d_euclidean = points_3d_homogeneous[:, :3] / points_3d_homogeneous[:, 3:]
+            points_3d.extend(points_3d_euclidean)
+
+            # Extract colors for the 3D points
+            for pt1 in points1:
+                x, y = int(pt1[0][0]), int(pt1[0][1])
+                if 0 <= x < self.frames[i].shape[1] and 0 <= y < self.frames[i].shape[0]:
+                    color = self.frames[i][y, x] / 255.0  # Normalize color values
+                    colors.append(color)
+
+        print(f"Triangulated {len(points_3d)} 3D points.")
+        return np.array(points_3d), np.array(colors)
+
+    def visualize_reconstruction(self):
+        if self.reconstruction is not None:
+            o3d.visualization.draw_geometries([self.reconstruction])
+
+    def scan(self):
+        self.capture_frames()
+        features = self.detect_features()
+        matches = self.match_features(features)
+        camera_poses = self.estimate_camera_poses(features, matches)
+        points_3d, colors = self.triangulate_points(features, camera_poses)
+        
+        # Create a point cloud for visualization
+        self.reconstruction = o3d.geometry.PointCloud()
+        self.reconstruction.points = o3d.utility.Vector3dVector(points_3d)
+        self.reconstruction.colors = o3d.utility.Vector3dVector(colors)
+
+        print("Reconstruction complete. Visualizing...")
+        self.visualize_reconstruction()
+
+        return points_3d, colors
 
 if __name__ == "__main__":
-    cube_state = scan_cube()
-    if cube_state:
-        solver_cube = cube_state_to_solver_format(cube_state)
-        print(solver_cube)
-    else:
-        print("Failed to scan cube. Please try again or use a randomly shuffled cube.")
+    scanner = RubiksCube3DScanner()
+    points_3d, colors = scanner.scan()
+    print(f"Reconstructed {len(points_3d)} points with colors.")

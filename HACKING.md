@@ -3,17 +3,17 @@ On macOS, I use a virtual enviroment.
 
 Create a new virtual environment:
 ```
-pypython3 -m venv rubix_env
+python3 -m venv rubix_env
 ```
 
 Activate the virtual environment:
 ```
-pysource rubix_env/bin/activate
+source rubix_env/bin/activate
 ```
 
 Install dependencies in the virtual environment:
 ```
-pypip install numpy
+pip install numpy
 ```
 
 Run script:
