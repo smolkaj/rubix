@@ -13,7 +13,7 @@ source rubix_env/bin/activate
 
 Install dependencies in the virtual environment:
 ```
-pip install numpy
+pip install -r requirements.txt
 ```
 
 Run script:
