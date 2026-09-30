@@ -21,6 +21,11 @@ Run script:
 python rubix_gui.py
 ```
 
+Run tests:
+```
+python3 -m unittest discover tests
+```
+
 When you're done, you can deactivate the virtual environment:
 ```
 deactivate
