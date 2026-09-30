@@ -40,6 +40,7 @@ SDL_VIDEODRIVER=dummy python3 -m unittest discover tests
 
 ## Architectural Invariants
 
+- **Maximally elegant, simple, and educational:** The solver's primary purpose is pedagogical beauty. Code clarity and linear algebra elegance always take priority over performance micro-optimizations.
 - **Strict line count invariant:** `rubix.py` must strictly remain under 400 lines of code (`wc -l rubix.py < 400`). Verify with:
   ```bash
   [ $(wc -l < rubix.py) -lt 400 ] && echo "OK" || echo "FAIL: Exceeds 400 lines"

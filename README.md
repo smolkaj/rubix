@@ -259,6 +259,7 @@ rubix/
 
 ## Invariants & Design Principles
 
+- **Maximally elegant, simple, and educational:** The solver's primary north star is pedagogical clarity and mathematical beauty. Code clarity and transparent linear algebra always trump micro-optimizations or clever programming tricks.
 - **Zero ambient magic:** No obscure puzzle encodings or heavyweight dependencies. Pure NumPy vector and matrix arithmetic.
 - **Strict code compactness:** The complete solver and domain model in `rubix.py` strictly stays below 400 lines of clean, readable Python.
 - **Headless-friendly:** GUI components decouple display initializers so importing `rubix_gui` works seamlessly in headless CI/CD environments.

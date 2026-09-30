@@ -88,13 +88,7 @@ def describe_config(cubelet, rotation):
      if any(color)
   ))
 
-@functools.cache
-def position(c, r):
-  return (
-    r[0][0]*c[0] + r[0][1]*c[1] + r[0][2]*c[2],
-    r[1][0]*c[0] + r[1][1]*c[1] + r[1][2]*c[2],
-    r[2][0]*c[0] + r[2][1]*c[1] + r[2][2]*c[2],
-  )
+def position(cubelet, rotation): return tuple(np.matmul(rotation, cubelet))
 
 def describe_cubelet(cubelet, rotation):
   return "%s %s: %s" % (
@@ -179,6 +173,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
     src = heapq.heappop(frontier).item
     last_move = came_from[src][1] if src in came_from else None
     for move in get_moves(src):
+      # Never immediately undo the move just taken.
       if last_move and move[0] == last_move[0] and move[1] == -last_move[1]: continue
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
@@ -191,7 +186,9 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
 
 @functools.cache
 def is_cubelet_solved(cubelet, rotation):
-  return all(rotation[i][i] == 1 for i in range(3) if cubelet[i])
+  colors = np.diag(cubelet)
+  color_positions = rotation @ colors
+  return np.array_equal(colors, color_positions)
 
 def is_cube_solved(cube): return all(is_cubelet_solved(c, r) for c, r in cube)
 
@@ -229,9 +226,9 @@ def bottom_layer_corner_heuristic(cube):
   d3 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == -1) ** (1/p)
   return d1/n1 + d2/n2 + d3/n3
 
-is_top_edge = {c for c, _ in solved_cube if c[2] == 1 and norm1(c) == 2}.__contains__
-is_top_cubelet = {c for c, _ in solved_cube if c[2] == 1}.__contains__
-is_top_or_middle_cubelet = {c for c, _ in solved_cube if c[2] >= 0}.__contains__
+def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
+def is_top_cubelet(cubelet): return cubelet[2] == 1
+def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
 
 def with_restarts(timeout, f, *args, **kwargs):
   def raise_timeout(signum, frame): raise TimeoutError()
@@ -265,11 +262,13 @@ def solve_top_and_middle_layer(cube, report_progress_callback):
     solution_moves += next_moves
   return (cube, solution_moves)
 
-is_bottom_edge = {c for c, _ in solved_cube if c[2] == -1 and norm1(c) == 2}.__contains__
-is_bottom_corner = {c for c, _ in solved_cube if c[2] == -1 and norm1(c) == 3}.__contains__
-is_bottom_cubelet = {c for c, _ in solved_cube if c[2] == -1}.__contains__
-def has_orange_bottom(cubelet, rotation): return cubelet[2] == -1 and rotation[2][2] == 1
-def is_in_right_place(c, r): return position(c, r) == c
+def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
+def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
+def is_bottom_cubelet(cubelet): return cubelet[2] == -1
+def has_orange_bottom(cubelet, rotation):
+  return cubelet[2] == -1 and all((rotation @ np.array([0, 0, -1])) == [0, 0, -1])
+def is_in_right_place(c, r):
+  return position(c, r) == c
 def num_bottom_edges_positioned(cube):
   return sum(is_bottom_edge(c) and has_orange_bottom(c, r) for c, r in cube)
 def num_bottom_corners_positioned(cube):
