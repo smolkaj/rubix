@@ -125,9 +125,10 @@ Phase 5: Endgame Permutation Alignment
 ```
 
 ### Admissible Heuristic
-In each phase, A\* uses the admissible heuristic `min_moves_to_solved(cube, target_cubelets)`:
-- Computes the minimum number of 90° rotations needed to bring each target cubelet into its home position and orientation.
-- Explores candidate moves, pruning states using transposition caching (`@functools.cache`).
+In each phase, A\* guides search using `min_moves_to_solved(cubelet, rotation)`:
+- Computes the exact minimum number of 90° rotations needed to bring an individual cubelet to its solved coordinate and orientation.
+- Aggregates these estimates across the active layer's target cubelets using $p$-norm distances to form admissible phase heuristics (`top_layer_heuristic`, etc.).
+- Evaluates successor states with memoized transposition caching (`@functools.cache`).
 
 ---
 
@@ -190,7 +191,7 @@ python rubix.py --benchmark
 Use `rubix` as a lightweight puzzle simulation and solving library:
 
 ```python
-from rubix import solved_cube, shuffle, solve, describe_move, is_cube_solved
+from rubix import solved_cube, shuffle, solve, describe_move, is_cube_solved, apply_move_to_cube
 
 # Create a scrambled cube
 scrambled = shuffle(solved_cube, iterations=1000, seed=42)
@@ -202,8 +203,11 @@ print(f"Solved in {len(solution)} moves:")
 for move in solution:
     print(" -", describe_move(move))
 
-# Verify final state
-print("Is solved?", is_cube_solved(scrambled, solution))  # True
+# Apply solution and verify final state
+final_cube = scrambled
+for move in solution:
+    final_cube = apply_move_to_cube(move, final_cube)
+print("Is solved?", is_cube_solved(final_cube))  # True
 ```
 
 ---
@@ -218,7 +222,7 @@ python3 -m unittest discover tests
 
 The test suite covers:
 - Representation invariants (cubelet counts, $L_1$ norms, canonical positions).
-- Rotation matrix algebra and orthogonal group invariants ($\det(R) = 1$, $R^T R = I$).
+- Rotation matrix algebra and orthogonal group invariants ($\det(R) = 1$, $R^T R = I$, axis preservation).
 - Scramble reproducibility and seed determinism.
 - End-to-end multi-phase solver execution on scrambled states.
 - Headless GUI snapshot rendering verification.

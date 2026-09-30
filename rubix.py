@@ -377,22 +377,21 @@ def print_stats():
   ))
   cache_info = min_moves_to_solved.cache_info()
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
-tough_seeds_for_top_layer = [17, 33]
-tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
-tough_seeds_for_bottom_layer = [6]
+tough_seeds_for_top_layer, tough_seeds_for_middle_layer, tough_seeds_for_bottom_layer = [17, 33], [0, 3, 4, 7, 8], [6]
 
 if __name__ == "__main__":
   import sys
   run_tests()
-  if len(sys.argv) > 1 and sys.argv[1] == "--benchmark":
+  arg = sys.argv[1] if len(sys.argv) > 1 else "42"
+  if arg in ("-h", "--help"):
+    print("Usage: python rubix.py [seed | --benchmark]")
+  elif arg == "--benchmark":
     for seed in range(100):
       print("== SEED:", seed, "==========================================")
-      random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
-      solve(random_cube)
+      solve(shuffle(solved_cube, iterations=100_000, seed=seed))
       print_stats()
   else:
-    seed = int(sys.argv[1]) if len(sys.argv) > 1 else 42
+    seed = int(arg)
     print("Solving scrambled cube (seed=%d)..." % seed)
-    random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
-    solve(random_cube)
+    solve(shuffle(solved_cube, iterations=100_000, seed=seed))
     print_stats()

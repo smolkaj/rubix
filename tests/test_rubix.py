@@ -1,4 +1,7 @@
 import unittest
+import os
+import tempfile
+import numpy as np
 
 from rubix import (
     solved_cube,
@@ -8,19 +11,50 @@ from rubix import (
     apply_move_to_cube,
     is_cube_solved,
     solve,
+    norm1,
+    rotation_matrix,
     NUM_CUBELETS,
 )
 
 
 class TestRubixCube(unittest.TestCase):
     def test_solved_cube_invariants(self):
-        """Verify structural properties of the solved cube."""
+        """Verify structural properties and L1 norm classifications of the solved cube."""
         self.assertEqual(len(solved_cube), NUM_CUBELETS)
         self.assertEqual(NUM_CUBELETS, 26)
         self.assertTrue(is_cube_solved(solved_cube))
         self.assertEqual(len(moves), 12)
         self.assertEqual(len(unit_vectors), 6)
         self.assertTrue(all(v in color_names for v in unit_vectors))
+
+        # Check L1 norm classifications: 6 centers, 12 edges, 8 corners
+        centers = [c for c, _ in solved_cube if norm1(c) == 1]
+        edges = [c for c, _ in solved_cube if norm1(c) == 2]
+        corners = [c for c, _ in solved_cube if norm1(c) == 3]
+        interiors = [c for c, _ in solved_cube if norm1(c) == 0]
+
+        self.assertEqual(len(centers), 6)
+        self.assertEqual(len(edges), 12)
+        self.assertEqual(len(corners), 8)
+        self.assertEqual(len(interiors), 0)
+
+        # Coordinate domain invariant: {-1, 0, 1}^3
+        for c, r in solved_cube:
+            self.assertTrue(all(x in (-1, 0, 1) for x in c))
+            self.assertEqual(r, ((1, 0, 0), (0, 1, 0), (0, 0, 1)))
+
+    def test_rotation_matrix_so3_invariants(self):
+        """Verify that all rotation matrices belong to SO(3): det(M) = 1 and M^T M = I."""
+        identity = np.eye(3)
+        for move in moves:
+            v, _ = move
+            M = rotation_matrix(move)
+            # Orthogonality: M^T @ M = I
+            self.assertTrue(np.allclose(M.T @ M, identity), f"Move {move} is not orthogonal")
+            # Orientation preserving: det(M) = +1 (SO(3))
+            self.assertTrue(np.isclose(np.linalg.det(M), 1.0), f"det(M) != 1 for move {move}")
+            # Rotational axis preservation: M @ v = v
+            self.assertTrue(np.allclose(M @ np.array(v), np.array(v)), f"Axis not fixed for move {move}")
 
     def test_single_move_order_4(self):
         """Every 90-degree face turn must have order 4 (cycle of 4 returns to identity)."""
@@ -114,13 +148,13 @@ class TestRubixCube(unittest.TestCase):
 
     def test_headless_gui_render(self):
         """Verify that rubix_gui renders a frame headlessly without error."""
-        import os
-        import tempfile
         import rubix_gui
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
-        with tempfile.NamedTemporaryFile(suffix=".png") as f:
-            out_path = rubix_gui.render_frame_to_image(solved_cube, f.name)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            out_path = os.path.join(tmp_dir, "preview.png")
+            result = rubix_gui.render_frame_to_image(solved_cube, out_path)
+            self.assertEqual(result, out_path)
             self.assertTrue(os.path.exists(out_path))
             self.assertGreater(os.path.getsize(out_path), 0)
 
