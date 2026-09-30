@@ -72,13 +72,13 @@ Each of the 6 face colors is associated with a standard unit normal vector:
 | $(0, 0, +1)$ | White | Top |
 | $(0, 0, -1)$ | Yellow | Bottom |
 
-For any cubelet $c$, its colors in the solved cube point in directions given by the columns of the diagonal matrix $\operatorname{diag}(c)$. When the cubelet undergoes orientation $R$, its colored faces now point in directions:
+For any cubelet $c$, its colors in the solved cube point in directions given by the columns of the diagonal matrix $\mathrm{diag}(c)$. When the cubelet undergoes orientation $R$, its colored faces now point in directions:
 
-$$\text{Color directions} = R \cdot \operatorname{diag}(c)$$
+$$\text{Color directions} = R \cdot \mathrm{diag}(c)$$
 
 A cubelet is in its solved position and orientation if and only if:
 
-$$R \cdot \operatorname{diag}(c) = \operatorname{diag}(c)$$
+$$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
 
 ### 4. Slice Moves as Hyperplane Rotations
 
