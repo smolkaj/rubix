@@ -10,10 +10,8 @@ by a standard unit vector or its opposite.
 import numpy as np
 import heapq
 import signal
-import math
 import random
 import functools
-from collections import deque
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any
@@ -40,6 +38,11 @@ crange = [-1, 0, 1]
 vectors = tuple((x,y,z) for x in crange for y in crange for z in crange)
 unit_vectors = [v for v in vectors if norm1(v) == 1]
 
+# Standard face direction unit vectors
+FRONT, BACK = (1, 0, 0), (-1, 0, 0)
+RIGHT, LEFT = (0, 1, 0), (0, -1, 0)
+TOP, BOTTOM = (0, 0, 1), (0, 0, -1)
+
 # A cube is encoded as a finite map from cubelets to 3-by-3 rotation matrices
 # `r`, where each cubelet is encoded as the 3D vector `c` that indicates the
 # position of the cubelet in the solved cube.
@@ -54,12 +57,12 @@ moves = [(v, direction) for v in unit_vectors for direction in [-1, 1]]
 # Each color is encoded by the unit vector corresponding to the direction that
 # faces of that color point to in a solved cube.
 color_names = {
-  (+1, 0, 0): "GREEN",   # front
-  (0, +1, 0): "RED",     # right
-  (0, 0, +1): "WHITE",   # top
-  (-1, 0, 0): "BLUE",    # back
-  (0, -1, 0): "ORANGE",  # left
-  (0, 0, -1): "YELLOW",  # bottom
+  FRONT: "GREEN",
+  RIGHT: "RED",
+  TOP: "WHITE",
+  BACK: "BLUE",
+  LEFT: "ORANGE",
+  BOTTOM: "YELLOW",
 }
 assert all(v in color_names for v in unit_vectors)
 
@@ -166,8 +169,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
     path = []
     current = dst
     while current in came_from:
-      src = came_from[current]
-      move = next(m for m in get_moves(src) if apply_move(m, src) == current)
+      src, move = came_from[current]
       path.append(move)
       current = src
     return (dst, tuple(reversed(path)))
@@ -177,7 +179,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
     for move in get_moves(src):
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
-      cost_so_far[dst], came_from[dst] = cost, src
+      cost_so_far[dst], came_from[dst] = cost, (src, move)
       if is_goal(dst): return reconstruct_solution(dst)
       h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
       priority = cost + h_weight * heuristic(dst)
@@ -193,7 +195,7 @@ def is_cubelet_solved(cubelet, rotation):
 def is_cube_solved(cube): return all(is_cubelet_solved(c, r) for c, r in cube)
 
 def num_solved_with_criterion(cube, criterion):
-  return sum(is_cubelet_solved(c, r) for c,r in cube if criterion(c))
+  return sum(is_cubelet_solved(c, r) for c, r in cube if criterion(c))
 
 @functools.cache
 def min_moves_to_solved(cubelet, rotation):
@@ -203,32 +205,42 @@ def min_moves_to_solved(cubelet, rotation):
   _, path = astar(rotation, is_dst, get_moves, apply_move)
   return len(path)
 
-def top_layer_heuristic(cube):
-  p, n = 0.5, 8
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
-  return d/n
-
-def middle_layer_heuristic(cube):
-  p, n = 0.5, 4
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] >= 0) ** (1/p)
-  return d/n
-
-def bottom_layer_edge_heuristic(cube):
-  p, n = 0.5, 3
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube
-          if not (c[2] == -1 and norm1(c) == 3)) ** (1/p)
-  return d/n
-
-def bottom_layer_corner_heuristic(cube):
-  p, n1, n2, n3 = 0.5, 5, 3, 8
-  d1 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
-  d2 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 0) ** (1/p)
-  d3 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == -1) ** (1/p)
-  return d1/n1 + d2/n2 + d3/n3
-
+# Cubelet classification predicates
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
 def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
+def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
+def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
+def is_bottom_cubelet(cubelet): return cubelet[2] == -1
+def is_in_right_place(c, r): return position(c, r) == c
+def is_bottom_face_aligned(cubelet, rotation):
+  return cubelet[2] == -1 and all((rotation @ np.array(BOTTOM)) == list(BOTTOM))
+
+def num_bottom_edges_positioned(cube):
+  return sum(is_bottom_edge(c) and is_bottom_face_aligned(c, r) for c, r in cube)
+
+def num_bottom_corners_positioned(cube):
+  return sum(is_bottom_corner(c) and is_in_right_place(c, r) for c, r in cube)
+
+# Layer heuristics based on Lp-norm distances
+def cube_layer_distance(cube, criterion, p=0.5):
+  return sum(min_moves_to_solved(c, r)**p for c, r in cube if criterion(c)) ** (1/p)
+
+def top_layer_heuristic(cube):
+  return cube_layer_distance(cube, is_top_cubelet) / 8
+
+def middle_layer_heuristic(cube):
+  return cube_layer_distance(cube, is_top_or_middle_cubelet) / 4
+
+def bottom_layer_edge_heuristic(cube):
+  return cube_layer_distance(cube, lambda c: not is_bottom_corner(c)) / 3
+
+def bottom_layer_corner_heuristic(cube):
+  return (
+    cube_layer_distance(cube, is_top_cubelet) / 5
+    + cube_layer_distance(cube, lambda c: c[2] == 0) / 3
+    + cube_layer_distance(cube, is_bottom_cubelet) / 8
+  )
 
 def with_restarts(timeout, f, *args, **kwargs):
   def raise_timeout(signum, frame): raise TimeoutError()
@@ -262,18 +274,6 @@ def solve_top_and_middle_layer(cube, report_progress_callback):
     solution_moves += next_moves
   return (cube, solution_moves)
 
-def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
-def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
-def is_bottom_cubelet(cubelet): return cubelet[2] == -1
-def has_orange_bottom(cubelet, rotation):
-  return cubelet[2] == -1 and all((rotation @ np.array([0, 0, -1])) == [0, 0, -1])
-def is_in_right_place(c, r):
-  return position(c, r) == c
-def num_bottom_edges_positioned(cube):
-  return sum(is_bottom_edge(c) and has_orange_bottom(c, r) for c, r in cube)
-def num_bottom_corners_positioned(cube):
-  return sum(is_bottom_corner(c) and is_in_right_place(c, r) for c, r in cube)
-
 def solve_bottom_layer_edges(cube, report_progress_callback):
   solution_moves = ()
   for i in range(8):
@@ -282,15 +282,11 @@ def solve_bottom_layer_edges(cube, report_progress_callback):
     def is_goal(cube): return all([
       num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
       num_bottom_edges_positioned(cube) >= min(4, i + 1),
-      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i-3),
+      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i - 3),
     ])
     def get_moves(_): return moves
-    heuristic = bottom_layer_edge_heuristic
-    try:
-      cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
-                                heuristic)
-    except KeyboardInterrupt:
-      return (cube, solution_moves)
+    cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
+                              bottom_layer_edge_heuristic)
     print("-> found solution with %d moves" % len(next_moves))
     solution_moves += next_moves
   return (cube, solution_moves)
@@ -306,48 +302,45 @@ def solve_bottom_layer_corners(cube, report_progress_callback):
       num_bottom_corners_positioned(cube) >= min(4, i + 1),
     ])
     def get_moves(_): return moves
-    heuristic = bottom_layer_corner_heuristic
-    try:
-      cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
-                                heuristic, random_weight=0.3)
-    except KeyboardInterrupt:
-      return (cube, solution_moves)
+    cube, next_moves = astar(cube, is_goal, get_moves, apply_move_to_cube,
+                              bottom_layer_corner_heuristic, random_weight=0.3)
     print("-> found solution with %d moves" % len(next_moves))
     solution_moves += next_moves
   return (cube, solution_moves)
 
 def bottom_left_front_corner(cube):
-  return next((c,r) for c,r in cube if position(c, r) == (1, -1, -1))
+  return next((c, r) for c, r in cube if position(c, r) == (1, -1, -1))
 
 def solve_endgame(cube, report_progress_callback):
   solution = []
-  move_by_name = { describe_move(move) : move for move in moves }
   def apply_move(m, c):
-    move = move_by_name[m]
-    solution.append(move)
-    return apply_move_to_cube(move, c)
+    solution.append(m)
+    return apply_move_to_cube(m, c)
+
+  # Standard corner orientation routine: 2x (L' U' L U)
   routine = 2 * [
-    "counterclockwise rotation of left slice",
-    "counterclockwise rotation of top slice",
-    "clockwise rotation of left slice",
-    "clockwise rotation of top slice",
+    (LEFT, -1),
+    (TOP, -1),
+    (LEFT, 1),
+    (TOP, 1),
   ]
+  bottom_cw = (BOTTOM, 1)
+
   def is_bottom_left_front_corner_ok(cube):
     c, r = bottom_left_front_corner(cube)
-    move = move_by_name["clockwise rotation of bottom slice"]
-    for i in range(4):
+    for _ in range(4):
       if is_cubelet_solved(c, r): return True
-      r = apply_move_to_cubelet_rotation(move, c, r)
+      r = apply_move_to_cubelet_rotation(bottom_cw, c, r)
     return False
 
   for _ in range(4):
     report_progress_callback(cube)
     while not is_bottom_left_front_corner_ok(cube):
       for move in routine: cube = apply_move(move, cube)
-    cube = apply_move("clockwise rotation of bottom slice", cube)
+    cube = apply_move(bottom_cw, cube)
 
   while not is_cube_solved(cube):
-    cube = apply_move("clockwise rotation of bottom slice", cube)
+    cube = apply_move(bottom_cw, cube)
 
   return (cube, tuple(solution))
 
@@ -377,7 +370,6 @@ def print_stats():
   ))
   cache_info = min_moves_to_solved.cache_info()
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
-tough_seeds_for_top_layer, tough_seeds_for_middle_layer, tough_seeds_for_bottom_layer = [17, 33], [0, 3, 4, 7, 8], [6]
 
 if __name__ == "__main__":
   import sys

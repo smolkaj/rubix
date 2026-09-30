@@ -14,6 +14,23 @@ from rubix import (
     norm1,
     rotation_matrix,
     NUM_CUBELETS,
+    FRONT,
+    BACK,
+    RIGHT,
+    LEFT,
+    TOP,
+    BOTTOM,
+    is_top_edge,
+    is_top_cubelet,
+    is_top_or_middle_cubelet,
+    is_bottom_edge,
+    is_bottom_corner,
+    is_bottom_cubelet,
+    is_bottom_face_aligned,
+    top_layer_heuristic,
+    middle_layer_heuristic,
+    bottom_layer_edge_heuristic,
+    bottom_layer_corner_heuristic,
 )
 
 
@@ -79,13 +96,56 @@ class TestRubixCube(unittest.TestCase):
             cube_restored = apply_move_to_cube(move_ccw, cube)
             self.assertEqual(cube_restored, solved_cube)
 
+    def test_face_constants_and_predicates(self):
+        """Verify face unit vector constants, color mappings, and cubelet predicates."""
+        faces = [FRONT, BACK, RIGHT, LEFT, TOP, BOTTOM]
+        self.assertEqual(len(set(faces)), 6)
+        self.assertTrue(all(norm1(f) == 1 for f in faces))
+        self.assertTrue(all(f in unit_vectors for f in faces))
+        self.assertEqual(color_names[FRONT], "GREEN")
+        self.assertEqual(color_names[BACK], "BLUE")
+        self.assertEqual(color_names[RIGHT], "RED")
+        self.assertEqual(color_names[LEFT], "ORANGE")
+        self.assertEqual(color_names[TOP], "WHITE")
+        self.assertEqual(color_names[BOTTOM], "YELLOW")
+
+        # Test predicates on solved cube
+        top_edges = [c for c, _ in solved_cube if is_top_edge(c)]
+        self.assertEqual(len(top_edges), 4)
+
+        top_cubelets = [c for c, _ in solved_cube if is_top_cubelet(c)]
+        self.assertEqual(len(top_cubelets), 9)
+
+        top_or_mid = [c for c, _ in solved_cube if is_top_or_middle_cubelet(c)]
+        self.assertEqual(len(top_or_mid), 17)
+
+        bottom_edges = [c for c, _ in solved_cube if is_bottom_edge(c)]
+        self.assertEqual(len(bottom_edges), 4)
+
+        bottom_corners = [c for c, _ in solved_cube if is_bottom_corner(c)]
+        self.assertEqual(len(bottom_corners), 4)
+
+        bottom_cubelets = [c for c, _ in solved_cube if is_bottom_cubelet(c)]
+        self.assertEqual(len(bottom_cubelets), 9)
+
+        # Bottom face alignment on solved cube
+        for c, r in solved_cube:
+            if c[2] == -1:
+                self.assertTrue(is_bottom_face_aligned(c, r))
+
+    def test_layer_heuristics_solved_cube(self):
+        """All layer heuristics should evaluate to exactly 0 on the solved cube."""
+        self.assertEqual(top_layer_heuristic(solved_cube), 0.0)
+        self.assertEqual(middle_layer_heuristic(solved_cube), 0.0)
+        self.assertEqual(bottom_layer_edge_heuristic(solved_cube), 0.0)
+        self.assertEqual(bottom_layer_corner_heuristic(solved_cube), 0.0)
+
     def test_sexy_move_order_6(self):
         """The 'sexy move' (R U R' U') repeated 6 times returns the cube to its original state."""
-        # Find R (Right: +y) and U (Up/Top: +z)
-        r_cw = ((0, 1, 0), 1)
-        r_ccw = ((0, 1, 0), -1)
-        u_cw = ((0, 0, 1), 1)
-        u_ccw = ((0, 0, 1), -1)
+        r_cw = (RIGHT, 1)
+        r_ccw = (RIGHT, -1)
+        u_cw = (TOP, 1)
+        u_ccw = (TOP, -1)
 
         sexy_move = [r_cw, u_cw, r_ccw, u_ccw]
 
@@ -157,6 +217,14 @@ class TestRubixCube(unittest.TestCase):
             self.assertEqual(result, out_path)
             self.assertTrue(os.path.exists(out_path))
             self.assertGreater(os.path.getsize(out_path), 0)
+
+    def test_solve_endgame_direct(self):
+        """Verify that solve_endgame resolves corners and returns cube in solved state."""
+        from rubix import solve_endgame
+        # A solved cube cycles through 4 bottom slice rotations
+        final_cube, moves_applied = solve_endgame(solved_cube, lambda _: None)
+        self.assertTrue(is_cube_solved(final_cube))
+        self.assertEqual(moves_applied, 4 * ((BOTTOM, 1),))
 
 
 if __name__ == "__main__":
