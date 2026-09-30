@@ -43,8 +43,8 @@ class TestRubixCube(unittest.TestCase):
             self.assertTrue(all(x in (-1, 0, 1) for x in c))
             self.assertEqual(r, ((1, 0, 0), (0, 1, 0), (0, 0, 1)))
 
-    def test_rotation_matrix_so3_invariants(self):
-        """Verify that all rotation matrices belong to SO(3): det(M) = 1 and M^T M = I."""
+    def test_rotation_matrix_properties(self):
+        """Verify that all rotation matrices are orthogonal and orientation-preserving (det(M) = 1 and M^T M = I)."""
         identity = np.eye(3)
         for move in moves:
             v, _ = move

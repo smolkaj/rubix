@@ -46,25 +46,22 @@ Total: $1 + 6 + 12 + 8 = 27$ cubelets.
 
 ### 2. State: Vectors and Rotation Matrices
 
-A cube state is a map from the 26 non-interior cubelets to their current orientation:
+A cube state is a mapping from each of the 26 non-interior cubelets to its current rotation matrix:
 
-$$\text{Cube} = \left\lbrace (c, R) \mid c \in \lbrace -1, 0, 1 \rbrace^3 \setminus \lbrace (0,0,0) \rbrace,\ R \in \mathrm{SO}(3) \right\rbrace$$
+$$\text{Cube} = \left\lbrace (c, R) \mid c \in \lbrace -1, 0, 1 \rbrace^3 \setminus \lbrace (0,0,0) \rbrace \right\rbrace$$
 
-- $c \in \lbrace -1, 0, 1 \rbrace^3$ is the **constant canonical home vector** of the cubelet (its coordinate in the solved cube).
-- $R \in \mathrm{SO}(3)$ is a $3 \times 3$ integer rotation matrix tracking how the cubelet has been rotated from its home position.
+- $c \in \lbrace -1, 0, 1 \rbrace^3$ is the **constant canonical home position** of the cubelet (its coordinate in the solved cube).
+- $R$ is a $3 \times 3$ **rotation matrix** tracking how the cubelet has been turned from its home orientation.
 
-> **What is $\mathrm{SO}(3)$?**  
-> $\mathrm{SO}(3)$ stands for the **Special Orthogonal group in 3 dimensions**—the mathematical group of all rigid 3D rotations around the origin. A $3 \times 3$ matrix $R$ belongs to $\mathrm{SO}(3)$ if it satisfies:
-> 1. **Orthogonality ($R^T R = I_3$):** Preserves lengths and angles (no stretching or skewing).
-> 2. **Special / Orientation-preserving ($\det(R) = +1$):** Pure rigid rotation without reflections (which have $\det(R) = -1$).
->
-> In our discrete grid, all matrix entries are in $\lbrace -1, 0, 1 \rbrace$, forming the 24 proper orientation matrices of the octahedral rotation group.
-
-The cubelet's **current physical position** $p$ in space is simply the matrix-vector product:
-
-$$p = R \cdot c$$
-
-In the solved cube, every rotation matrix is the identity matrix $I_3$, so $p = I_3 \cdot c = c$.
+**How rotation matrices work here:**
+1. **Initial state:** Every cubelet starts with the $3 \times 3$ identity matrix $I_3$ (meaning "not rotated yet").
+2. **Current position:** The matrix-vector product gives the cubelet's current $(x, y, z)$ position in space:
+   $$p = R \cdot c$$
+   In the solved cube, $p = I_3 \cdot c = c$.
+3. **Face orientation:** The columns of $R$ directly indicate where the cubelet's original Front, Right, and Top faces are pointing in space right now.
+4. **Applying moves:** When a 90° slice rotation matrix $M$ affects a cubelet, its new orientation is simply:
+   $$R_{\text{new}} = M \cdot R$$
+   Because every turn is a 90° rotation along an axis, all entries in $R$ remain simple integers in $\lbrace -1, 0, 1 \rbrace$.
 
 ### 3. Face Colors and Solved Invariant
 
@@ -233,7 +230,7 @@ python3 -m unittest discover tests
 
 The test suite covers:
 - Representation invariants (cubelet counts, $L_1$ norms, canonical positions).
-- Rotation matrix algebra and orthogonal group invariants ($\det(R) = 1$, $R^T R = I$, axis preservation).
+- Rotation matrix algebra (orthogonality $R^T R = I$, $\det(R) = 1$, axis preservation).
 - Scramble reproducibility and seed determinism.
 - End-to-end multi-phase solver execution on scrambled states.
 - Headless GUI snapshot rendering verification.
