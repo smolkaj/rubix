@@ -51,7 +51,14 @@ A cube state is a map from the 26 non-interior cubelets to their current orienta
 $$\text{Cube} = \left\lbrace (c, R) \mid c \in \lbrace -1, 0, 1 \rbrace^3 \setminus \lbrace (0,0,0) \rbrace,\ R \in \mathrm{SO}(3) \right\rbrace$$
 
 - $c \in \lbrace -1, 0, 1 \rbrace^3$ is the **constant canonical home vector** of the cubelet (its coordinate in the solved cube).
-- $R$ is a $3 \times 3$ integer rotation matrix tracking how the cubelet has been rotated from its home position.
+- $R \in \mathrm{SO}(3)$ is a $3 \times 3$ integer rotation matrix tracking how the cubelet has been rotated from its home position.
+
+> **What is $\mathrm{SO}(3)$?**  
+> $\mathrm{SO}(3)$ stands for the **Special Orthogonal group in 3 dimensions**—the mathematical group of all rigid 3D rotations around the origin. A $3 \times 3$ matrix $R$ belongs to $\mathrm{SO}(3)$ if it satisfies:
+> 1. **Orthogonality ($R^T R = I_3$):** Preserves lengths and angles (no stretching or skewing).
+> 2. **Special / Orientation-preserving ($\det(R) = +1$):** Pure rigid rotation without reflections (which have $\det(R) = -1$).
+>
+> In our discrete grid, all matrix entries are in $\lbrace -1, 0, 1 \rbrace$, forming the 24 proper orientation matrices of the octahedral rotation group.
 
 The cubelet's **current physical position** $p$ in space is simply the matrix-vector product:
 
