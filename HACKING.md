@@ -44,5 +44,5 @@ SDL_VIDEODRIVER=dummy python3 -m unittest discover tests
   ```bash
   [ $(wc -l < rubix.py) -lt 400 ] && echo "OK" || echo "FAIL: Exceeds 400 lines"
   ```
-- **Pure Linear Algebra representation:** Cube state must remain formulated as vectors in $\{-1, 0, 1\}^3$ and rotation matrices in $\mathrm{SO}(3)$.
+- **Pure Linear Algebra representation:** Cube state must remain formulated as vectors in $\lbrace -1, 0, 1 \rbrace^3$ and rotation matrices in $\mathrm{SO}(3)$.
 - **Headless testability:** All GUI modules must support headless imports and execution (`init_display()` must remain lazy and respect `SDL_VIDEODRIVER=dummy`).

@@ -14,7 +14,7 @@ Most Rubik's cube software relies on complex combinatorial representations: 54 c
 
 ### 1. Discrete 3D Coordinate Space
 
-Anchor a 3D Cartesian coordinate frame at the center of the cube $(0, 0, 0)$. Each of the 27 smaller *cubelets* has integer coordinates $(x, y, z) \in \{-1, 0, 1\}^3$.
+Anchor a 3D Cartesian coordinate frame at the center of the cube $(0, 0, 0)$. Each of the 27 smaller *cubelets* has integer coordinates $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$.
 
 ```
            +Z (Top / White)
@@ -48,9 +48,9 @@ Total: $1 + 6 + 12 + 8 = 27$ cubelets.
 
 A cube state is a map from the 26 non-interior cubelets to their current orientation:
 
-$$\text{Cube} = \{ (c, R) \mid c \in \{-1, 0, 1\}^3 \setminus \{(0,0,0)\},\ R \in \mathrm{SO}(3) \}$$
+$$\text{Cube} = \left\lbrace (c, R) \mid c \in \lbrace -1, 0, 1 \rbrace^3 \setminus \lbrace (0,0,0) \rbrace,\ R \in \mathrm{SO}(3) \right\rbrace$$
 
-- $c \in \{-1, 0, 1\}^3$ is the **constant canonical home vector** of the cubelet (its coordinate in the solved cube).
+- $c \in \lbrace -1, 0, 1 \rbrace^3$ is the **constant canonical home vector** of the cubelet (its coordinate in the solved cube).
 - $R$ is a $3 \times 3$ integer rotation matrix tracking how the cubelet has been rotated from its home position.
 
 The cubelet's **current physical position** $p$ in space is simply the matrix-vector product:
@@ -82,7 +82,7 @@ $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
 
 ### 4. Slice Moves as Hyperplane Rotations
 
-A move is specified by a unit normal vector $v \in \{\pm e_x, \pm e_y, \pm e_z\}$ and a direction $d \in \{-1, +1\}$ (clockwise or counterclockwise 90° rotation).
+A move is specified by a unit normal vector $v \in \lbrace \pm e_x, \pm e_y, \pm e_z \rbrace$ and a direction $d \in \lbrace -1, +1 \rbrace$ (clockwise or counterclockwise 90° rotation).
 
 Which cubelets belong to the rotating slice? In linear algebra, this is a half-space test:
 
