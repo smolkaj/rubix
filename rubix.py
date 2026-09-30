@@ -88,7 +88,13 @@ def describe_config(cubelet, rotation):
      if any(color)
   ))
 
-def position(cubelet, rotation): return tuple(np.matmul(rotation, cubelet))
+@functools.cache
+def position(c, r):
+  return (
+    r[0][0]*c[0] + r[0][1]*c[1] + r[0][2]*c[2],
+    r[1][0]*c[0] + r[1][1]*c[1] + r[1][2]*c[2],
+    r[2][0]*c[0] + r[2][1]*c[1] + r[2][2]*c[2],
+  )
 
 def describe_cubelet(cubelet, rotation):
   return "%s %s: %s" % (
@@ -159,25 +165,24 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
           random_weight=0):
   if is_goal(start): return (start, ())
   frontier = [PrioritizedItem(start, 0)]
-  came_from = {}
-  cost_so_far = { start : 0 }
+  came_from, cost_so_far = {}, { start : 0 }
 
   def reconstruct_solution(dst):
-    path = []
-    current = dst
+    path, current = [], dst
     while current in came_from:
-      src = came_from[current]
-      move = next(m for m in get_moves(src) if apply_move(m, src) == current)
+      src, move = came_from[current]
       path.append(move)
       current = src
     return (dst, tuple(reversed(path)))
 
   while frontier:
     src = heapq.heappop(frontier).item
+    last_move = came_from[src][1] if src in came_from else None
     for move in get_moves(src):
+      if last_move and move[0] == last_move[0] and move[1] == -last_move[1]: continue
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
-      cost_so_far[dst], came_from[dst] = cost, src
+      cost_so_far[dst], came_from[dst] = cost, (src, move)
       if is_goal(dst): return reconstruct_solution(dst)
       h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
       priority = cost + h_weight * heuristic(dst)
@@ -186,9 +191,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
 
 @functools.cache
 def is_cubelet_solved(cubelet, rotation):
-  colors = np.diag(cubelet)
-  color_positions = rotation @ colors
-  return np.array_equal(colors, color_positions)
+  return all(rotation[i][i] == 1 for i in range(3) if cubelet[i])
 
 def is_cube_solved(cube): return all(is_cubelet_solved(c, r) for c, r in cube)
 
@@ -226,9 +229,9 @@ def bottom_layer_corner_heuristic(cube):
   d3 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == -1) ** (1/p)
   return d1/n1 + d2/n2 + d3/n3
 
-def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
-def is_top_cubelet(cubelet): return cubelet[2] == 1
-def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
+is_top_edge = {c for c, _ in solved_cube if c[2] == 1 and norm1(c) == 2}.__contains__
+is_top_cubelet = {c for c, _ in solved_cube if c[2] == 1}.__contains__
+is_top_or_middle_cubelet = {c for c, _ in solved_cube if c[2] >= 0}.__contains__
 
 def with_restarts(timeout, f, *args, **kwargs):
   def raise_timeout(signum, frame): raise TimeoutError()
@@ -262,13 +265,11 @@ def solve_top_and_middle_layer(cube, report_progress_callback):
     solution_moves += next_moves
   return (cube, solution_moves)
 
-def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
-def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
-def is_bottom_cubelet(cubelet): return cubelet[2] == -1
-def has_orange_bottom(cubelet, rotation):
-  return cubelet[2] == -1 and all((rotation @ np.array([0, 0, -1])) == [0, 0, -1])
-def is_in_right_place(c, r):
-  return position(c, r) == c
+is_bottom_edge = {c for c, _ in solved_cube if c[2] == -1 and norm1(c) == 2}.__contains__
+is_bottom_corner = {c for c, _ in solved_cube if c[2] == -1 and norm1(c) == 3}.__contains__
+is_bottom_cubelet = {c for c, _ in solved_cube if c[2] == -1}.__contains__
+def has_orange_bottom(cubelet, rotation): return cubelet[2] == -1 and rotation[2][2] == 1
+def is_in_right_place(c, r): return position(c, r) == c
 def num_bottom_edges_positioned(cube):
   return sum(is_bottom_edge(c) and has_orange_bottom(c, r) for c, r in cube)
 def num_bottom_corners_positioned(cube):
