@@ -208,6 +208,7 @@ def min_moves_to_solved(cubelet, rotation):
 # Cubelet classification predicates
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
+def is_middle_cubelet(cubelet): return cubelet[2] == 0
 def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
 def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
 def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
@@ -238,7 +239,7 @@ def bottom_layer_edge_heuristic(cube):
 def bottom_layer_corner_heuristic(cube):
   return (
     cube_layer_distance(cube, is_top_cubelet) / 5
-    + cube_layer_distance(cube, lambda c: c[2] == 0) / 3
+    + cube_layer_distance(cube, is_middle_cubelet) / 3
     + cube_layer_distance(cube, is_bottom_cubelet) / 8
   )
 

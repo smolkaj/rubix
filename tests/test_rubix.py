@@ -22,6 +22,7 @@ from rubix import (
     BOTTOM,
     is_top_edge,
     is_top_cubelet,
+    is_middle_cubelet,
     is_top_or_middle_cubelet,
     is_bottom_edge,
     is_bottom_corner,
@@ -115,6 +116,9 @@ class TestRubixCube(unittest.TestCase):
 
         top_cubelets = [c for c, _ in solved_cube if is_top_cubelet(c)]
         self.assertEqual(len(top_cubelets), 9)
+
+        mid_cubelets = [c for c, _ in solved_cube if is_middle_cubelet(c)]
+        self.assertEqual(len(mid_cubelets), 8)
 
         top_or_mid = [c for c, _ in solved_cube if is_top_or_middle_cubelet(c)]
         self.assertEqual(len(top_or_mid), 17)
