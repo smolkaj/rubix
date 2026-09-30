@@ -6,7 +6,7 @@
 
 Most Rubik's cube software relies on complex combinatorial representations: 54 color stickers mapped across 6 face arrays, lookup tables for permutations, or massive pattern databases.
 
-**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space, the entire physics and state of the Rubik's Cube reduces to **vectors, rotation matrices, and dot products**. The core solver ([`rubix.py`](rubix.py)) solves random 100,000-move scrambles in seconds with zero puzzle libraries or external lookups.
+**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space, the entire physics and state of the Rubik's Cube reduces to **vectors, rotation matrices, and dot products**. The core solver ([`rubix.py`](rubix.py)) reliably solves full 100,000-move scrambles with zero external puzzle libraries, pattern databases, or precomputed tables (typically in ~15–30s, or a few minutes for tough scrambles using randomized restarts).
 
 ---
 
@@ -129,6 +129,10 @@ In each phase, A\* guides search using `min_moves_to_solved(cubelet, rotation)`:
 - Computes the exact minimum number of 90° rotations needed to bring an individual cubelet to its solved coordinate and orientation.
 - Aggregates these estimates across the active layer's target cubelets using $p$-norm distances to form admissible phase heuristics (`top_layer_heuristic`, etc.).
 - Evaluates successor states with memoized transposition caching (`@functools.cache`).
+
+### Search Performance & Randomized Restarts
+- **Throughput:** Simulates ~35,000 moves/sec via vector dot products and memoized transposition caching.
+- **Randomized Restarts:** To escape deep local plateaus in complex scrambles without storing massive precomputed pattern tables, A\* incorporates subtle priority randomization (`RANDOMIZE_SEARCH = True`) protected by exponential restart timeouts (`with_restarts`). Typical scrambles solve in 15–30 seconds; difficult configurations that trigger a restart resolve in 1–3 minutes.
 
 ---
 
