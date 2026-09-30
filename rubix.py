@@ -142,17 +142,12 @@ def shuffle(cube, iterations=100_000, seed=42):
   return cube
 
 def run_tests():
-  # Check that every move is a permutation with cyle length 4.
+  # Check that every move is a permutation with cycle length 4.
   for move in moves:
     cubes = [solved_cube]
     for _ in range(3): cubes.append(apply_move_to_cube(move, cubes[-1]))
     assert len(set(cubes)) == 4
     assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
-
-run_tests()
-# print(describe_cube(shuffle(solved_cube)))
-# print("rotation_matrix: ", rotation_matrix.cache_info())
-# print("apply_move_to_cubelet_rotation: ", apply_move_to_cubelet_rotation.cache_info())
 
 
 @dataclass(order=True, frozen=True)
@@ -327,10 +322,10 @@ def bottom_left_front_corner(cube):
 def solve_endgame(cube, report_progress_callback):
   solution = []
   move_by_name = { describe_move(move) : move for move in moves }
-  def apply_move(m, cunbe):
+  def apply_move(m, c):
     move = move_by_name[m]
     solution.append(move)
-    return apply_move_to_cube(move, cube)
+    return apply_move_to_cube(move, c)
   routine = 2 * [
     "counterclockwise rotation of left slice",
     "counterclockwise rotation of top slice",
@@ -382,14 +377,21 @@ def print_stats():
   ))
   cache_info = min_moves_to_solved.cache_info()
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
-
-tough_seeds_for_top_layer = [17, 33]
-tough_seeds_for_middle_layer = [0, 3, 4, 7, 8]
-tough_seeds_for_bottom_layer = [6]
+tough_seeds_for_top_layer, tough_seeds_for_middle_layer, tough_seeds_for_bottom_layer = [17, 33], [0, 3, 4, 7, 8], [6]
 
 if __name__ == "__main__":
-  for seed in range(100):
-    print("== SEED:", seed, "==========================================")
-    random_cube = shuffle(solved_cube, iterations=100_000, seed=seed)
-    solve(random_cube)
+  import sys
+  run_tests()
+  arg = sys.argv[1] if len(sys.argv) > 1 else "42"
+  if arg in ("-h", "--help"):
+    print("Usage: python rubix.py [seed | --benchmark]")
+  elif arg == "--benchmark":
+    for seed in range(100):
+      print("== SEED:", seed, "==========================================")
+      solve(shuffle(solved_cube, iterations=100_000, seed=seed))
+      print_stats()
+  else:
+    seed = int(arg)
+    print("Solving scrambled cube (seed=%d)..." % seed)
+    solve(shuffle(solved_cube, iterations=100_000, seed=seed))
     print_stats()

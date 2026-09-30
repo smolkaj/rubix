@@ -1,32 +1,48 @@
-# Development
-On macOS, I use a virtual enviroment.
+# Development & Hacking
 
-Create a new virtual environment:
-```
+## Environment Setup
+
+Create and activate a virtual environment:
+
+```bash
 python3 -m venv rubix_env
-```
-
-Activate the virtual environment:
-```
 source rubix_env/bin/activate
-```
-
-Install dependencies in the virtual environment:
-```
 pip install -r requirements.txt
 ```
 
-Run script:
-```
+## Running the Solver & GUI
+
+Launch the interactive Pygame GUI:
+```bash
 python rubix_gui.py
 ```
 
-Run tests:
+Run the command-line solver:
+```bash
+# Single scramble solve
+python rubix.py [seed]
+
+# 100-seed benchmark
+python rubix.py --benchmark
 ```
+
+## Running Tests
+
+Run the full unit test suite:
+```bash
 python3 -m unittest discover tests
 ```
 
-When you're done, you can deactivate the virtual environment:
+To run tests in a headless environment without an X11/Wayland display server:
+```bash
+SDL_VIDEODRIVER=dummy python3 -m unittest discover tests
 ```
-deactivate
-```
+
+## Architectural Invariants
+
+- **Strict line count invariant:** `rubix.py` must strictly remain under 400 lines of code (`wc -l rubix.py < 400`). Verify with:
+  ```bash
+  [ $(wc -l < rubix.py) -lt 400 ] && echo "OK" || echo "FAIL: Exceeds 400 lines"
+  ```
+- **Pure Linear Algebra representation:** Cube state must remain formulated as vectors in $\lbrace -1, 0, 1 \rbrace^3$ and $3 \times 3$ rotation matrices.
+- **Headless testability:** All GUI modules must support headless imports and execution (`init_display()` must remain lazy and respect `SDL_VIDEODRIVER=dummy`).
