@@ -1,6 +1,6 @@
 # Rubix
 
-> A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
+> A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
 ![Rubix GUI Preview](img/gui-preview.png)
 
@@ -259,7 +259,7 @@ rubix/
 
 ## Invariants & Design Principles
 
-- **Maximally elegant, simple, and educational:** The solver's primary north star is pedagogical clarity and mathematical beauty. Code clarity and transparent linear algebra always trump micro-optimizations or clever programming tricks.
+- **A Functional Pearl (Maximally elegant, simple, and educational):** Rubix is designed in the tradition of a *functional pearl*—an elegant, instructive gem where the code is an executable mathematical specification. Code clarity, linear algebra transparency, and pedagogical beauty always trump micro-optimizations or clever programming tricks.
 - **Zero ambient magic:** No obscure puzzle encodings or heavyweight dependencies. Pure NumPy vector and matrix arithmetic.
 - **Strict code compactness:** The complete solver and domain model in `rubix.py` strictly stays below 400 lines of clean, readable Python.
 - **Headless-friendly:** GUI components decouple display initializers so importing `rubix_gui` works seamlessly in headless CI/CD environments.
