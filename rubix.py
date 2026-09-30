@@ -13,6 +13,8 @@ import signal
 import math
 import random
 import functools
+import contextlib
+import io
 from collections import deque
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -356,7 +358,10 @@ def solve_endgame(cube, report_progress_callback):
 
   return (cube, tuple(solution))
 
-def solve(cube, report_progress_callback=lambda cube: None):
+def solve(cube, report_progress_callback=lambda cube: None, verbose=True):
+  if not verbose:
+    with contextlib.redirect_stdout(io.StringIO()):
+      return solve(cube, report_progress_callback=report_progress_callback, verbose=True)
   cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube, report_progress_callback)
   print(50 * "-")
   cube, solution2 = solve_bottom_layer_edges(cube, report_progress_callback)
