@@ -57,6 +57,21 @@ class TestRubiksCubeScanner(unittest.TestCase):
             self.assertEqual(detected, expected_name, f"Expected {expected_name}, got {detected}")
             self.assertGreater(conf, 0.5)
 
+    def test_color_classifier_noise_and_dark_rejection(self):
+        """Verify that dark shadows, black borders, and desaturated noise are rejected as UNKNOWN."""
+        classifier = self.ColorClassifier()
+        dark_patches = [
+            (10, 10, 10),   # Pitch black
+            (25, 25, 25),   # Dark plastic seam
+            (15, 10, 35),   # Dark shadow
+            (40, 40, 40),   # Dim neutral gray
+        ]
+        for bgr in dark_patches:
+            patch = np.full((20, 20, 3), bgr, dtype=np.uint8)
+            detected, conf = classifier.classify_patch(patch)
+            self.assertEqual(detected, "UNKNOWN", f"Expected UNKNOWN for {bgr}, got {detected}")
+            self.assertEqual(conf, 0.0)
+
     def test_grid_pos_bijection(self):
         """Verify that grid_to_pos and pos_to_grid form a complete bijection for all 54 facelets."""
         face_normals = [
@@ -78,6 +93,29 @@ class TestRubiksCubeScanner(unittest.TestCase):
                     visited_positions.add((pos, fn))
 
         self.assertEqual(len(visited_positions), 54)
+
+    def test_physical_camera_geometry_consistency(self):
+        """Verify that adjacent faces share edge cubelets and corner cubelets with 100% spatial consistency."""
+        # Front top edge (r=0, c=1) must equal Top front edge (r=2, c=1) -> cubelet (1, 0, 1)
+        self.assertEqual(self.grid_to_pos((1, 0, 0), 0, 1), (1, 0, 1))
+        self.assertEqual(self.grid_to_pos((0, 0, 1), 2, 1), (1, 0, 1))
+
+        # Front right edge (r=1, c=2) must equal Right front edge (r=1, c=0) -> cubelet (1, 1, 0)
+        self.assertEqual(self.grid_to_pos((1, 0, 0), 1, 2), (1, 1, 0))
+        self.assertEqual(self.grid_to_pos((0, 1, 0), 1, 0), (1, 1, 0))
+
+        # Right back edge (r=1, c=2) must equal Back right edge (r=1, c=0) -> cubelet (-1, 1, 0)
+        self.assertEqual(self.grid_to_pos((0, 1, 0), 1, 2), (-1, 1, 0))
+        self.assertEqual(self.grid_to_pos((-1, 0, 0), 1, 0), (-1, 1, 0))
+
+        # Back left edge (r=1, c=2) must equal Left back edge (r=1, c=0) -> cubelet (-1, -1, 0)
+        self.assertEqual(self.grid_to_pos((-1, 0, 0), 1, 2), (-1, -1, 0))
+        self.assertEqual(self.grid_to_pos((0, -1, 0), 1, 0), (-1, -1, 0))
+
+        # Front-Right-Top corner (1, 1, 1)
+        self.assertEqual(self.grid_to_pos((1, 0, 0), 0, 2), (1, 1, 1))
+        self.assertEqual(self.grid_to_pos((0, 1, 0), 0, 0), (1, 1, 1))
+        self.assertEqual(self.grid_to_pos((0, 0, 1), 2, 2), (1, 1, 1))
 
     def test_cube_model_solved_state(self):
         """Verify that CubeModel correctly validates and converts a solved cube."""
@@ -153,11 +191,49 @@ class TestRubiksCubeScanner(unittest.TestCase):
 
         self.assertTrue(is_cube_solved(cur))
 
-    def test_conflict_detection(self):
-        """Verify that CubeModel catches color count and edge/corner inconsistencies."""
+    def test_auto_orient_rotated_faces(self):
+        """Verify that register_face automatically corrects 90, 180, and 270 degree face rotations."""
+        from rubix_scanner import rotate_grid_cw
+        scrambled = shuffle(solved_cube, iterations=8, seed=42)
         model = self.CubeModel()
 
-        # Register faces with an invalid impossible edge (White-Yellow)
+        # Pre-register lateral faces
+        for fn_name, fn in [
+            ("FRONT", (1, 0, 0)),
+            ("RIGHT", (0, 1, 0)),
+            ("BACK", (-1, 0, 0)),
+            ("LEFT", (0, -1, 0)),
+        ]:
+            grid = [["" for _ in range(3)] for _ in range(3)]
+            for cubelet, rotation in scrambled:
+                pos = tuple(np.matmul(rotation, cubelet))
+                if np.dot(pos, fn) == 1:
+                    r, c = self.pos_to_grid(pos, fn)
+                    v = tuple(np.round(np.dot(np.array(rotation).T, fn)).astype(int))
+                    grid[r][c] = color_names[v]
+            model.register_face(fn_name, grid)
+
+        # Extract true TOP grid
+        fn_top = (0, 0, 1)
+        grid_top = [["" for _ in range(3)] for _ in range(3)]
+        for cubelet, rotation in scrambled:
+            pos = tuple(np.matmul(rotation, cubelet))
+            if np.dot(pos, fn_top) == 1:
+                r, c = self.pos_to_grid(pos, fn_top)
+                v = tuple(np.round(np.dot(np.array(rotation).T, fn_top)).astype(int))
+                grid_top[r][c] = color_names[v]
+
+        # Present TOP face rotated by 180 degrees
+        rotated_top = rotate_grid_cw(grid_top, 2)
+        model.register_face("TOP", rotated_top, auto_orient=True)
+
+        # Check that registered face matches true un-rotated grid
+        self.assertEqual(model.faces["TOP"], grid_top)
+
+    def test_conflict_detection_and_pinpointing(self):
+        """Verify that CubeModel catches inconsistencies and flags the exact conflicting stickers."""
+        model = self.CubeModel()
+
         for fn_name, fn in [
             ("FRONT", (1, 0, 0)),
             ("RIGHT", (0, 1, 0)),
@@ -170,34 +246,43 @@ class TestRubiksCubeScanner(unittest.TestCase):
             grid = [[color for _ in range(3)] for _ in range(3)]
             model.register_face(fn_name, grid)
 
-        # Corrupt one sticker on FRONT to create an impossible edge and color imbalance
-        # FRONT top edge is (0, 1). Normally Green-White. Change it to Yellow:
+        # Corrupt one sticker on FRONT to create an impossible edge
+        # FRONT top edge is (0, 1), touching TOP face. Change it to Yellow:
         model.faces["FRONT"][0][1] = "YELLOW"
 
         is_valid, errors, warnings = model.validate()
         self.assertFalse(is_valid)
-        # Check that errors mention color count and/or impossible edge
         error_text = " ".join(errors)
         self.assertTrue("YELLOW" in error_text or "edge" in error_text.lower())
 
-    def test_dynamic_guidance(self):
-        """Verify that get_guidance provides appropriate rotation instructions as faces are scanned."""
+        # Verify get_conflicts pinpoints FRONT (0, 1)
+        conflicts = model.get_conflicts()
+        self.assertIn(("FRONT", 0, 1), conflicts)
+
+    def test_dynamic_adaptive_guidance(self):
+        """Verify that get_guidance provides adaptive contextual rotation guidance."""
         model = self.CubeModel()
-        # Initially empty
+        # Initial guidance
         g0 = model.get_guidance()
         self.assertTrue("Hold" in g0 or "camera" in g0.lower())
 
         # Scan Front
         model.register_face("FRONT", [["GREEN"]*3 for _ in range(3)])
-        g1 = model.get_guidance()
-        self.assertTrue("RED" in g1 or "RIGHT" in g1)
+
+        # When FRONT is in view
+        g_front = model.get_guidance(current_visible_face="FRONT")
+        self.assertTrue("RED" in g_front or "RIGHT" in g_front)
+
+        # Scan Right
+        model.register_face("RIGHT", [["RED"]*3 for _ in range(3)])
+        g_right = model.get_guidance(current_visible_face="RIGHT")
+        self.assertTrue("BLUE" in g_right or "BACK" in g_right)
 
     def test_synthetic_feed_detection(self):
         """Verify that CubeFaceDetector successfully detects and extracts facelets from SyntheticCubeFeed."""
         feed = self.SyntheticCubeFeed()
         detector = self.CubeFaceDetector()
 
-        # Generate a frame for FRONT face with tilt
         test_colors = [
             ["WHITE", "GREEN", "ORANGE"],
             ["RED", "GREEN", "BLUE"],

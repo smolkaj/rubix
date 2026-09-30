@@ -87,28 +87,62 @@ BGR_COLORS: Dict[str, Tuple[int, int, int]] = {
 
 
 # ==============================================================================
-# Coordinate Space Bijections: Grid (row, col) <-> Euclidean 3D Position
+# ==============================================================================
+# Coordinate Space Bijections: Camera Grid (row, col) <-> Euclidean 3D Position
 # ==============================================================================
 
-def pos_to_grid(pos: Tuple[int, int, int], fn: Tuple[int, int, int]) -> Tuple[int, int]:
-    """Maps a 3D cubelet position to its 2D (row, col) on the given face net."""
-    if fn[0] != 0:
-        x, y = pos[1] + 1, -pos[2] + 1
-    elif fn[1] != 0:
-        x, y = -pos[0] + 1, -pos[2] + 1
-    else:
-        x, y = pos[0] + 1, pos[1] + 1
-    return (y, x)
-
-
 def grid_to_pos(fn: Tuple[int, int, int], r: int, c: int) -> Tuple[int, int, int]:
-    """Inverts pos_to_grid: maps face normal and (row, col) back to 3D cubelet position."""
-    if fn[0] != 0:
-        return (fn[0], c - 1, -(r - 1))
-    elif fn[1] != 0:
-        return (-(c - 1), fn[1], -(r - 1))
-    else:
-        return (c - 1, r - 1, fn[2])
+    """Inverts pos_to_grid: maps face normal and camera (row, col) to 3D cubelet position.
+    
+    Camera frame orientation convention when holding the cube:
+    - Lateral faces (FRONT, RIGHT, BACK, LEFT): White (+z) is UP, Yellow (-z) is DOWN.
+      r=0 corresponds to top (+z), r=2 corresponds to bottom (-z).
+      c=0 is image left, c=2 is image right.
+    - TOP (White) face (tilting top toward camera from FRONT):
+      r=0 is Back (-x), r=2 is Front (+x), c=0 is Left (-y), c=2 is Right (+y).
+    - BOTTOM (Yellow) face (tilting bottom toward camera from FRONT):
+      r=0 is Front (+x), r=2 is Back (-x), c=0 is Left (-y), c=2 is Right (+y).
+    """
+    if fn == (1, 0, 0):     # FRONT (Green)
+        return (1, c - 1, -(r - 1))
+    elif fn == (0, 1, 0):   # RIGHT (Red)
+        return (-(c - 1), 1, -(r - 1))
+    elif fn == (-1, 0, 0):  # BACK (Blue)
+        return (-1, -(c - 1), -(r - 1))
+    elif fn == (0, -1, 0):  # LEFT (Orange)
+        return (c - 1, -1, -(r - 1))
+    elif fn == (0, 0, 1):   # TOP (White)
+        return (r - 1, c - 1, 1)
+    elif fn == (0, 0, -1):  # BOTTOM (Yellow)
+        return (-(r - 1), c - 1, -1)
+    raise ValueError(f"Unknown face normal {fn}")
+
+
+def pos_to_grid(pos: Tuple[int, int, int], fn: Tuple[int, int, int]) -> Tuple[int, int]:
+    """Maps a 3D cubelet position to its camera (row, col) on the given face."""
+    if fn == (1, 0, 0):     # FRONT
+        return (-pos[2] + 1, pos[1] + 1)
+    elif fn == (0, 1, 0):   # RIGHT
+        return (-pos[2] + 1, -pos[0] + 1)
+    elif fn == (-1, 0, 0):  # BACK
+        return (-pos[2] + 1, -pos[1] + 1)
+    elif fn == (0, -1, 0):  # LEFT
+        return (-pos[2] + 1, pos[0] + 1)
+    elif fn == (0, 0, 1):   # TOP
+        return (pos[0] + 1, pos[1] + 1)
+    elif fn == (0, 0, -1):  # BOTTOM
+        return (-pos[0] + 1, pos[1] + 1)
+    raise ValueError(f"Unknown face normal {fn}")
+
+
+def rotate_grid_cw(grid: List[List[str]], k: int) -> List[List[str]]:
+    """Rotates a 3x3 grid clockwise by k * 90 degrees."""
+    k = k % 4
+    if k == 0:
+        return [row[:] for row in grid]
+    arr = np.array(grid)
+    rotated = np.rot90(arr, -k)
+    return rotated.tolist()
 
 
 # ==============================================================================
@@ -138,10 +172,18 @@ class ColorClassifier:
         h, s, v = int(hsv[0]), int(hsv[1]), int(hsv[2])
         L, a, b = float(lab[0]), float(lab[1]), float(lab[2])
 
+        # 0. Reject dark shadows, black borders, and low-light noise
+        if v < 45 or L < 40:
+            return ("UNKNOWN", 0.0)
+
         # 1. White detection: low saturation and moderate/high lightness
         if s < 65 and L > 115:
             conf = min(1.0, (140 - s) / 80.0)
             return ("WHITE", max(0.5, conf))
+
+        # Reject desaturated non-white pixels (neutral gray borders)
+        if s < 40:
+            return ("UNKNOWN", 0.0)
 
         # 2. Hue-based classification with LAB refinement
         if 38 <= h < 88:
@@ -365,13 +407,37 @@ class CubeModel:
             self.confirmed_faces[name] = False
             self.face_scan_counts[name] = 0
 
-    def register_face(self, face_name: str, grid_colors: List[List[str]]) -> bool:
-        """Registers a 3x3 face scan into the model."""
+    def register_face(self, face_name: str, grid_colors: List[List[str]], auto_orient: bool = True) -> bool:
+        """Registers a 3x3 face scan into the model with conflict-minimizing auto-orientation."""
         if face_name not in self.faces:
             return False
 
-        # Set facelets
-        self.faces[face_name] = [row[:] for row in grid_colors]
+        best_grid = [row[:] for row in grid_colors]
+        if auto_orient:
+            # Test all 4 rotations (0, 90, 180, 270) against confirmed faces
+            best_errors_count = float("inf")
+            prev_grid = self.faces[face_name]
+            prev_confirmed = self.confirmed_faces[face_name]
+
+            for k in [0, 1, 2, 3]:
+                cand = rotate_grid_cw(grid_colors, k)
+                self.faces[face_name] = cand
+                self.confirmed_faces[face_name] = True
+                is_valid, errors, _ = self.validate()
+                total_errors = len(errors)
+                # Favor rotation 0 if valid (matches canonical orientation)
+                if k == 0 and total_errors == 0:
+                    best_grid = cand
+                    break
+                if total_errors < best_errors_count:
+                    best_errors_count = total_errors
+                    best_grid = cand
+
+            # Restore previous state before final assignment
+            self.faces[face_name] = prev_grid
+            self.confirmed_faces[face_name] = prev_confirmed
+
+        self.faces[face_name] = [row[:] for row in best_grid]
         self.confirmed_faces[face_name] = True
         self.face_scan_counts[face_name] += 1
         return True
@@ -390,6 +456,56 @@ class CubeModel:
                         stickers_count += 1
 
         return (faces_count, stickers_count, color_counts)
+
+    def get_conflicts(self) -> set:
+        """Returns the set of (face_name, r, c) coordinates of stickers involved in conflicts."""
+        conflicts = set()
+        _, _, color_counts = self.get_progress()
+
+        # Excess color stickers
+        excess_colors = {c for c, count in color_counts.items() if count > 9}
+
+        # Map facelet colors by (pos, fn) -> (face_name, r, c, color)
+        facelet_info = {}
+        for face_name, grid in self.faces.items():
+            fn = FACE_NORMALS[face_name]
+            for r in range(3):
+                for c in range(3):
+                    color = grid[r][c]
+                    if color:
+                        pos = grid_to_pos(fn, r, c)
+                        facelet_info[(pos, fn)] = (face_name, r, c, color)
+                        if color in excess_colors:
+                            conflicts.add((face_name, r, c))
+
+        # Check edges
+        for cubelet, _ in solved_cube:
+            if norm1(cubelet) == 2:
+                vis_fns = [fn for fn in unit_vectors if np.dot(cubelet, fn) == 1]
+                fn1, fn2 = vis_fns[0], vis_fns[1]
+                entry1 = facelet_info.get((cubelet, fn1))
+                entry2 = facelet_info.get((cubelet, fn2))
+                if entry1 and entry2:
+                    f1, r1, c1, color1 = entry1
+                    f2, r2, c2, color2 = entry2
+                    pair = tuple(sorted([color1, color2]))
+                    if color1 == color2 or pair not in VALID_EDGES:
+                        conflicts.add((f1, r1, c1))
+                        conflicts.add((f2, r2, c2))
+
+        # Check corners
+        for cubelet, _ in solved_cube:
+            if norm1(cubelet) == 3:
+                vis_fns = [fn for fn in unit_vectors if np.dot(cubelet, fn) == 1]
+                entries = [facelet_info.get((cubelet, fn)) for fn in vis_fns]
+                if all(entries):
+                    colors = [e[3] for e in entries]
+                    triplet = tuple(sorted(colors))
+                    if triplet not in VALID_CORNERS:
+                        for e in entries:
+                            conflicts.add((e[0], e[1], e[2]))
+
+        return conflicts
 
     def validate(self) -> Tuple[bool, List[str], List[str]]:
         """Validates physical Rubik's cube invariants (color counts, edges, corners)."""
@@ -427,11 +543,13 @@ class CubeModel:
                 c1 = facelet_colors.get((cubelet, fn1))
                 c2 = facelet_colors.get((cubelet, fn2))
                 if c1 and c2:
+                    f1_name = NORMAL_TO_FACE[fn1]
+                    f2_name = NORMAL_TO_FACE[fn2]
                     if c1 == c2:
-                        errors.append(f"Impossible duplicate edge color {c1}-{c2} at {cubelet}.")
+                        errors.append(f"Impossible duplicate edge color {c1}-{c2} between {f1_name} and {f2_name}.")
                     pair = tuple(sorted([c1, c2]))
                     if pair not in VALID_EDGES:
-                        errors.append(f"Impossible edge piece {pair[0]}-{pair[1]} at {cubelet}.")
+                        errors.append(f"Impossible edge piece {pair[0]}-{pair[1]} between {f1_name} and {f2_name}.")
 
         # Check corners
         for cubelet, _ in solved_cube:
@@ -441,37 +559,71 @@ class CubeModel:
                 if all(colors):
                     triplet = tuple(sorted(colors))
                     if triplet not in VALID_CORNERS:
-                        errors.append(f"Impossible corner triplet {triplet} at {cubelet}.")
+                        fn_names = [NORMAL_TO_FACE[fn] for fn in vis_fns]
+                        errors.append(f"Impossible corner piece {'-'.join(triplet)} between {', '.join(fn_names)}.")
 
         is_valid = (len(errors) == 0 and stickers_count == 54)
         return (is_valid, errors, warnings)
 
-    def get_guidance(self) -> str:
+    def get_guidance(self, current_visible_face: Optional[str] = None) -> str:
         """Returns real-time conversational guidance on which face to rotate to next."""
         faces_count, stickers_count, color_counts = self.get_progress()
 
         is_valid, errors, _ = self.validate()
         if errors:
-            return f"⚠️ {errors[0]} Please re-show that face to correct."
+            return f"⚠️ {errors[0]} Re-show face or click sticker to fix."
 
         if is_valid:
             return "🎉 Cube completely recognized and verified! Press SPACE or 'Solve' to begin."
 
-        # Structured rotation flow
-        if not self.confirmed_faces["FRONT"]:
-            return "Hold the FRONT (Green) face up to the camera with White on Top."
-        elif not self.confirmed_faces["RIGHT"]:
-            return "👉 Front captured! Rotate cube 90° to the RIGHT to show the RED face."
-        elif not self.confirmed_faces["BACK"]:
-            return "👉 Right captured! Rotate to the RIGHT again to show the BLUE (Back) face."
-        elif not self.confirmed_faces["LEFT"]:
-            return "👉 Back captured! Rotate to the RIGHT again to show the ORANGE (Left) face."
-        elif not self.confirmed_faces["TOP"]:
-            return "👉 Lateral faces complete! Tilt the cube DOWN to show the WHITE (Top) face."
-        elif not self.confirmed_faces["BOTTOM"]:
-            return "👉 Almost done! Tilt the cube UP to show the YELLOW (Bottom) face."
-        else:
+        unconfirmed = [f for f, conf in self.confirmed_faces.items() if not conf]
+        if not unconfirmed:
             return "Analyzing cube state..."
+
+        # If a recognized face is currently visible in camera:
+        if current_visible_face and current_visible_face in self.faces:
+            cur = current_visible_face
+            if not self.confirmed_faces[cur]:
+                return f"Hold the {cur} face steady to capture..."
+
+            # Guide rotation from current face towards an unconfirmed face
+            if cur in ("FRONT", "RIGHT", "BACK", "LEFT"):
+                ring = ["FRONT", "RIGHT", "BACK", "LEFT"]
+                idx = ring.index(cur)
+                next_lat = ring[(idx + 1) % 4]
+                prev_lat = ring[(idx - 1) % 4]
+                if next_lat in unconfirmed:
+                    return f"👉 {cur} captured! Rotate 90° RIGHT to show {next_lat} ({color_names[FACE_NORMALS[next_lat]]})."
+                elif prev_lat in unconfirmed:
+                    return f"👉 {cur} captured! Rotate 90° LEFT to show {prev_lat} ({color_names[FACE_NORMALS[prev_lat]]})."
+                elif "TOP" in unconfirmed:
+                    return "👉 Lateral faces complete! Tilt cube DOWN to show TOP (WHITE)."
+                elif "BOTTOM" in unconfirmed:
+                    return "👉 Tilt cube UP to show BOTTOM (YELLOW)."
+            elif cur == "TOP":
+                if "BOTTOM" in unconfirmed:
+                    return "👉 TOP captured! Tilt cube UP/OVER to show BOTTOM (YELLOW)."
+                for lat in ["FRONT", "RIGHT", "BACK", "LEFT"]:
+                    if lat in unconfirmed:
+                        return f"👉 Tilt cube UP to show {lat} ({color_names[FACE_NORMALS[lat]]})."
+            elif cur == "BOTTOM":
+                if "TOP" in unconfirmed:
+                    return "👉 BOTTOM captured! Tilt cube DOWN/OVER to show TOP (WHITE)."
+                for lat in ["FRONT", "RIGHT", "BACK", "LEFT"]:
+                    if lat in unconfirmed:
+                        return f"👉 Tilt cube DOWN to show {lat} ({color_names[FACE_NORMALS[lat]]})."
+
+        # Default natural sequence if no recognized face is in view
+        next_target = unconfirmed[0]
+        target_color = color_names[FACE_NORMALS[next_target]]
+        if next_target == "FRONT":
+            return f"Hold FRONT ({target_color}) up to the camera with WHITE on Top."
+        elif next_target in ("RIGHT", "BACK", "LEFT"):
+            return f"Rotate cube to show {next_target} ({target_color}) with WHITE on Top."
+        elif next_target == "TOP":
+            return "Tilt cube DOWN to show the TOP (WHITE) face."
+        else:
+            return "Tilt cube UP to show the BOTTOM (YELLOW) face."
 
     def to_rubix_cube(self) -> Tuple[Tuple[Tuple[int, int, int], Tuple[Tuple[int, ...], ...]], ...]:
         """Converts the 54 confirmed facelets into canonical rubix.py algebraic cube representation."""
@@ -690,9 +842,12 @@ class RubiksCubeScanner:
                 self.candidate_streak += 1
                 self.lock_progress = min(1.0, self.candidate_streak / self.stability_threshold)
                 if self.candidate_streak >= self.stability_threshold:
-                    # Lock face!
+                    # Lock face! Only flash if the grid was newly confirmed or modified
+                    cur_grid = self.model.faces.get(detection.face_name)
+                    grid_changed = (cur_grid != detection.grid_colors)
                     self.model.register_face(detection.face_name, detection.grid_colors)
-                    self.flash_timer = 6
+                    if grid_changed:
+                        self.flash_timer = 6
                     self.candidate_streak = 0
                     self.lock_progress = 0.0
             else:
@@ -885,6 +1040,7 @@ def render_scanner_ui(surface: pygame.Surface, scanner: RubiksCubeScanner, font=
     base_x = net_panel_x + 18
     base_y = net_panel_y + 40
     sticker_rects = []
+    conflicts = scanner.model.get_conflicts()
 
     for face_name, (fx, fy) in face_offsets.items():
         fx_pos = base_x + fx * (face_size + face_spacing)
@@ -909,7 +1065,11 @@ def render_scanner_ui(surface: pygame.Surface, scanner: RubiksCubeScanner, font=
                 s_rect = pygame.Rect(sx, sy, sticker_size, sticker_size)
                 sticker_rects.append((s_rect, face_name, r, c))
                 pygame.draw.rect(surface, rgb, s_rect, border_radius=3)
-                pygame.draw.rect(surface, (20, 20, 20), s_rect, 1, border_radius=3)
+                if (face_name, r, c) in conflicts:
+                    # Highlight conflicting stickers with red warning border
+                    pygame.draw.rect(surface, RGB_COLORS["RED"], s_rect, 2, border_radius=3)
+                else:
+                    pygame.draw.rect(surface, (20, 20, 20), s_rect, 1, border_radius=3)
 
         # Highlight active face border
         if is_active:
@@ -945,7 +1105,12 @@ def render_scanner_ui(surface: pygame.Surface, scanner: RubiksCubeScanner, font=
         surface, RGB_COLORS["BORDER"], (20, guidance_y, guidance_w, guidance_h), 1, border_radius=8
     )
 
-    guidance_text = scanner.model.get_guidance()
+    vis_face = (
+        scanner.latest_detection.face_name
+        if scanner.latest_detection and scanner.latest_detection.found and scanner.latest_detection.face_name != "UNKNOWN"
+        else None
+    )
+    guidance_text = scanner.model.get_guidance(current_visible_face=vis_face)
     is_valid, errors, _ = scanner.model.validate()
 
     headline_color = RGB_COLORS["ACCENT"] if is_valid else (RGB_COLORS["WARNING"] if errors else RGB_COLORS["TEXT"])
