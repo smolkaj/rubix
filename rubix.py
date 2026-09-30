@@ -10,10 +10,8 @@ by a standard unit vector or its opposite.
 import numpy as np
 import heapq
 import signal
-import math
 import random
 import functools
-from collections import deque
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any
@@ -107,6 +105,10 @@ def describe_move(move):
       describe_position(v),
   )
 
+def inverse_move(move):
+  v, direction = move
+  return (v, -direction)
+
 @functools.cache
 def rotation_matrix(move):
   v, direction = move
@@ -174,7 +176,7 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
     last_move = came_from[src][1] if src in came_from else None
     for move in get_moves(src):
       # Never immediately undo the move just taken.
-      if last_move and move[0] == last_move[0] and move[1] == -last_move[1]: continue
+      if last_move and move == inverse_move(last_move): continue
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
       cost_so_far[dst], came_from[dst] = cost, (src, move)

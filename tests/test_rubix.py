@@ -13,6 +13,7 @@ from rubix import (
     solve,
     norm1,
     rotation_matrix,
+    inverse_move,
     NUM_CUBELETS,
 )
 
@@ -71,12 +72,12 @@ class TestRubixCube(unittest.TestCase):
 
     def test_inverse_move_cancellation(self):
         """Applying a move and its inverse should be the identity."""
-        for v in unit_vectors:
-            move_cw = (v, 1)
-            move_ccw = (v, -1)
-            cube = apply_move_to_cube(move_cw, solved_cube)
+        for move in moves:
+            inv = inverse_move(move)
+            self.assertIn(inv, moves)
+            cube = apply_move_to_cube(move, solved_cube)
             self.assertNotEqual(cube, solved_cube)
-            cube_restored = apply_move_to_cube(move_ccw, cube)
+            cube_restored = apply_move_to_cube(inv, cube)
             self.assertEqual(cube_restored, solved_cube)
 
     def test_sexy_move_order_6(self):
