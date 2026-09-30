@@ -177,10 +177,28 @@ def create_button(text, x, y, width, height, color, text_color):
     button_rect = pygame.Rect(x, y, width, height)
     return (button_surface, button_rect)
 
-def render_frame_to_image(cube, output_path="img/gui-preview.png"):
+def render_frame_to_image(cube, output_path="img/gui-preview.png", solution=None, move_index=0, current_move=None):
     scr = init_display()
     scr.fill(BACKGROUND)
     draw_cube_static(cube)
+
+    # Draw header buttons
+    button_width, button_height = 150, 40
+    button_y = 10
+    button_spacing = (WIDTH - 3 * button_width) / 4
+    scan_btn = create_button("Scan my cube", button_spacing, button_y, button_width, button_height, COLORS["BLUE"], WHITE)
+    shuffle_btn = create_button("Shuffle", 2 * button_spacing + button_width, button_y, button_width, button_height, COLORS["ORANGE"], WHITE)
+    solve_btn = create_button("Solve", 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, COLORS["GREEN"], WHITE)
+
+    scr.blit(scan_btn[0], scan_btn[1])
+    scr.blit(shuffle_btn[0], shuffle_btn[1])
+    scr.blit(solve_btn[0], solve_btn[1])
+
+    # Draw instructions and move info
+    if solution:
+        draw_instructions(HEIGHT - 60)
+    draw_move_info(move_index, solution, current_move)
+
     pygame.image.save(scr, output_path)
     return output_path
 

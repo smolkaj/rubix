@@ -163,7 +163,7 @@ pip install -r requirements.txt
 
 ### 1. Interactive Pygame Visualizer
 
-Launch the 2D isometric cube visualizer:
+Launch the 2D cube net visualizer:
 
 ```bash
 python rubix_gui.py
