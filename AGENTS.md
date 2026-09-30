@@ -72,6 +72,7 @@ Whenever investigating or fixing a bug observed by a user or in production:
 
 # Philosophy & invariants
 
+- **A Functional Pearl (Maximally elegant, simple, and educational):** The primary north star of Rubix is to serve as a functional pearl—an elegant, instructive gem where the code is an executable mathematical specification. Code clarity, mathematical transparency, and clean algorithmic abstractions always take priority over performance micro-optimizations or clever language tricks.
 - **Simplicity above all:** Rubix is a minimalistic Rubik's cube solver (~300 lines of Python code) and visualizer. Reject accidental complexity, heavy external frameworks, or speculative abstractions.
 - **Single source of truth:** The cube state representation, face notation, and move conventions must have one canonical representation across `rubix.py`, `rubix_gui.py`, and `rubix_scanner.py`.
 - **Churn is free:** When a coherent simplification calls for a refactor, follow it through every affected file and call site. Diff size is not a reason to leave debt behind. The standard is a materially simpler, more understandable system.

@@ -10,10 +10,8 @@ by a standard unit vector or its opposite.
 import numpy as np
 import heapq
 import signal
-import math
 import random
 import functools
-from collections import deque
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any
@@ -107,6 +105,10 @@ def describe_move(move):
       describe_position(v),
   )
 
+def inverse_move(move):
+  v, direction = move
+  return (v, -direction)
+
 @functools.cache
 def rotation_matrix(move):
   v, direction = move
@@ -159,25 +161,25 @@ def astar(start, is_goal, get_moves, apply_move, heuristic = lambda _: 0,
           random_weight=0):
   if is_goal(start): return (start, ())
   frontier = [PrioritizedItem(start, 0)]
-  came_from = {}
-  cost_so_far = { start : 0 }
+  came_from, cost_so_far = {}, { start : 0 }
 
   def reconstruct_solution(dst):
-    path = []
-    current = dst
+    path, current = [], dst
     while current in came_from:
-      src = came_from[current]
-      move = next(m for m in get_moves(src) if apply_move(m, src) == current)
+      src, move = came_from[current]
       path.append(move)
       current = src
     return (dst, tuple(reversed(path)))
 
   while frontier:
     src = heapq.heappop(frontier).item
+    last_move = came_from[src][1] if src in came_from else None
     for move in get_moves(src):
+      # Never immediately undo the move just taken.
+      if last_move and move == inverse_move(last_move): continue
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
-      cost_so_far[dst], came_from[dst] = cost, src
+      cost_so_far[dst], came_from[dst] = cost, (src, move)
       if is_goal(dst): return reconstruct_solution(dst)
       h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
       priority = cost + h_weight * heuristic(dst)

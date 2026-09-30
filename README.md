@@ -1,6 +1,6 @@
 # Rubix
 
-> A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
+> A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
 ![Rubix GUI Preview](img/gui-preview.png)
 
@@ -128,11 +128,11 @@ Phase 5: Endgame Permutation Alignment
  [Solved Cube]
 ```
 
-### Admissible Heuristic
-In each phase, A\* guides search using `min_moves_to_solved(cubelet, rotation)`:
-- Computes the exact minimum number of 90° rotations needed to bring an individual cubelet to its solved coordinate and orientation.
-- Aggregates these estimates across the active layer's target cubelets using $p$-norm distances to form admissible phase heuristics (`top_layer_heuristic`, etc.).
-- Evaluates successor states with memoized transposition caching (`@functools.cache`).
+### Guiding the Search: Distance Estimation
+A\* needs a sense of direction so it doesn't search aimlessly. Rather than storing gigabytes of precomputed lookup tables, Rubix calculates a quick distance estimate on the fly:
+- **Individual piece distance (`min_moves_to_solved`):** Calculates how many 90° turns an isolated cubelet needs to reach its solved coordinate and orientation if no other pieces were in the way.
+- **Layer distance:** Combines the individual estimates of the active layer's target pieces into a single distance score, pulling the search toward states where more pieces are closer to home.
+- **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
 
 ### Search Performance & Randomized Restarts
 - **Throughput:** Simulates ~35,000 moves/sec via vector dot products and memoized transposition caching.
@@ -259,6 +259,7 @@ rubix/
 
 ## Invariants & Design Principles
 
+- **A Functional Pearl (Maximally elegant, simple, and educational):** Rubix is designed in the tradition of a *functional pearl*—an elegant, instructive gem where the code is an executable mathematical specification. Code clarity, linear algebra transparency, and pedagogical beauty always trump micro-optimizations or clever programming tricks.
 - **Zero ambient magic:** No obscure puzzle encodings or heavyweight dependencies. Pure NumPy vector and matrix arithmetic.
 - **Strict code compactness:** The complete solver and domain model in `rubix.py` strictly stays below 400 lines of clean, readable Python.
 - **Headless-friendly:** GUI components decouple display initializers so importing `rubix_gui` works seamlessly in headless CI/CD environments.
