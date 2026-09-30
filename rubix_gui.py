@@ -4,21 +4,31 @@ import numpy as np
 from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move, is_cubelet_solved, NUM_CUBELETS
 
 
-pygame.init()
-pygame.display.set_caption("Rubik's Cube Solver")
-pygame.key.set_repeat(300, 50)  # delay, interval
-
 WIDTH, HEIGHT, TEXT_SIZE = 875, 750, 19
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = None
+font_regular = None
+font_bold = None
+MAX_TEXT_HEIGHT = 20
 
-# Load fonts
-try:
-    font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=TEXT_SIZE)
-    font_bold = pygame.freetype.Font("fonts/Roboto-Medium.ttf", size=TEXT_SIZE)
-except:
-    print("Could not load custom font. Falling back to default font.")
-    font_regular = pygame.freetype.SysFont("Arial", size=TEXT_SIZE)
-    font_bold = font_regular
+def init_display(surface=None):
+    global screen, font_regular, font_bold, MAX_TEXT_HEIGHT
+    if surface is not None:
+        screen = surface
+    elif screen is None:
+        pygame.init()
+        pygame.display.set_caption("Rubik's Cube Solver")
+        pygame.key.set_repeat(300, 50)  # delay, interval
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+    if font_regular is None:
+        try:
+            font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=TEXT_SIZE)
+            font_bold = pygame.freetype.Font("fonts/Roboto-Medium.ttf", size=TEXT_SIZE)
+        except Exception:
+            font_regular = pygame.freetype.SysFont("Arial", size=TEXT_SIZE)
+            font_bold = font_regular
+        MAX_TEXT_HEIGHT = font_bold.get_sized_height(TEXT_SIZE)
+    return screen
 
 COLORS = {
     "GREEN": (46, 204, 113),
@@ -74,6 +84,9 @@ def rotate_cubelet(cubelet, rotation, target_rotation, progress):
     return tuple(map(tuple, interpolated))
 
 def draw_cube_animated(cube, next_cube, progress):
+    global screen
+    if screen is None:
+        init_display()
     face_normals = [
         ( 1,  0,  0),  # Front
         ( 0,  1,  0),  # Right
@@ -114,9 +127,10 @@ def draw_cube_animated(cube, next_cube, progress):
 
 def draw_cube_static(cube): return draw_cube_animated(cube, cube, 1)
 
-MAX_TEXT_HEIGHT = font_bold.get_sized_height(TEXT_SIZE)
-
 def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
+    global screen
+    if screen is None or font_bold is None:
+        init_display()
     padding_x = 10
     rect_height = MAX_TEXT_HEIGHT + 20  # Fixed height based on max possible text height plus some padding
 
@@ -153,6 +167,8 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
     return rect_height
 
 def create_button(text, x, y, width, height, color, text_color):
+    if font_bold is None:
+        init_display()
     button_surface = pygame.Surface((width, height))
     button_surface.fill(color)
     text_surface, _ = font_bold.render(text, text_color)
@@ -160,6 +176,13 @@ def create_button(text, x, y, width, height, color, text_color):
     button_surface.blit(text_surface, text_rect)
     button_rect = pygame.Rect(x, y, width, height)
     return (button_surface, button_rect)
+
+def render_frame_to_image(cube, output_path="img/gui-preview.png"):
+    scr = init_display()
+    scr.fill(BACKGROUND)
+    draw_cube_static(cube)
+    pygame.image.save(scr, output_path)
+    return output_path
 
 def draw_move_info(move_index, solution, current_move):
     x, y, width = 10, HEIGHT - 50, WIDTH - 20
@@ -195,6 +218,7 @@ def report_solve_progress(cube):
     pygame.display.flip()
 
 def main():
+    init_display()
     cube = shuffle(solved_cube, iterations=20)
     original_cube = cube
     solution = None

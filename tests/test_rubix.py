@@ -84,6 +84,46 @@ class TestRubixCube(unittest.TestCase):
 
         self.assertTrue(is_cube_solved(cube))
 
+    def test_shuffle_reproducibility(self):
+        """Shuffle with the same seed must produce identical cube states."""
+        from rubix import shuffle
+        cube_a = shuffle(solved_cube, iterations=20, seed=42)
+        cube_b = shuffle(solved_cube, iterations=20, seed=42)
+        cube_c = shuffle(solved_cube, iterations=20, seed=99)
+        self.assertEqual(cube_a, cube_b)
+        self.assertNotEqual(cube_a, cube_c)
+        self.assertFalse(is_cube_solved(cube_a))
+
+    def test_descriptions(self):
+        """Verify describe_position, describe_move, and describe_cubelet_type."""
+        from rubix import describe_position, describe_move, describe_cubelet_type
+        self.assertEqual(describe_position((1, 0, 0)), "front")
+        self.assertEqual(describe_position((0, 1, 1)), "top-right")
+        self.assertEqual(describe_position((-1, -1, -1)), "bottom-left-back")
+        self.assertEqual(describe_cubelet_type((0, 0, 1)), "center")
+        self.assertEqual(describe_cubelet_type((1, 1, 0)), "edge")
+        self.assertEqual(describe_cubelet_type((1, 1, 1)), "corner")
+        self.assertEqual(
+            describe_move(((1, 0, 0), 1)),
+            "clockwise rotation of front slice",
+        )
+        self.assertEqual(
+            describe_move(((0, 0, -1), -1)),
+            "counterclockwise rotation of bottom slice",
+        )
+
+    def test_headless_gui_render(self):
+        """Verify that rubix_gui renders a frame headlessly without error."""
+        import os
+        import tempfile
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        with tempfile.NamedTemporaryFile(suffix=".png") as f:
+            out_path = rubix_gui.render_frame_to_image(solved_cube, f.name)
+            self.assertTrue(os.path.exists(out_path))
+            self.assertGreater(os.path.getsize(out_path), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
