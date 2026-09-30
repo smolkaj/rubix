@@ -1,6 +1,6 @@
 # Rubix
 
-> A minimalistic Rubik's Cube solver and interactive visualizer in **under 400 lines of Python**, powered by **linear algebra**.
+> A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
 ![Rubix GUI Preview](img/gui-preview.png)
 
