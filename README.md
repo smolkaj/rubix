@@ -128,11 +128,11 @@ Phase 5: Endgame Permutation Alignment
  [Solved Cube]
 ```
 
-### Admissible Heuristic
-In each phase, A\* guides search using `min_moves_to_solved(cubelet, rotation)`:
-- Computes the exact minimum number of 90° rotations needed to bring an individual cubelet to its solved coordinate and orientation.
-- Aggregates these estimates across the active layer's target cubelets using $p$-norm distances to form admissible phase heuristics (`top_layer_heuristic`, etc.).
-- Evaluates successor states with memoized transposition caching (`@functools.cache`).
+### Guiding the Search: Distance Estimation
+A\* needs a sense of direction so it doesn't search aimlessly. Rather than storing gigabytes of precomputed lookup tables, Rubix calculates a quick distance estimate on the fly:
+- **Individual piece distance (`min_moves_to_solved`):** Calculates how many 90° turns an isolated cubelet needs to reach its solved coordinate and orientation if no other pieces were in the way.
+- **Layer distance:** Combines the individual estimates of the active layer's target pieces into a single distance score, pulling the search toward states where more pieces are closer to home.
+- **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
 
 ### Search Performance & Randomized Restarts
 - **Throughput:** Simulates ~35,000 moves/sec via vector dot products and memoized transposition caching.
