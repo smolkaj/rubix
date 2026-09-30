@@ -1,5 +1,3 @@
-import contextlib
-import io
 import unittest
 
 from rubix import (
@@ -79,48 +77,12 @@ class TestRubixCube(unittest.TestCase):
             cube = apply_move_to_cube(m, cube)
         self.assertFalse(is_cube_solved(cube))
 
-        # Solve quietly
-        solution = solve(cube, verbose=False)
+        # Solve
+        solution = solve(cube)
         for m in solution:
             cube = apply_move_to_cube(m, cube)
 
         self.assertTrue(is_cube_solved(cube))
-
-    def test_solve_verbose_flag_controls_output(self):
-        """Verify verbose=False suppresses stdout while verbose=True emits logs."""
-        scramble = [((1, 0, 0), 1)]
-        cube = solved_cube
-        for m in scramble:
-            cube = apply_move_to_cube(m, cube)
-
-        # verbose=False should produce no output
-        buf_quiet = io.StringIO()
-        with contextlib.redirect_stdout(buf_quiet):
-            solve(cube, verbose=False)
-        self.assertEqual(buf_quiet.getvalue(), "")
-
-        # verbose=True should produce output
-        buf_verbose = io.StringIO()
-        with contextlib.redirect_stdout(buf_verbose):
-            solve(cube, verbose=True)
-        self.assertIn("solving cubelet", buf_verbose.getvalue())
-
-    def test_solve_quiet_preserves_callback_output(self):
-        """Verify report_progress_callback output is preserved even when verbose=False."""
-        scramble = [((1, 0, 0), 1)]
-        cube = solved_cube
-        for m in scramble:
-            cube = apply_move_to_cube(m, cube)
-
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            solve(
-                cube,
-                report_progress_callback=lambda c: print("callback_output"),
-                verbose=False,
-            )
-        self.assertIn("callback_output", buf.getvalue())
-        self.assertNotIn("solving cubelet", buf.getvalue())
 
 
 if __name__ == "__main__":

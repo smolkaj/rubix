@@ -24,14 +24,10 @@ RANDOMIZE_SEARCH = True
 # Remember start up time for stats.
 STARTUP_TIME = datetime.now()
 
-# Whether solver logging is enabled.
-_verbose = True
-
-# Redefine print to include timestamps when verbose is enabled.
+# Redefine print to include timestamps.
 _print = print
 def print(*args, **kw):
-  if _verbose:
-    _print("[%s]" % (datetime.now().strftime('%H:%M:%S')), *args, **kw)
+  _print("[%s]" % (datetime.now().strftime('%H:%M:%S')), *args, **kw)
 
 # Returns the 1-norm of a vector.
 def norm1(v): return sum(abs(x) for x in v)
@@ -360,26 +356,20 @@ def solve_endgame(cube, report_progress_callback):
 
   return (cube, tuple(solution))
 
-def solve(cube, report_progress_callback=lambda cube: None, verbose=True):
-  global _verbose
-  prev_verbose = _verbose
-  _verbose = verbose
-  try:
-    cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube, report_progress_callback)
-    print(50 * "-")
-    cube, solution2 = solve_bottom_layer_edges(cube, report_progress_callback)
-    print(50 * "-")
-    cube, solution3 = with_restarts(30, solve_bottom_layer_corners, cube, report_progress_callback)
-    print(50 * "-")
-    cube, solution4 = solve_endgame(cube, report_progress_callback)
-    solution = solution1 + solution2 + solution3 + solution4
-    print("Solved cube in %d moves. Final cube:" % len(solution))
-    # print(describe_cube(cube))
-    print("is_cube_solved: ", is_cube_solved(cube))
-    print("cube == solved_cube: ", cube == solved_cube)
-    return solution
-  finally:
-    _verbose = prev_verbose
+def solve(cube, report_progress_callback=lambda cube: None):
+  cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube, report_progress_callback)
+  print(50 * "-")
+  cube, solution2 = solve_bottom_layer_edges(cube, report_progress_callback)
+  print(50 * "-")
+  cube, solution3 = with_restarts(30, solve_bottom_layer_corners, cube, report_progress_callback)
+  print(50 * "-")
+  cube, solution4 = solve_endgame(cube, report_progress_callback)
+  solution = solution1 + solution2 + solution3 + solution4
+  print("Solved cube in %d moves. Final cube:" % len(solution))
+  # print(describe_cube(cube))
+  print("is_cube_solved: ", is_cube_solved(cube))
+  print("cube == solved_cube: ", cube == solved_cube)
+  return solution
 
 def print_stats():
   secs_elapsed = (datetime.now() - STARTUP_TIME).total_seconds()
