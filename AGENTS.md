@@ -50,11 +50,11 @@ git worktree remove ../rubix-<task>
 
 # Hindsight reflection
 
-Before submitting a PR for review, pause, run the [hindsight reflection](.agents/skills/hindsight-reflection), and post the evaluation in dialogue with the user.
+Before submitting a PR for review, pause, run the [hindsight reflection](.agents/skills/hindsight-reflection/SKILL.md), and post the evaluation in dialogue with the user.
 
 # Independent review loop
 
-Every PR must pass the [independent PR review loop](.agents/skills/independent-pr-review) before merge.
+Every PR must pass the [independent PR review loop](.agents/skills/independent-pr-review/SKILL.md) before merge.
 
 # Escaped defect analysis & post-mortem
 

@@ -1,7 +1,5 @@
 import unittest
-import numpy as np
 
-import rubix
 from rubix import (
     solved_cube,
     moves,
@@ -10,7 +8,6 @@ from rubix import (
     apply_move_to_cube,
     is_cube_solved,
     solve,
-    shuffle,
     NUM_CUBELETS,
 )
 
