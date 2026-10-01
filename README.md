@@ -267,8 +267,15 @@ rubix/
 
 ---
 
+## Inspiration & Acknowledgments
+
+The core insight for Rubix was directly sparked by Grant Sanderson’s ([3Blue1Brown](https://www.3blue1brown.com)) masterclass YouTube series, [**Essence of Linear Algebra**](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab). The series’ emphasis on geometric intuition—treating matrices as transformations of coordinate space and tracking where standard basis vectors land—inspired ditching messy combinatorial sticker permutations in favor of discrete 3D rotation matrices, vectors, and inner products. Massive praise and gratitude to Grant for making linear algebra so intuitive, visual, and delightful.
+
+---
+
 ## License
 
 Copyright 2023–2026 Steffen Smolka.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+
