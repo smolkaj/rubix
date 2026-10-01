@@ -2,3 +2,5 @@
 .DS_Store
 __*__
 *_env
+build/
+.mojo_cache
