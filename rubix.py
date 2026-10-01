@@ -305,8 +305,8 @@ def bottom_left_front_corner(cube):
 
 def solve_endgame(cube, report_progress_callback):
   solution = []
-  L, U, D = ((0, -1, 0), 1), ((0, 0, 1), 1), ((0, 0, -1), 1)
-  routine = 2 * (inverse_move(L), inverse_move(U), L, U)
+  left, top, bottom = ((0, -1, 0), 1), ((0, 0, 1), 1), ((0, 0, -1), 1)
+  routine = 2 * (inverse_move(left), inverse_move(top), left, top)
 
   def apply(move):
     nonlocal cube
@@ -317,16 +317,16 @@ def solve_endgame(cube, report_progress_callback):
     c, r = bottom_left_front_corner(cube)
     for _ in range(4):
       if is_cubelet_solved(c, r): return True
-      r = apply_move_to_cubelet_rotation(D, c, r)
+      r = apply_move_to_cubelet_rotation(bottom, c, r)
     return False
 
   for _ in range(4):
     report_progress_callback(cube)
     while not is_corner_oriented():
       for move in routine: apply(move)
-    apply(D)
+    apply(bottom)
 
-  while not is_cube_solved(cube): apply(D)
+  while not is_cube_solved(cube): apply(bottom)
   return (cube, tuple(solution))
 
 def solve(cube, report_progress_callback=lambda cube: None):
