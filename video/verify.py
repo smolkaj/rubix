@@ -13,6 +13,15 @@ import numpy as np
 import render
 
 
+class StoryChecks(unittest.TestCase):
+    def test_explicit_narrative_handoffs_reach_the_next_scene(self):
+        for index, beat in enumerate(render.STORY):
+            if "continues_with" in beat:
+                with self.subTest(scene=beat["title"]):
+                    self.assertLess(index + 1, len(render.STORY))
+                    self.assertEqual(render.STORY[index + 1]["visual"], beat["continues_with"])
+
+
 class GeometryChecks(unittest.TestCase):
     def test_sticker_lists_are_bijections_with_inverse_turns(self):
         slots = render.sticker_slots()
@@ -138,7 +147,7 @@ def verify_film():
 
 if __name__ == "__main__":
     suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromTestCase(checks)
-                               for checks in [GeometryChecks, CaptionChecks, SpeechTimingChecks])
+                               for checks in [StoryChecks, GeometryChecks, CaptionChecks, SpeechTimingChecks])
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful():
         raise SystemExit(1)

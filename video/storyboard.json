@@ -52,7 +52,7 @@
         "pause_after": 1.5
       },
       {
-        "text": "A face is an outside surface. The objects that carry those stickers live underneath it. Let's look at one.",
+        "text": "A face is an outside surface. The stickers are attached to small blocks called cubelets. Let's look at the cubelet carrying our green and white stickers.",
         "rate": "-14%",
         "pitch": "+0Hz",
         "pause_after": 2.0
@@ -62,41 +62,8 @@
       "face": "Nine",
       "equation": "Nine"
     },
-    "animate": false
-  },
-  {
-    "act": 0,
-    "visual": "flat_list",
-    "title": "A list can record the colors",
-    "equation": "",
-    "notes": [
-      "One list of 54 slots, wrapped into rows to fit."
-    ],
-    "narration": [
-      {
-        "text": "Here is a natural first attempt. Number the fifty four sticker positions, and store their colors in a list. This is a perfectly valid way to represent the cube.",
-        "rate": "-14%",
-        "pitch": "+0Hz",
-        "pause_after": 1.9
-      },
-      {
-        "text": "Now turn the top. Each moving sticker has to jump from its old list entry to a new one. Follow the colored paths. A single smooth turn has become a collection of scattered index changes.",
-        "rate": "-14%",
-        "pitch": "+0Hz",
-        "pause_after": 2.8
-      },
-      {
-        "text": "We could specify those permutations, one move at a time. But the list order gives us little help in seeing why these stickers belong to the same turn. Can we keep the spatial structure in our description?",
-        "rate": "-14%",
-        "pitch": "+3Hz",
-        "pause_after": 3.0
-      }
-    ],
-    "cues": {
-      "turn": "Follow"
-    },
-    "animate": true,
-    "turn_duration": 8.0
+    "animate": false,
+    "continues_with": "anatomy_cubelet"
   },
   {
     "act": 0,
@@ -121,7 +88,8 @@
       }
     ],
     "cues": {},
-    "animate": false
+    "animate": false,
+    "continues_with": "anatomy_layer"
   },
   {
     "act": 0,
@@ -156,6 +124,40 @@
       "equation": "rules"
     },
     "animate": true
+  },
+  {
+    "act": 0,
+    "visual": "flat_list",
+    "title": "A list can record the colors",
+    "equation": "",
+    "notes": [
+      "One list of 54 slots, wrapped into rows to fit."
+    ],
+    "narration": [
+      {
+        "text": "Here is a natural first attempt. Number the fifty four sticker positions, and store their colors in a list. This is a perfectly valid way to represent the cube.",
+        "rate": "-14%",
+        "pitch": "+0Hz",
+        "pause_after": 1.9
+      },
+      {
+        "text": "Now turn the top. Each moving sticker has to jump from its old list entry to a new one. Follow the colored paths. A single smooth turn has become a collection of scattered index changes.",
+        "rate": "-14%",
+        "pitch": "+0Hz",
+        "pause_after": 2.8
+      },
+      {
+        "text": "We could specify those permutations, one move at a time. But the list order gives us little help in seeing why these stickers belong to the same turn. Can we keep the spatial structure in our description?",
+        "rate": "-14%",
+        "pitch": "+3Hz",
+        "pause_after": 3.0
+      }
+    ],
+    "cues": {
+      "turn": "Follow"
+    },
+    "animate": true,
+    "turn_duration": 8.0
   },
   {
     "act": 0,
