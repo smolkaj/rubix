@@ -36,7 +36,7 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
 > - **$180^\circ$ and $270^\circ$ turns** decompose directly into sequences of elementary $\pm 90^\circ$ quarter turns.  
 > - **Middle-slice turns** are redundant: turning an equator is physically identical to counter-rotating both opposing outer faces and tilting the cube.  
 > 
-> What remains is a complete, minimal basis: **6 outer faces $\times$ 2 directions ($\pm 90^\circ$) = 12 atomic moves**. As a profound payoff, omitting middle-slice moves keeps all 6 center cubelets permanently stationary in space.
+> What remains is a complete, minimal basis: **6 outer faces $\times$ 2 directions ($\pm 90^\circ$) = 12 atomic moves**. As a profound payoff, omitting middle-slice moves and whole-cube rotations keeps all 6 center cubelets permanently stationary in space.
 
 ---
 
