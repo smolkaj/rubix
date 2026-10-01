@@ -35,17 +35,24 @@ C_TEXT_TITLE = (255, 255, 255)
 C_TEXT_SUB = (205, 215, 230)
 C_TEXT_MUTED = (165, 180, 202)
 
-# Cubelet base colors (clearly visible 3D geometry for unhighlighted)
-C_DARK_TOP = (58, 66, 82)
-C_DARK_FRONT = (46, 53, 67)
-C_DARK_RIGHT = (36, 42, 54)
-C_DARK_EDGE = (90, 102, 126)
+# Cubelet base colors (dark charcoal for unhighlighted faces)
+C_DARK_TOP = (42, 48, 60)
+C_DARK_FRONT = (32, 37, 48)
+C_DARK_RIGHT = (25, 29, 39)
+C_DARK_EDGE = (62, 72, 92)
 
-# Lightly highlighted face wash colors (shows which faces the cubelet belongs to)
-C_WASH_TOP = (76, 88, 112)
-C_WASH_FRONT = (62, 72, 94)
-C_WASH_RIGHT = (50, 58, 76)
-C_WASH_EDGE = (112, 128, 158)
+# High-contrast face wash colors (clearly illuminates which 2D faces the cubelet belongs to)
+# Top face wash: cool white/ice-blue wash for the White face (+Z)
+C_WASH_TOP = (140, 160, 192)
+C_WASH_TOP_EDGE = (195, 218, 248)
+
+# Front face wash: rich emerald wash for the Green face (+X)
+C_WASH_FRONT = (40, 118, 86)
+C_WASH_FRONT_EDGE = (82, 202, 150)
+
+# Right face wash: rich ruby wash for the Red face (+Y)
+C_WASH_RIGHT = (125, 52, 62)
+C_WASH_RIGHT_EDGE = (220, 102, 116)
 
 # Colors for facelets
 C_WHITE = (255, 255, 255)
@@ -98,10 +105,10 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
     if mode == "core":
         # Render the internal core at (0, 0, 0) inside a wireframe cube cage
         # 1. Solid glowing core at origin
-        c_core_top = (139, 92, 246)    # Vibrant Purple
-        c_core_front = (109, 40, 217)
-        c_core_right = (91, 33, 182)
-        c_core_edge = (196, 181, 253)
+        c_core_top = (168, 85, 247)
+        c_core_front = (147, 51, 234)
+        c_core_right = (126, 34, 206)
+        c_core_edge = (216, 180, 254)
 
         draw_cubelet_face(draw, 0, 0, 0, "top", cx, cy, sz, c_core_top, c_core_edge, int(2 * SCALE))
         draw_cubelet_face(draw, 0, 0, 0, "front", cx, cy, sz, c_core_front, c_core_edge, int(2 * SCALE))
@@ -123,112 +130,94 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
 
         # 3. Outer wireframe box
         col_box = (100, 112, 135)
-        col_grid = (75, 84, 104)
         w_box = int(1.5 * SCALE)
-        w_grid = 1 * SCALE
 
-        # Outer vertical edges
         for i in [-1.5, 1.5]:
             for j in [-1.5, 1.5]:
                 draw.line([project_pt(i, j, -1.5, cx, cy, sz), project_pt(i, j, 1.5, cx, cy, sz)], fill=col_box, width=w_box)
 
-        # Top boundary polygon
-        p_t1 = project_pt(-1.5, -1.5, 1.5, cx, cy, sz)
-        p_t2 = project_pt(1.5, -1.5, 1.5, cx, cy, sz)
-        p_t3 = project_pt(1.5, 1.5, 1.5, cx, cy, sz)
-        p_t4 = project_pt(-1.5, 1.5, 1.5, cx, cy, sz)
-        draw.polygon([p_t1, p_t2, p_t3, p_t4], outline=col_box, width=w_box)
+        for poly in [
+            [project_pt(-1.5, -1.5, 1.5, cx, cy, sz), project_pt(1.5, -1.5, 1.5, cx, cy, sz), project_pt(1.5, 1.5, 1.5, cx, cy, sz), project_pt(-1.5, 1.5, 1.5, cx, cy, sz)],
+            [project_pt(1.5, -1.5, -1.5, cx, cy, sz), project_pt(1.5, 1.5, -1.5, cx, cy, sz), project_pt(1.5, 1.5, 1.5, cx, cy, sz), project_pt(1.5, -1.5, 1.5, cx, cy, sz)],
+            [project_pt(-1.5, 1.5, -1.5, cx, cy, sz), project_pt(1.5, 1.5, -1.5, cx, cy, sz), project_pt(1.5, 1.5, 1.5, cx, cy, sz), project_pt(-1.5, 1.5, 1.5, cx, cy, sz)],
+        ]:
+            draw.polygon(poly, outline=col_box, width=w_box)
+        return
 
-        # Front boundary polygon
-        p_f1 = project_pt(1.5, -1.5, -1.5, cx, cy, sz)
-        p_f2 = project_pt(1.5, 1.5, -1.5, cx, cy, sz)
-        p_f3 = project_pt(1.5, 1.5, 1.5, cx, cy, sz)
-        p_f4 = project_pt(1.5, -1.5, 1.5, cx, cy, sz)
-        draw.polygon([p_f1, p_f2, p_f3, p_f4], outline=col_box, width=w_box)
+    # Configuration per cubelet type
+    active_faces = {
+        "corner": {"top", "front", "right"},
+        "edge": {"top", "front"},
+        "center": {"top"},
+    }.get(mode, set())
 
-        # Right boundary polygon
-        p_r1 = project_pt(-1.5, 1.5, -1.5, cx, cy, sz)
-        p_r2 = project_pt(1.5, 1.5, -1.5, cx, cy, sz)
-        p_r3 = project_pt(1.5, 1.5, 1.5, cx, cy, sz)
-        p_r4 = project_pt(-1.5, 1.5, 1.5, cx, cy, sz)
-        draw.polygon([p_r1, p_r2, p_r3, p_r4], outline=col_box, width=w_box)
+    target = {
+        "corner": (1, 1, 1),
+        "edge": (1, 0, 1),
+        "center": (0, 0, 1),
+    }.get(mode, None)
 
-        # Grid lines on top, front, right faces
-        for u in [-0.5, 0.5]:
-            draw.line([project_pt(-1.5, u, 1.5, cx, cy, sz), project_pt(1.5, u, 1.5, cx, cy, sz)], fill=col_grid, width=w_grid)
-            draw.line([project_pt(u, -1.5, 1.5, cx, cy, sz), project_pt(u, 1.5, 1.5, cx, cy, sz)], fill=col_grid, width=w_grid)
-            draw.line([project_pt(1.5, -1.5, u, cx, cy, sz), project_pt(1.5, 1.5, u, cx, cy, sz)], fill=col_grid, width=w_grid)
-            draw.line([project_pt(1.5, u, -1.5, cx, cy, sz), project_pt(1.5, u, 1.5, cx, cy, sz)], fill=col_grid, width=w_grid)
-            draw.line([project_pt(-1.5, 1.5, u, cx, cy, sz), project_pt(1.5, 1.5, u, cx, cy, sz)], fill=col_grid, width=w_grid)
-            draw.line([project_pt(u, 1.5, -1.5, cx, cy, sz), project_pt(u, 1.5, 1.5, cx, cy, sz)], fill=col_grid, width=w_grid)
+    # Render cubelets
+    for i, j, k in cubelets:
+        is_target = (target and i == target[0] and j == target[1] and k == target[2])
 
-    elif mode == "center":
-        # Highlight top-center (0, 0, 1): part of 1 face (Top face lightly washed)
-        for i, j, k in cubelets:
-            is_center = (i == 0 and j == 0 and k == 1)
-            fill_top = C_WHITE if is_center else C_WASH_TOP
-            edge_top = (255, 255, 255) if is_center else C_WASH_EDGE
-            w_top = 2 * SCALE if is_center else 1 * SCALE
+        # Top face
+        if k == 1:
+            if is_target:
+                fill_t = C_WHITE
+                edge_t = (255, 255, 255)
+                w_t = 2 * SCALE
+            elif "top" in active_faces:
+                fill_t = C_WASH_TOP
+                edge_t = C_WASH_TOP_EDGE
+                w_t = int(1.5 * SCALE)
+            else:
+                fill_t = C_DARK_TOP
+                edge_t = C_DARK_EDGE
+                w_t = 1 * SCALE
+            draw_cubelet_face(draw, i, j, k, "top", cx, cy, sz, fill_t, edge_t, w_t)
 
-            fill_front = C_DARK_FRONT
-            fill_right = C_DARK_RIGHT
-            edge_front = C_DARK_EDGE
-            edge_right = C_DARK_EDGE
-            w_front = 1 * SCALE
-            w_right = 1 * SCALE
+        # Front face
+        if i == 1:
+            if is_target:
+                fill_f = C_GREEN
+                edge_f = (140, 255, 195)
+                w_f = 2 * SCALE
+            elif "front" in active_faces:
+                fill_f = C_WASH_FRONT
+                edge_f = C_WASH_FRONT_EDGE
+                w_f = int(1.5 * SCALE)
+            else:
+                fill_f = C_DARK_FRONT
+                edge_f = C_DARK_EDGE
+                w_f = 1 * SCALE
+            draw_cubelet_face(draw, i, j, k, "front", cx, cy, sz, fill_f, edge_f, w_f)
 
-            if k == 1:
-                draw_cubelet_face(draw, i, j, k, "top", cx, cy, sz, fill_top, edge_top, w_top)
-            if i == 1:
-                draw_cubelet_face(draw, i, j, k, "front", cx, cy, sz, fill_front, edge_front, w_front)
-            if j == 1:
-                draw_cubelet_face(draw, i, j, k, "right", cx, cy, sz, fill_right, edge_right, w_right)
+        # Right face
+        if j == 1:
+            if is_target:
+                fill_r = C_RED
+                edge_r = (255, 160, 160)
+                w_r = 2 * SCALE
+            elif "right" in active_faces:
+                fill_r = C_WASH_RIGHT
+                edge_r = C_WASH_RIGHT_EDGE
+                w_r = int(1.5 * SCALE)
+            else:
+                fill_r = C_DARK_RIGHT
+                edge_r = C_DARK_EDGE
+                w_r = 1 * SCALE
+            draw_cubelet_face(draw, i, j, k, "right", cx, cy, sz, fill_r, edge_r, w_r)
 
-    elif mode == "edge":
-        # Highlight front-top edge (1, 0, 1): part of 2 faces (Top & Front faces lightly washed)
-        for i, j, k in cubelets:
-            is_edge = (i == 1 and j == 0 and k == 1)
-            fill_top = C_WHITE if is_edge else C_WASH_TOP
-            edge_top = (255, 255, 255) if is_edge else C_WASH_EDGE
-            w_top = 2 * SCALE if is_edge else 1 * SCALE
-
-            fill_front = C_GREEN if is_edge else C_WASH_FRONT
-            edge_front = (140, 255, 195) if is_edge else C_WASH_EDGE
-            w_front = 2 * SCALE if is_edge else 1 * SCALE
-
-            fill_right = C_DARK_RIGHT
-            edge_right = C_DARK_EDGE
-            w_right = 1 * SCALE
-
-            if k == 1:
-                draw_cubelet_face(draw, i, j, k, "top", cx, cy, sz, fill_top, edge_top, w_top)
-            if i == 1:
-                draw_cubelet_face(draw, i, j, k, "front", cx, cy, sz, fill_front, edge_front, w_front)
-            if j == 1:
-                draw_cubelet_face(draw, i, j, k, "right", cx, cy, sz, fill_right, edge_right, w_right)
-
-    elif mode == "corner":
-        # Highlight front-top-right corner (1, 1, 1): part of 3 faces (Top, Front, Right faces lightly washed)
-        for i, j, k in cubelets:
-            is_corner = (i == 1 and j == 1 and k == 1)
-            fill_top = C_WHITE if is_corner else C_WASH_TOP
-            edge_top = (255, 255, 255) if is_corner else C_WASH_EDGE
-            w_top = 2 * SCALE if is_corner else 1 * SCALE
-
-            fill_front = C_GREEN if is_corner else C_WASH_FRONT
-            edge_front = (140, 255, 195) if is_corner else C_WASH_EDGE
-            w_front = 2 * SCALE if is_corner else 1 * SCALE
-
-            fill_right = C_RED if is_corner else C_WASH_RIGHT
-            edge_right = (255, 160, 160) if is_corner else C_WASH_EDGE
-            w_right = 2 * SCALE if is_corner else 1 * SCALE
-
-            if k == 1:
-                draw_cubelet_face(draw, i, j, k, "top", cx, cy, sz, fill_top, edge_top, w_top)
-            if i == 1:
-                draw_cubelet_face(draw, i, j, k, "front", cx, cy, sz, fill_front, edge_front, w_front)
-            if j == 1:
-                draw_cubelet_face(draw, i, j, k, "right", cx, cy, sz, fill_right, edge_right, w_right)
+    # Re-draw the target hero cubelet on top to ensure crisp borders
+    if target:
+        ti, tj, tk = target
+        if tk == 1:
+            draw_cubelet_face(draw, ti, tj, tk, "top", cx, cy, sz, C_WHITE, (255, 255, 255), 2 * SCALE)
+        if ti == 1 and mode in ("corner", "edge"):
+            draw_cubelet_face(draw, ti, tj, tk, "front", cx, cy, sz, C_GREEN, (140, 255, 195), 2 * SCALE)
+        if tj == 1 and mode == "corner":
+            draw_cubelet_face(draw, ti, tj, tk, "right", cx, cy, sz, C_RED, (255, 160, 160), 2 * SCALE)
 
 
 # Define 4 panels in descending order: 3 -> 2 -> 1 -> 0 faces
