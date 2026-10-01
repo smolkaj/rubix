@@ -49,6 +49,9 @@ COLOR_TO_FACE: Dict[str, str] = {
     color: NORMAL_TO_FACE[vec] for color, vec in COLOR_TO_NORMAL.items()
 }
 
+# Canonical 6 Rubik's cube colors
+CANONICAL_COLORS: List[str] = ["WHITE", "YELLOW", "GREEN", "BLUE", "RED", "ORANGE"]
+
 # Canonical 12 valid edge color pairs and 8 corner color triplets on a standard cube
 VALID_EDGES = set()
 for c, _ in solved_cube:
@@ -213,6 +216,47 @@ class ColorClassifier:
         med_bgr = tuple(int(round(x)) for x in np.median(pixels, axis=0))
         return self.classify_bgr(med_bgr)
 
+    def compute_likelihoods_bgr(self, bgr: Tuple[int, int, int], sigma: float = 16.0) -> Dict[str, float]:
+        """Computes categorical measurement likelihoods L(c) for the 6 canonical colors derived from CIELAB distances."""
+        pix = np.uint8([[bgr]])
+        hsv = cv2.cvtColor(pix, cv2.COLOR_BGR2HSV)[0, 0]
+        lab = cv2.cvtColor(pix, cv2.COLOR_BGR2LAB)[0, 0].astype(np.float32)
+
+        h, s, v = int(hsv[0]), int(hsv[1]), int(hsv[2])
+        L, a, b = float(lab[0]), float(lab[1]), float(lab[2])
+
+        # Reject dark shadows, black borders, and uninformative low-light noise (uniform likelihood)
+        if v < 45 or L < 40 or (s < 40 and not (s < 65 and L > 115)):
+            return {c: 1.0 / 6.0 for c in CANONICAL_COLORS}
+
+        # Weighted CIELAB distance: lower weight on L* (lighting variations),
+        # higher on chromaticity a*, b*
+        dists = {}
+        for c, target in self.lab_targets.items():
+            dL = (L - target[0])
+            da = (a - target[1])
+            db = (b - target[2])
+            if c == "WHITE":
+                dist = np.sqrt(0.5 * dL**2 + 2.0 * (da**2 + db**2) + (s * 1.5)**2)
+            else:
+                dist = np.sqrt(0.2 * dL**2 + 1.0 * (da**2 + db**2))
+            dists[c] = float(dist)
+
+        # Convert distances to exponential likelihoods
+        scores = {c: float(np.exp(-d / sigma)) for c, d in dists.items()}
+        floor = 1e-4
+        scores = {c: max(val, floor) for c, val in scores.items()}
+        total = sum(scores.values())
+        return {c: val / total for c, val in scores.items()}
+
+    def compute_likelihoods(self, patch_bgr: np.ndarray, sigma: float = 16.0) -> Dict[str, float]:
+        """Computes measurement likelihoods from the trimmed median of an image patch."""
+        if patch_bgr.size == 0:
+            return {c: 1.0 / 6.0 for c in CANONICAL_COLORS}
+        pixels = patch_bgr.reshape(-1, 3).astype(np.float32)
+        med_bgr = tuple(int(round(x)) for x in np.median(pixels, axis=0))
+        return self.compute_likelihoods_bgr(med_bgr, sigma=sigma)
+
 
 # ==============================================================================
 # Quadrilateral Geometry & Corner Ordering
@@ -256,6 +300,7 @@ class FaceDetectionResult:
         grid_colors: Optional[List[List[str]]] = None,
         face_name: str = "UNKNOWN",
         confidence: float = 0.0,
+        grid_likelihoods: Optional[List[List[Dict[str, float]]]] = None,
     ):
         self.found = found
         self.corners = corners
@@ -263,6 +308,20 @@ class FaceDetectionResult:
         self.grid_colors = grid_colors or [["UNKNOWN"] * 3 for _ in range(3)]
         self.face_name = face_name
         self.confidence = confidence
+        if grid_likelihoods is None:
+            self.grid_likelihoods = [
+                [
+                    (
+                        {cn: (0.99 if cn == self.grid_colors[r][c] else 0.002) for cn in CANONICAL_COLORS}
+                        if self.grid_colors[r][c] in CANONICAL_COLORS
+                        else {cn: 1.0 / 6.0 for cn in CANONICAL_COLORS}
+                    )
+                    for c in range(3)
+                ]
+                for r in range(3)
+            ]
+        else:
+            self.grid_likelihoods = grid_likelihoods
 
 
 class CubeFaceDetector:
@@ -355,11 +414,13 @@ class CubeFaceDetector:
         # Sample 3x3 sticker grid (inner 45% of each 100x100 cell to avoid borders)
         grid_colors = []
         confidences = []
+        grid_likelihoods = []
         cell_size = warp_size // 3
         margin = int(cell_size * 0.28)
 
         for r in range(3):
             row_colors = []
+            row_likelihoods = []
             for c in range(3):
                 y1 = r * cell_size + margin
                 y2 = (r + 1) * cell_size - margin
@@ -367,9 +428,12 @@ class CubeFaceDetector:
                 x2 = (c + 1) * cell_size - margin
                 patch = warped[y1:y2, x1:x2]
                 color_name, conf = self.classifier.classify_patch(patch)
+                likelihoods = self.classifier.compute_likelihoods(patch)
                 row_colors.append(color_name)
+                row_likelihoods.append(likelihoods)
                 confidences.append(conf)
             grid_colors.append(row_colors)
+            grid_likelihoods.append(row_likelihoods)
 
         # Center sticker defines face identity
         center_color = grid_colors[1][1]
@@ -383,6 +447,7 @@ class CubeFaceDetector:
             grid_colors=grid_colors,
             face_name=face_name,
             confidence=avg_confidence,
+            grid_likelihoods=grid_likelihoods,
         )
 
 
@@ -391,32 +456,148 @@ class CubeFaceDetector:
 # ==============================================================================
 
 class CubeModel:
-    """Maintains the live hypothesis of the scanned Rubik's cube."""
+    """Maintains the live hypothesis of the scanned Rubik's cube using a discrete Bayesian belief filter."""
 
     def __init__(self):
+        self.beliefs: Dict[str, List[List[Dict[str, float]]]] = {
+            name: [[{c: 1.0 / 6.0 for c in CANONICAL_COLORS} for _ in range(3)] for _ in range(3)]
+            for name in FACE_NORMALS
+        }
         self.faces: Dict[str, List[List[Optional[str]]]] = {
             name: [[None] * 3 for _ in range(3)] for name in FACE_NORMALS
         }
         self.confirmed_faces: Dict[str, bool] = {name: False for name in FACE_NORMALS}
         self.face_scan_counts: Dict[str, int] = {name: 0 for name in FACE_NORMALS}
+        self.confirmation_threshold: float = 0.82
 
     def reset(self):
-        """Clears all scanned facelets."""
+        """Clears all scanned facelets and resets Bayesian beliefs to uniform prior 1/6."""
         for name in FACE_NORMALS:
+            self.beliefs[name] = [
+                [{c: 1.0 / 6.0 for c in CANONICAL_COLORS} for _ in range(3)] for _ in range(3)
+            ]
             self.faces[name] = [[None] * 3 for _ in range(3)]
             self.confirmed_faces[name] = False
             self.face_scan_counts[name] = 0
 
-    def register_face(self, face_name: str, grid_colors: List[List[str]], auto_orient: bool = True) -> bool:
-        """Registers a 3x3 face scan into the model with conflict-minimizing auto-orientation."""
+    def sync_beliefs_from_faces(self):
+        """Synchronizes beliefs if faces grid was modified directly."""
+        for face_name in FACE_NORMALS:
+            for r in range(3):
+                for c in range(3):
+                    col = self.faces[face_name][r][c]
+                    if col and col in CANONICAL_COLORS:
+                        b = self.beliefs[face_name][r][c]
+                        map_c = max(b, key=b.get)
+                        if map_c != col or b[map_c] < 0.90:
+                            self.beliefs[face_name][r][c] = {
+                                cn: (0.995 if cn == col else 0.001) for cn in CANONICAL_COLORS
+                            }
+
+    def set_facelet(self, face_name: str, r: int, c: int, color: str):
+        """Manually sets a facelet color, updating both MAP state and Bayesian belief."""
+        if face_name not in self.faces or color not in CANONICAL_COLORS:
+            return
+        self.faces[face_name][r][c] = color
+        self.beliefs[face_name][r][c] = {
+            cn: (0.995 if cn == color else 0.001) for cn in CANONICAL_COLORS
+        }
+        if all(self.faces[face_name][i][j] is not None for i in range(3) for j in range(3)):
+            self.confirmed_faces[face_name] = True
+
+    def update_facelet_belief(
+        self, face_name: str, r: int, c: int, likelihoods: Dict[str, float]
+    ) -> Tuple[str, float]:
+        """Applies recursive Bayesian update: p_t = normalize(p_{t-1} * L_t)."""
+        prior = self.beliefs[face_name][r][c]
+        unnorm = {}
+        for c_name in CANONICAL_COLORS:
+            lh = likelihoods.get(c_name, 1.0 / 6.0)
+            unnorm[c_name] = prior[c_name] * lh
+
+        total = sum(unnorm.values())
+        if total <= 0:
+            total = 1.0
+
+        posterior = {c_name: unnorm[c_name] / total for c_name in CANONICAL_COLORS}
+        floor = 1e-4
+        posterior = {c_name: max(val, floor) for c_name, val in posterior.items()}
+        norm_factor = sum(posterior.values())
+        posterior = {c_name: val / norm_factor for c_name, val in posterior.items()}
+
+        self.beliefs[face_name][r][c] = posterior
+        best_color = max(posterior, key=posterior.get)
+        confidence = posterior[best_color]
+
+        # Update MAP facelet if confidence has risen above uniform
+        if confidence > 0.25:
+            self.faces[face_name][r][c] = best_color
+
+        return best_color, confidence
+
+    def update_face_bayesian(
+        self,
+        face_name: str,
+        grid_likelihoods: List[List[Dict[str, float]]],
+        auto_orient: bool = True,
+    ) -> bool:
+        """Updates Bayesian beliefs for an entire 3x3 face with rotation alignment."""
+        if face_name not in self.faces:
+            return False
+
+        best_likelihoods = grid_likelihoods
+        if auto_orient:
+            best_errors_count = float("inf")
+            prev_grid = [row[:] for row in self.faces[face_name]]
+            prev_confirmed = self.confirmed_faces[face_name]
+
+            for k in [0, 1, 2, 3]:
+                cand_lh = rotate_grid_cw(grid_likelihoods, k)
+                cand_colors = [
+                    [max(cand_lh[r][c], key=cand_lh[r][c].get) for c in range(3)]
+                    for r in range(3)
+                ]
+                self.faces[face_name] = cand_colors
+                self.confirmed_faces[face_name] = True
+                is_valid, errors, _ = self.validate()
+                total_errors = len(errors)
+                if k == 0 and total_errors == 0:
+                    best_likelihoods = cand_lh
+                    break
+                if total_errors < best_errors_count:
+                    best_errors_count = total_errors
+                    best_likelihoods = cand_lh
+
+            self.faces[face_name] = prev_grid
+            self.confirmed_faces[face_name] = prev_confirmed
+
+        # Apply Bayesian updates with best oriented likelihoods
+        for r in range(3):
+            for c in range(3):
+                self.update_facelet_belief(face_name, r, c, best_likelihoods[r][c])
+
+        # Auto-confirm face if average confidence exceeds threshold
+        avg_conf = self.get_face_confidence(face_name)
+        if avg_conf >= self.confirmation_threshold:
+            self.confirmed_faces[face_name] = True
+
+        return True
+
+    def register_face(
+        self,
+        face_name: str,
+        grid_colors: List[List[str]],
+        auto_orient: bool = True,
+        grid_likelihoods: Optional[List[List[Dict[str, float]]]] = None,
+    ) -> bool:
+        """Registers a 3x3 face scan with Bayesian updates and auto-orientation."""
         if face_name not in self.faces:
             return False
 
         best_grid = [row[:] for row in grid_colors]
         if auto_orient:
-            # Test all 4 rotations (0, 90, 180, 270) against confirmed faces
             best_errors_count = float("inf")
-            prev_grid = self.faces[face_name]
+            prev_grid = [row[:] for row in self.faces[face_name]]
             prev_confirmed = self.confirmed_faces[face_name]
 
             for k in [0, 1, 2, 3]:
@@ -425,7 +606,6 @@ class CubeModel:
                 self.confirmed_faces[face_name] = True
                 is_valid, errors, _ = self.validate()
                 total_errors = len(errors)
-                # Favor rotation 0 if valid (matches canonical orientation)
                 if k == 0 and total_errors == 0:
                     best_grid = cand
                     break
@@ -433,20 +613,71 @@ class CubeModel:
                     best_errors_count = total_errors
                     best_grid = cand
 
-            # Restore previous state before final assignment
             self.faces[face_name] = prev_grid
             self.confirmed_faces[face_name] = prev_confirmed
 
         self.faces[face_name] = [row[:] for row in best_grid]
         self.confirmed_faces[face_name] = True
         self.face_scan_counts[face_name] += 1
+
+        for r in range(3):
+            for c in range(3):
+                col = best_grid[r][c]
+                if col in CANONICAL_COLORS:
+                    self.beliefs[face_name][r][c] = {
+                        cn: (0.995 if cn == col else 0.001) for cn in CANONICAL_COLORS
+                    }
         return True
+
+    def get_confidence(self, face_name: str, r: int, c: int) -> float:
+        """Returns the posterior confidence max(p) for this facelet."""
+        self.sync_beliefs_from_faces()
+        return float(max(self.beliefs[face_name][r][c].values()))
+
+    def get_face_confidence(self, face_name: str) -> float:
+        """Returns the average posterior confidence across all 9 facelets on this face."""
+        confs = [self.get_confidence(face_name, r, c) for r in range(3) for c in range(3)]
+        return float(np.mean(confs))
+
+    def get_map_color(self, face_name: str, r: int, c: int) -> Optional[str]:
+        """Returns the MAP color for this facelet, or None if still uniform/unknown."""
+        self.sync_beliefs_from_faces()
+        b = self.beliefs[face_name][r][c]
+        best_c = max(b, key=b.get)
+        if b[best_c] <= 0.25:
+            return self.faces[face_name][r][c]
+        return best_c
+
+    def get_facelet_entropy(self, face_name: str, r: int, c: int) -> float:
+        """Computes Shannon entropy H = -sum(p * log2(p)) in bits for a single facelet."""
+        self.sync_beliefs_from_faces()
+        probs = self.beliefs[face_name][r][c].values()
+        entropy = 0.0
+        for p in probs:
+            if p > 1e-9:
+                entropy -= p * np.log2(p)
+        return float(entropy)
+
+    def get_face_entropy(self, face_name: str) -> float:
+        """Computes total Shannon entropy across the 9 facelets of a face (in bits)."""
+        return float(sum(self.get_facelet_entropy(face_name, r, c) for r in range(3) for c in range(3)))
+
+    def get_total_entropy(self) -> float:
+        """Computes total Shannon entropy across all 54 facelets of the cube (in bits)."""
+        return float(sum(self.get_face_entropy(f) for f in FACE_NORMALS))
+
+    def get_highest_entropy_face(self) -> Tuple[str, float]:
+        """Returns the face with the highest remaining uncertainty and its entropy."""
+        face_entropies = {f: self.get_face_entropy(f) for f in FACE_NORMALS}
+        best_face = max(face_entropies, key=face_entropies.get)
+        return best_face, face_entropies[best_face]
 
     def get_progress(self) -> Tuple[int, int, Dict[str, int]]:
         """Returns (confirmed_faces_count, confirmed_stickers_count, color_counts)."""
+        self.sync_beliefs_from_faces()
         faces_count = sum(1 for conf in self.confirmed_faces.values() if conf)
         stickers_count = 0
-        color_counts = {c: 0 for c in ["WHITE", "YELLOW", "GREEN", "BLUE", "RED", "ORANGE"]}
+        color_counts = {c: 0 for c in CANONICAL_COLORS}
 
         for face in self.faces.values():
             for row in face:
@@ -459,6 +690,7 @@ class CubeModel:
 
     def get_conflicts(self) -> set:
         """Returns the set of (face_name, r, c) coordinates of stickers involved in conflicts."""
+        self.sync_beliefs_from_faces()
         conflicts = set()
         _, _, color_counts = self.get_progress()
 
@@ -508,7 +740,7 @@ class CubeModel:
         return conflicts
 
     def validate(self) -> Tuple[bool, List[str], List[str]]:
-        """Validates physical Rubik's cube invariants (color counts, edges, corners)."""
+        """Validates physical Rubik's cube invariants on the MAP cube state."""
         errors = []
         warnings = []
         faces_count, stickers_count, color_counts = self.get_progress()
@@ -566,9 +798,8 @@ class CubeModel:
         return (is_valid, errors, warnings)
 
     def get_guidance(self, current_visible_face: Optional[str] = None) -> str:
-        """Returns real-time conversational guidance on which face to rotate to next."""
-        faces_count, stickers_count, color_counts = self.get_progress()
-
+        """Returns real-time guidance directed toward the face with highest remaining Shannon entropy."""
+        self.sync_beliefs_from_faces()
         is_valid, errors, _ = self.validate()
         if errors:
             return f"⚠️ {errors[0]} Re-show face or click sticker to fix."
@@ -576,51 +807,72 @@ class CubeModel:
         if is_valid:
             return "🎉 Cube completely recognized and verified! Press SPACE or 'Solve' to begin."
 
+        face_entropies = {f: self.get_face_entropy(f) for f in FACE_NORMALS}
+
+        # Candidate unconfirmed or high uncertainty faces (H > 1.5 bits)
         unconfirmed = [f for f, conf in self.confirmed_faces.items() if not conf]
-        if not unconfirmed:
+        if not unconfirmed and all(h <= 1.5 for h in face_entropies.values()):
             return "Analyzing cube state..."
+
+        # Priority target: highest entropy among unconfirmed faces (or all faces if none unconfirmed)
+        candidate_pool = unconfirmed if unconfirmed else list(FACE_NORMALS.keys())
+        canonical_seq = ["FRONT", "RIGHT", "BACK", "LEFT", "TOP", "BOTTOM"]
+        target_face = max(
+            candidate_pool,
+            key=lambda f: (face_entropies[f], -canonical_seq.index(f)),
+        )
+        target_entropy = face_entropies[target_face]
+        target_color = color_names[FACE_NORMALS[target_face]]
 
         # If a recognized face is currently visible in camera:
         if current_visible_face and current_visible_face in self.faces:
             cur = current_visible_face
-            if not self.confirmed_faces[cur]:
-                return f"Hold the {cur} face steady to capture..."
+            cur_entropy = face_entropies[cur]
 
-            # Guide rotation from current face towards an unconfirmed face
+            # If current face still has high entropy, hold it steady
+            if cur in unconfirmed and cur_entropy > 2.5:
+                return f"Hold the {cur} face steady to capture (Uncertainty: {cur_entropy:.1f}b)..."
+
+            if cur == target_face:
+                return f"Hold {cur} face steady to refine stickers (Uncertainty: {cur_entropy:.1f}b)..."
+
+            # Guide rotation from current face towards target_face
             if cur in ("FRONT", "RIGHT", "BACK", "LEFT"):
                 ring = ["FRONT", "RIGHT", "BACK", "LEFT"]
                 idx = ring.index(cur)
                 next_lat = ring[(idx + 1) % 4]
                 prev_lat = ring[(idx - 1) % 4]
-                if next_lat in unconfirmed:
-                    return f"👉 {cur} captured! Rotate 90° RIGHT to show {next_lat} ({color_names[FACE_NORMALS[next_lat]]})."
-                elif prev_lat in unconfirmed:
-                    return f"👉 {cur} captured! Rotate 90° LEFT to show {prev_lat} ({color_names[FACE_NORMALS[prev_lat]]})."
-                elif "TOP" in unconfirmed:
+                opp_lat = ring[(idx + 2) % 4]
+
+                if target_face == next_lat:
+                    return f"👉 Rotate 90° RIGHT to show {next_lat} ({color_names[FACE_NORMALS[next_lat]]})."
+                elif target_face == prev_lat:
+                    return f"👉 Rotate 90° LEFT to show {prev_lat} ({color_names[FACE_NORMALS[prev_lat]]})."
+                elif target_face == opp_lat:
+                    return f"👉 Rotate 180° to show {opp_lat} ({color_names[FACE_NORMALS[opp_lat]]})."
+                elif target_face == "TOP":
                     return "👉 Lateral faces complete! Tilt cube DOWN to show TOP (WHITE)."
-                elif "BOTTOM" in unconfirmed:
+                elif target_face == "BOTTOM":
                     return "👉 Tilt cube UP to show BOTTOM (YELLOW)."
+
             elif cur == "TOP":
-                if "BOTTOM" in unconfirmed:
+                if target_face == "BOTTOM":
                     return "👉 TOP captured! Tilt cube UP/OVER to show BOTTOM (YELLOW)."
-                for lat in ["FRONT", "RIGHT", "BACK", "LEFT"]:
-                    if lat in unconfirmed:
-                        return f"👉 Tilt cube UP to show {lat} ({color_names[FACE_NORMALS[lat]]})."
+                else:
+                    return f"👉 Tilt cube UP to show {target_face} ({target_color})."
+
             elif cur == "BOTTOM":
-                if "TOP" in unconfirmed:
+                if target_face == "TOP":
                     return "👉 BOTTOM captured! Tilt cube DOWN/OVER to show TOP (WHITE)."
-                for lat in ["FRONT", "RIGHT", "BACK", "LEFT"]:
-                    if lat in unconfirmed:
-                        return f"👉 Tilt cube DOWN to show {lat} ({color_names[FACE_NORMALS[lat]]})."
+                else:
+                    return f"👉 Tilt cube DOWN to show {target_face} ({target_color})."
 
         # Default natural sequence if no recognized face is in view
-        next_target = unconfirmed[0]
-        target_color = color_names[FACE_NORMALS[next_target]]
-        if next_target == "FRONT":
+        if target_face == "FRONT":
             return f"Hold FRONT ({target_color}) up to the camera with WHITE on Top."
-        elif next_target in ("RIGHT", "BACK", "LEFT"):
-            return f"Rotate cube to show {next_target} ({target_color}) with WHITE on Top."
-        elif next_target == "TOP":
+        elif target_face in ("RIGHT", "BACK", "LEFT"):
+            return f"Rotate cube to show {target_face} ({target_color}) with WHITE on Top."
+        elif target_face == "TOP":
             return "Tilt cube DOWN to show the TOP (WHITE) face."
         else:
             return "Tilt cube UP to show the BOTTOM (YELLOW) face."
@@ -790,10 +1042,9 @@ class RubiksCubeScanner:
         self.detector = CubeFaceDetector()
         self.model = CubeModel()
 
-        # Stability accumulator
-        self.stability_threshold = 4  # Frames of stable recognition before locking face
+        # Stability & Bayesian tracking
+        self.stability_threshold = 3
         self.candidate_face_name: Optional[str] = None
-        self.candidate_grid: Optional[List[List[str]]] = None
         self.candidate_streak = 0
         self.lock_progress = 0.0
 
@@ -819,7 +1070,7 @@ class RubiksCubeScanner:
             print("[Scanner] Switched to synthetic demo feed.")
 
     def step_frame(self) -> Tuple[np.ndarray, FaceDetectionResult]:
-        """Captures and processes a single video frame."""
+        """Captures and processes a single video frame with recursive Bayesian belief filtering."""
         if self.use_synthetic:
             frame = self.synthetic_feed.get_frame()
         else:
@@ -836,28 +1087,23 @@ class RubiksCubeScanner:
         if self.flash_timer > 0:
             self.flash_timer -= 1
 
-        # Stability accumulation
+        # Recursive Bayesian update per frame: p_t = normalize(p_{t-1} * L_t)
         if detection.found and detection.face_name != "UNKNOWN":
-            if detection.face_name == self.candidate_face_name:
-                self.candidate_streak += 1
-                self.lock_progress = min(1.0, self.candidate_streak / self.stability_threshold)
-                if self.candidate_streak >= self.stability_threshold:
-                    # Lock face! Only flash if the grid was newly confirmed or modified
-                    cur_grid = self.model.faces.get(detection.face_name)
-                    grid_changed = (cur_grid != detection.grid_colors)
-                    self.model.register_face(detection.face_name, detection.grid_colors)
-                    if grid_changed:
-                        self.flash_timer = 6
-                    self.candidate_streak = 0
-                    self.lock_progress = 0.0
-            else:
-                self.candidate_face_name = detection.face_name
-                self.candidate_grid = detection.grid_colors
-                self.candidate_streak = 1
-                self.lock_progress = 1.0 / self.stability_threshold
+            face_name = detection.face_name
+            was_confirmed = self.model.confirmed_faces.get(face_name, False)
+            prev_grid = [row[:] for row in self.model.faces[face_name]] if was_confirmed else None
+
+            self.model.update_face_bayesian(face_name, detection.grid_likelihoods, auto_orient=True)
+            face_conf = self.model.get_face_confidence(face_name)
+            self.lock_progress = min(1.0, face_conf)
+
+            is_now_confirmed = self.model.confirmed_faces.get(face_name, False)
+            cur_grid = self.model.faces.get(face_name)
+            if is_now_confirmed and (not was_confirmed or cur_grid != prev_grid):
+                self.flash_timer = 6
+                self.model.face_scan_counts[face_name] += 1
         else:
-            self.candidate_streak = max(0, self.candidate_streak - 1)
-            self.lock_progress = self.candidate_streak / self.stability_threshold
+            self.lock_progress = max(0.0, self.lock_progress * 0.75)
 
         return (frame, detection)
 
@@ -957,6 +1203,35 @@ def draw_ar_overlay(frame: np.ndarray, detection: FaceDetectionResult, lock_prog
     )
 
 
+def get_confidence_color(color_name: Optional[str], confidence: float) -> Tuple[int, int, int]:
+    """Computes facelet sticker RGB with saturation/intensity proportional to Bayesian confidence.
+    
+    Confidence profile:
+    - Unknown / uniform prior (conf <= 0.22): dark neutral gray (55, 60, 65).
+    - Low confidence (~50%): pale pastel tone.
+    - High confidence (>= 90%): vivid solid canonical color.
+    """
+    if not color_name or color_name == "UNKNOWN" or confidence <= 0.22:
+        return RGB_COLORS["UNKNOWN"]
+
+    base_rgb = np.array(RGB_COLORS.get(color_name, RGB_COLORS["UNKNOWN"]), dtype=np.float32)
+    if confidence >= 0.90:
+        return tuple(int(round(x)) for x in base_rgb)
+
+    light_neutral = np.array([215.0, 215.0, 215.0], dtype=np.float32)
+    pastel_rgb = 0.45 * base_rgb + 0.55 * light_neutral
+    gray_neutral = np.array(RGB_COLORS["UNKNOWN"], dtype=np.float32)
+
+    if confidence <= 0.50:
+        t = max(0.0, min(1.0, (confidence - 0.22) / (0.50 - 0.22)))
+        rgb = (1.0 - t) * gray_neutral + t * pastel_rgb
+    else:
+        t = max(0.0, min(1.0, (confidence - 0.50) / (0.90 - 0.50)))
+        rgb = (1.0 - t) * pastel_rgb + t * base_rgb
+
+    return tuple(int(np.clip(round(x), 0, 255)) for x in rgb)
+
+
 def render_scanner_ui(surface: pygame.Surface, scanner: RubiksCubeScanner, font=None, font_bold=None):
     """Renders the complete scanner view onto the Pygame surface."""
     surface.fill(RGB_COLORS["BACKGROUND"])
@@ -1019,6 +1294,10 @@ def render_scanner_ui(surface: pygame.Surface, scanner: RubiksCubeScanner, font=
     )
 
     font_bold.render_to(surface, (net_panel_x + 15, net_panel_y + 12), "Current Cube Guess", RGB_COLORS["TEXT"])
+    total_entropy = scanner.model.get_total_entropy()
+    font.render_to(
+        surface, (net_panel_x + 195, net_panel_y + 14), f"H: {total_entropy:.1f}b", RGB_COLORS["TEXT_MUTED"]
+    )
 
     # Unfolded Net Layout:
     # Top at (1, 0)
@@ -1053,13 +1332,15 @@ def render_scanner_ui(surface: pygame.Surface, scanner: RubiksCubeScanner, font=
             and scanner.latest_detection.face_name == face_name
         )
 
-        grid = scanner.model.faces[face_name]
         for r in range(3):
             for c in range(3):
                 sx = fx_pos + c * (sticker_size + sticker_gap)
                 sy = fy_pos + r * (sticker_size + sticker_gap)
-                col_name = grid[r][c]
-                rgb = RGB_COLORS.get(col_name or "UNKNOWN", RGB_COLORS["UNKNOWN"])
+                
+                # Bayesian MAP color and posterior confidence
+                col_name = scanner.model.get_map_color(face_name, r, c)
+                conf = scanner.model.get_confidence(face_name, r, c)
+                rgb = get_confidence_color(col_name, conf)
 
                 # Draw sticker rect
                 s_rect = pygame.Rect(sx, sy, sticker_size, sticker_size)
@@ -1069,7 +1350,11 @@ def render_scanner_ui(surface: pygame.Surface, scanner: RubiksCubeScanner, font=
                     # Highlight conflicting stickers with red warning border
                     pygame.draw.rect(surface, RGB_COLORS["RED"], s_rect, 2, border_radius=3)
                 else:
-                    pygame.draw.rect(surface, (20, 20, 20), s_rect, 1, border_radius=3)
+                    # Border intensity proportional to posterior confidence max(p)
+                    # Pale/translucent when low/uniform, vivid solid when >= 90%
+                    border_val = int(np.clip(45 + (conf - 0.166) / (1.0 - 0.166) * 155, 45, 200))
+                    border_rgb = (border_val, border_val, border_val)
+                    pygame.draw.rect(surface, border_rgb, s_rect, 1, border_radius=3)
 
         # Highlight active face border
         if is_active:
@@ -1222,8 +1507,7 @@ def run_scanner(
                         if s_rect.collidepoint(pos):
                             cur = scanner.model.faces[face_name][r][c]
                             idx = 0 if cur not in color_cycle else (color_cycle.index(cur) + 1) % len(color_cycle)
-                            scanner.model.faces[face_name][r][c] = color_cycle[idx]
-                            scanner.model.confirmed_faces[face_name] = True
+                            scanner.model.set_facelet(face_name, r, c, color_cycle[idx])
                             break
 
     scanner.close()

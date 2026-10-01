@@ -29,6 +29,11 @@ class TestRubiksCubeScanner(unittest.TestCase):
             grid_to_pos,
             VALID_EDGES,
             VALID_CORNERS,
+            CANONICAL_COLORS,
+            get_confidence_color,
+            RGB_COLORS,
+            RubiksCubeScanner,
+            render_scanner_ui,
         )
         self.ColorClassifier = ColorClassifier
         self.CubeFaceDetector = CubeFaceDetector
@@ -39,6 +44,11 @@ class TestRubiksCubeScanner(unittest.TestCase):
         self.grid_to_pos = grid_to_pos
         self.VALID_EDGES = VALID_EDGES
         self.VALID_CORNERS = VALID_CORNERS
+        self.CANONICAL_COLORS = CANONICAL_COLORS
+        self.get_confidence_color = get_confidence_color
+        self.RGB_COLORS = RGB_COLORS
+        self.RubiksCubeScanner = RubiksCubeScanner
+        self.render_scanner_ui = render_scanner_ui
 
     def test_color_classifier(self):
         """Verify that ColorClassifier accurately identifies the 6 canonical colors."""
@@ -314,6 +324,156 @@ class TestRubiksCubeScanner(unittest.TestCase):
             pygame.image.save(surface, out_path)
             self.assertTrue(os.path.exists(out_path))
             self.assertGreater(os.path.getsize(out_path), 0)
+
+    def test_bayesian_uniform_prior_and_initial_entropy(self):
+        """Verify that CubeModel initializes all 54 facelets to uniform 1/6 prior and maximum entropy."""
+        model = self.CubeModel()
+        max_sticker_entropy = np.log2(6)  # ~2.58496 bits
+
+        for fn in ["FRONT", "RIGHT", "TOP", "LEFT", "BACK", "BOTTOM"]:
+            for r in range(3):
+                for c in range(3):
+                    b = model.beliefs[fn][r][c]
+                    self.assertEqual(len(b), 6)
+                    for col in self.CANONICAL_COLORS:
+                        self.assertAlmostEqual(b[col], 1.0 / 6.0, places=5)
+                    self.assertAlmostEqual(model.get_confidence(fn, r, c), 1.0 / 6.0, places=5)
+                    self.assertAlmostEqual(model.get_facelet_entropy(fn, r, c), max_sticker_entropy, places=4)
+                    self.assertIsNone(model.get_map_color(fn, r, c))
+            self.assertAlmostEqual(model.get_face_entropy(fn), 9 * max_sticker_entropy, places=3)
+
+        self.assertAlmostEqual(model.get_total_entropy(), 54 * max_sticker_entropy, places=2)
+        faces_cnt, stickers_cnt, _ = model.get_progress()
+        self.assertEqual(faces_cnt, 0)
+        self.assertEqual(stickers_cnt, 0)
+
+    def test_bayesian_measurement_likelihood_updates_and_convergence(self):
+        """Verify that recursive updates p_t = normalize(p_{t-1} * L_t) converge monotonically."""
+        clf = self.ColorClassifier()
+        green_bgr = (45, 195, 45)
+        green_patch = np.full((20, 20, 3), green_bgr, dtype=np.uint8)
+        lh = clf.compute_likelihoods(green_patch)
+
+        # Confirm likelihood heavily favors GREEN
+        self.assertEqual(max(lh, key=lh.get), "GREEN")
+        self.assertGreater(lh["GREEN"], 0.60)
+
+        model = self.CubeModel()
+        ent_init = model.get_facelet_entropy("FRONT", 1, 1)
+
+        # Frame 1
+        best_c, conf1 = model.update_facelet_belief("FRONT", 1, 1, lh)
+        self.assertEqual(best_c, "GREEN")
+        self.assertGreater(conf1, 0.60)
+        ent1 = model.get_facelet_entropy("FRONT", 1, 1)
+        self.assertLess(ent1, ent_init)
+
+        # Frame 2
+        _, conf2 = model.update_facelet_belief("FRONT", 1, 1, lh)
+        self.assertGreater(conf2, conf1)
+        ent2 = model.get_facelet_entropy("FRONT", 1, 1)
+        self.assertLess(ent2, ent1)
+
+        # Frame 3: reaches high confidence
+        _, conf3 = model.update_facelet_belief("FRONT", 1, 1, lh)
+        self.assertGreater(conf3, conf2)
+        self.assertGreater(conf3, 0.90)
+        ent3 = model.get_facelet_entropy("FRONT", 1, 1)
+        self.assertLess(ent3, 0.6)
+
+    def test_bayesian_noise_and_shadow_rejection(self):
+        """Verify that dark/noisy patches yield uniform likelihoods and do not corrupt prior beliefs."""
+        clf = self.ColorClassifier()
+        shadow_patch = np.full((15, 15, 3), (18, 18, 18), dtype=np.uint8)
+        lh_shadow = clf.compute_likelihoods(shadow_patch)
+
+        for c in self.CANONICAL_COLORS:
+            self.assertAlmostEqual(lh_shadow[c], 1.0 / 6.0, places=4)
+
+        model = self.CubeModel()
+        # Seed a confident belief on FRONT center
+        model.set_facelet("FRONT", 1, 1, "GREEN")
+        prior_conf = model.get_confidence("FRONT", 1, 1)
+        prior_ent = model.get_facelet_entropy("FRONT", 1, 1)
+
+        # Apply uninformative shadow likelihood
+        model.update_facelet_belief("FRONT", 1, 1, lh_shadow)
+        post_conf = model.get_confidence("FRONT", 1, 1)
+        post_ent = model.get_facelet_entropy("FRONT", 1, 1)
+
+        # Belief and entropy remain uncorrupted
+        self.assertAlmostEqual(post_conf, prior_conf, places=3)
+        self.assertAlmostEqual(post_ent, prior_ent, places=3)
+
+    def test_shannon_entropy_rotation_guidance(self):
+        """Verify that Shannon entropy accurately guides rotation toward faces with highest uncertainty."""
+        model = self.CubeModel()
+        max_face_entropy = 9 * np.log2(6)
+
+        # Initially, all faces share maximal uncertainty
+        high_face, high_entropy = model.get_highest_entropy_face()
+        self.assertAlmostEqual(high_entropy, max_face_entropy, places=2)
+
+        # Register FRONT face: uncertainty drops to near 0
+        model.register_face("FRONT", [["GREEN"] * 3 for _ in range(3)])
+        self.assertLess(model.get_face_entropy("FRONT"), 1.0)
+
+        # Guidance points towards next lateral face with remaining entropy
+        g_front = model.get_guidance(current_visible_face="FRONT")
+        self.assertTrue("RIGHT" in g_front or "RED" in g_front)
+
+        # Register RIGHT face
+        model.register_face("RIGHT", [["RED"] * 3 for _ in range(3)])
+        self.assertLess(model.get_face_entropy("RIGHT"), 1.0)
+
+        # Guidance points to BACK
+        g_right = model.get_guidance(current_visible_face="RIGHT")
+        self.assertTrue("BACK" in g_right or "BLUE" in g_right)
+
+    def test_visual_confidence_shading(self):
+        """Verify get_confidence_color returns gray when uniform, pastel at ~50%, and vivid solid at >=90%."""
+        get_col = self.get_confidence_color
+        green_base = self.RGB_COLORS["GREEN"]
+        unknown_col = self.RGB_COLORS["UNKNOWN"]
+
+        # Unknown / uniform prior (conf <= 0.22)
+        self.assertEqual(get_col("GREEN", 1.0 / 6.0), unknown_col)
+        self.assertEqual(get_col("GREEN", 0.20), unknown_col)
+        self.assertEqual(get_col(None, 0.95), unknown_col)
+        self.assertEqual(get_col("UNKNOWN", 0.95), unknown_col)
+
+        # Low confidence (~50%): pale pastel
+        col_50 = get_col("GREEN", 0.50)
+        self.assertNotEqual(col_50, unknown_col)
+        self.assertNotEqual(col_50, green_base)
+        # Pastel is significantly lighter (higher average RGB) than saturated green
+        self.assertGreater(sum(col_50), sum(green_base) * 0.95)
+
+        # Vivid solid (conf >= 90%)
+        col_90 = get_col("GREEN", 0.90)
+        self.assertEqual(col_90, green_base)
+        col_98 = get_col("GREEN", 0.98)
+        self.assertEqual(col_98, green_base)
+
+    def test_bayesian_continuous_scanning_integration(self):
+        """Verify that RubiksCubeScanner runs continuous Bayesian frame updates to confirmation."""
+        scanner = self.RubiksCubeScanner(use_synthetic=True)
+        self.assertEqual(scanner.model.get_progress()[0], 0)
+
+        # Step first frame
+        frame, detection = scanner.step_frame()
+        self.assertTrue(detection.found)
+        self.assertGreater(scanner.lock_progress, 0.5)
+        self.assertLess(scanner.model.get_total_entropy(), 54 * np.log2(6))
+
+        # Step additional frames to pass confirmation threshold
+        for _ in range(4):
+            scanner.step_frame()
+
+        # Face should be confirmed
+        self.assertTrue(scanner.model.confirmed_faces[detection.face_name])
+        self.assertGreaterEqual(scanner.model.get_face_confidence(detection.face_name), 0.82)
+        scanner.close()
 
 
 if __name__ == "__main__":
