@@ -20,6 +20,7 @@ RANDOMIZE_SEARCH = True
 
 # Remember start up time for stats.
 STARTUP_TIME = datetime.now()
+TOTAL_MOVES = 0
 
 # Redefine print to include timestamps.
 _print = print
@@ -144,9 +145,7 @@ def run_tests():
   for move in moves:
     cubes = [solved_cube]
     for _ in range(3): cubes.append(apply_move_to_cube(move, cubes[-1]))
-    assert len(set(cubes)) == 4
-    assert apply_move_to_cube(move, cubes[-1]) == cubes[0]
-
+    assert len(set(cubes)) == 4 and apply_move_to_cube(move, cubes[-1]) == cubes[0]
 
 @dataclass(order=True, frozen=True)
 class PrioritizedItem:
@@ -183,6 +182,7 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
           if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
         dst, cost = apply_move(move, src), cost_so_far[src] + 1
         moves_simulated += 1
+        global TOTAL_MOVES; TOTAL_MOVES += 1
         budget_exceeded = budget is not None and moves_simulated >= budget
         if dst in cost_so_far and cost_so_far[dst] <= cost:
           if budget_exceeded: break
@@ -213,159 +213,170 @@ def num_solved_with_criterion(cube, criterion):
 
 @functools.cache
 def min_moves_to_solved(cubelet, rotation):
-  def is_dst(r): return is_cubelet_solved(cubelet, r)
-  def apply_move(m, r): return tupled(rotation_matrix(m) @ r)
-  _, path = astar(rotation, is_dst, apply_move)
+  _, path = astar(rotation, lambda r: is_cubelet_solved(cubelet, r),
+                  lambda m, r: tupled(rotation_matrix(m) @ r))
   return len(path)
 
 @functools.cache
 def min_moves_to_position(cubelet, rotation):
-  def is_dst(r): return position(cubelet, r) == cubelet
-  def apply_move(m, r): return tupled(rotation_matrix(m) @ r)
-  _, path = astar(rotation, is_dst, apply_move)
+  _, path = astar(rotation, lambda r: position(cubelet, r) == cubelet,
+                  lambda m, r: tupled(rotation_matrix(m) @ r))
   return len(path)
 
-def top_layer_heuristic(cube):
-  p, n = 0.5, 8
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
-  return d/n
+# The 24 rotational orientations of a cubelet in SO(3).
+identity_3 = tupled(np.identity(3))
+rotations = [identity_3]
+for r in rotations:
+  for m in moves:
+    mr = tupled(rotation_matrix(m) @ r)
+    if mr not in rotations: rotations.append(mr)
+rot_to_id = {r: i for i, r in enumerate(rotations)}
+cubelets = tuple(c for c, _ in solved_cube)
 
-def middle_layer_heuristic(cube):
-  p, n = 0.5, 4
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] >= 0) ** (1/p)
-  return d/n
+# Fast state transitions compiled directly from linear algebra hyperplane tests.
+transitions = tuple(
+  tuple(
+    tuple(
+      rot_to_id[tupled(rotation_matrix(m) @ r)] if np.dot(m[0], position(c, r)) > 0 else r_idx
+      for r_idx, r in enumerate(rotations)
+    ) for c in cubelets
+  ) for m in moves
+)
+move_to_id = {m: i for i, m in enumerate(moves)}
 
-def bottom_layer_edge_heuristic(cube):
-  p, n = 0.5, 3
-  d = sum(min_moves_to_solved(c, r)**p for c, r in cube
-          if not (c[2] == -1 and norm1(c) == 3)) ** (1/p)
-  return d/n
+def to_cube(state): return tuple((cubelets[i], rotations[state[i]]) for i in range(NUM_CUBELETS))
+def from_cube(cube): return tuple(rot_to_id[r] for _, r in cube)
+def apply_move_fast(m, s):
+  t = transitions[move_to_id[m]]
+  return tuple(t[i][s[i]] for i in range(NUM_CUBELETS))
 
-def bottom_layer_corner_heuristic(cube):
-  p, n1, n2, n3 = 0.5, 5, 3, 8
-  d1 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
-  d2 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 0) ** (1/p)
-  d3 = sum((min_moves_to_position(c, r) if norm1(c) == 3 else min_moves_to_solved(c, r))**p
-           for c, r in cube if c[2] == -1) ** (1/p)
-  return d1/n1 + d2/n2 + d3/n3
+def has_yellow_bottom(c, r): return c[2] == -1 and position((0, 0, -1), r) == (0, 0, -1)
+def is_in_right_place(c, r): return position(c, r) == c
 
-def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
-def is_top_cubelet(cubelet): return cubelet[2] == 1
-def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
+is_solved_tab = tuple(tuple(is_cubelet_solved(c, r) for r in rotations) for c in cubelets)
+dist_solved_tab = tuple(tuple(min_moves_to_solved(c, r) for r in rotations) for c in cubelets)
+dist_pos_tab = tuple(tuple(min_moves_to_position(c, r) for r in rotations) for c in cubelets)
+has_yellow_tab = tuple(tuple(has_yellow_bottom(c, r) for r in rotations) for c in cubelets)
+is_in_place_tab = tuple(tuple(is_in_right_place(c, r) for r in rotations) for c in cubelets)
 
+top_edges = tuple(i for i, c in enumerate(cubelets) if c[2] == 1 and norm1(c) == 2)
+top_cubelets = tuple(i for i, c in enumerate(cubelets) if c[2] == 1)
+top_or_mid = tuple(i for i, c in enumerate(cubelets) if c[2] >= 0)
+bot_edges = tuple(i for i, c in enumerate(cubelets) if c[2] == -1 and norm1(c) == 2)
+bot_corners = tuple(i for i, c in enumerate(cubelets) if c[2] == -1 and norm1(c) == 3)
+bot_edge_heur_idx = tuple(i for i, c in enumerate(cubelets) if not (c[2] == -1 and norm1(c) == 3))
+bot_corner_c1 = tuple(i for i, c in enumerate(cubelets) if c[2] == 1)
+bot_corner_c2 = tuple(i for i, c in enumerate(cubelets) if c[2] == 0)
+bot_corner_c3 = tuple(i for i, c in enumerate(cubelets) if c[2] == -1)
+is_corner_c3 = tuple(norm1(cubelets[i]) == 3 for i in bot_corner_c3)
 
-def solve_top_and_middle_layer(cube, report_progress_callback):
+p = 0.5
+def top_layer_heuristic(s): return (sum(dist_solved_tab[i][s[i]]**p for i in top_cubelets)**(1/p)) / 8
+def middle_layer_heuristic(s): return (sum(dist_solved_tab[i][s[i]]**p for i in top_or_mid)**(1/p)) / 4
+def bottom_layer_edge_heuristic(s): return (sum(dist_solved_tab[i][s[i]]**p for i in bot_edge_heur_idx)**(1/p)) / 3
+def bottom_layer_corner_heuristic(s):
+  d1 = sum(dist_solved_tab[i][s[i]]**p for i in bot_corner_c1)**(1/p)
+  d2 = sum(dist_solved_tab[i][s[i]]**p for i in bot_corner_c2)**(1/p)
+  d3 = sum((dist_pos_tab[i][s[i]] if ic else dist_solved_tab[i][s[i]])**p for i, ic in zip(bot_corner_c3, is_corner_c3))**(1/p)
+  return d1/5 + d2/3 + d3/8
+
+def solve_top_and_middle_layer(st, report_progress_callback):
   solution_moves = ()
   for num_solved in range(17):
-    report_progress_callback(cube)
+    report_progress_callback(to_cube(st))
     print("solving cubelet #%d" % (num_solved + 1))
-    def is_goal(cube): return (
-      num_solved_with_criterion(cube, is_top_edge) >= min(4, num_solved + 1) and
-      num_solved_with_criterion(cube, is_top_cubelet) >= min(9, num_solved + 1) and
-      num_solved_with_criterion(cube, is_top_or_middle_cubelet) >= min(17, num_solved + 1)
+    tgt_e, tgt_t, tgt_tm = min(4, num_solved + 1), min(9, num_solved + 1), min(17, num_solved + 1)
+    def is_goal(s): return (
+      sum(is_solved_tab[i][s[i]] for i in top_edges) >= tgt_e and
+      sum(is_solved_tab[i][s[i]] for i in top_cubelets) >= tgt_t and
+      sum(is_solved_tab[i][s[i]] for i in top_or_mid) >= tgt_tm
     )
-    heuristic = top_layer_heuristic if num_solved < 9 else middle_layer_heuristic
-    cube, next_moves = astar(cube, is_goal, apply_move_to_cube,
-                             heuristic, random_weight=0.25)
+    h = top_layer_heuristic if num_solved < 9 else middle_layer_heuristic
+    st, next_moves = astar(st, is_goal, apply_move_fast, h, random_weight=0.25)
     print("-> found solution with %d moves" % len(next_moves))
     solution_moves += next_moves
-  return (cube, solution_moves)
+  return (st, solution_moves)
 
-def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
-def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
-def has_yellow_bottom(cubelet, rotation):
-  return cubelet[2] == -1 and position((0, 0, -1), rotation) == (0, 0, -1)
-def is_in_right_place(c, r): return position(c, r) == c
-def num_bottom_edges_positioned(cube):
-  return sum(is_bottom_edge(c) and has_yellow_bottom(c, r) for c, r in cube)
-def num_bottom_corners_positioned(cube):
-  return sum(is_bottom_corner(c) and is_in_right_place(c, r) for c, r in cube)
-
-def solve_bottom_layer_edges(cube, report_progress_callback):
+def solve_bottom_layer_edges(st, report_progress_callback):
   solution_moves = ()
   for i in range(8):
-    report_progress_callback(cube)
+    report_progress_callback(to_cube(st))
     print("solving bottom cross #%d" % (i + 1))
-    def is_goal(cube): return (
-      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17 and
-      num_bottom_edges_positioned(cube) >= min(4, i + 1) and
-      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i - 3)
+    tgt_p, tgt_s = min(4, i + 1), min(4, i - 3)
+    def is_goal(s): return (
+      sum(is_solved_tab[idx][s[idx]] for idx in top_or_mid) == 17 and
+      sum(has_yellow_tab[idx][s[idx]] for idx in bot_edges) >= tgt_p and
+      sum(is_solved_tab[idx][s[idx]] for idx in bot_edges) >= tgt_s
     )
-    cube, next_moves = astar(cube, is_goal, apply_move_to_cube,
-                             bottom_layer_edge_heuristic, random_weight=0.25)
+    st, next_moves = astar(st, is_goal, apply_move_fast, bottom_layer_edge_heuristic, random_weight=0.25)
     print("-> found solution with %d moves" % len(next_moves))
     solution_moves += next_moves
-  return (cube, solution_moves)
+  return (st, solution_moves)
 
-def solve_bottom_layer_corners(cube, report_progress_callback):
+def solve_bottom_layer_corners(st, report_progress_callback):
   solution_moves = ()
   for i in range(4):
-    report_progress_callback(cube)
+    report_progress_callback(to_cube(st))
     print("positioning bottom corners #%d" % (i + 1))
-    def is_goal(cube): return (
-      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17 and
-      num_solved_with_criterion(cube, is_bottom_edge) == 4 and
-      num_bottom_corners_positioned(cube) >= min(4, i + 1)
+    tgt_c = min(4, i + 1)
+    def is_goal(s): return (
+      sum(is_solved_tab[idx][s[idx]] for idx in top_or_mid) == 17 and
+      sum(is_solved_tab[idx][s[idx]] for idx in bot_edges) == 4 and
+      sum(is_in_place_tab[idx][s[idx]] for idx in bot_corners) >= tgt_c
     )
-    cube, next_moves = astar(cube, is_goal, apply_move_to_cube,
-                             bottom_layer_corner_heuristic, random_weight=0.3)
+    st, next_moves = astar(st, is_goal, apply_move_fast, bottom_layer_corner_heuristic, random_weight=0.3)
     print("-> found solution with %d moves" % len(next_moves))
     solution_moves += next_moves
-  return (cube, solution_moves)
+  return (st, solution_moves)
 
-def bottom_left_front_corner(cube):
-  return next((c,r) for c,r in cube if position(c, r) == (1, -1, -1))
-
-def solve_endgame(cube, report_progress_callback):
+def solve_endgame(st, report_progress_callback):
   solution = []
-  left, top, bottom = ((0, -1, 0), 1), ((0, 0, 1), 1), ((0, 0, -1), 1)
-  routine = 2 * (inverse_move(left), inverse_move(top), left, top)
+  bottom_m = ((0, 0, -1), 1)
+  left_m = ((0, -1, 0), 1)
+  top_m = ((0, 0, 1), 1)
+  routine = 2 * (inverse_move(left_m), inverse_move(top_m), left_m, top_m)
 
   def apply(move):
-    nonlocal cube
+    nonlocal st
     solution.append(move)
-    cube = apply_move_to_cube(move, cube)
+    st = apply_move_fast(move, st)
 
   def is_corner_oriented():
-    c, r = bottom_left_front_corner(cube)
+    c_idx = next(i for i in range(NUM_CUBELETS) if position(cubelets[i], rotations[st[i]]) == (1, -1, -1))
+    rot_idx = st[c_idx]
     for _ in range(4):
-      if is_cubelet_solved(c, r): return True
-      r = apply_move_to_cubelet_rotation(bottom, c, r)
+      if is_solved_tab[c_idx][rot_idx]: return True
+      rot_idx = transitions[move_to_id[bottom_m]][c_idx][rot_idx]
     return False
 
   for _ in range(4):
-    report_progress_callback(cube)
+    report_progress_callback(to_cube(st))
     while not is_corner_oriented():
       for move in routine: apply(move)
-    apply(bottom)
-
-  while not is_cube_solved(cube): apply(bottom)
-  return (cube, tuple(solution))
+    apply(bottom_m)
+  while not all(is_solved_tab[i][st[i]] for i in range(NUM_CUBELETS)): apply(bottom_m)
+  return (st, tuple(solution))
 
 def solve(cube, report_progress_callback=lambda cube: None):
-  cube, solution1 = solve_top_and_middle_layer(cube, report_progress_callback)
+  st = from_cube(cube)
+  st, solution1 = solve_top_and_middle_layer(st, report_progress_callback)
   print(50 * "-")
-  cube, solution2 = solve_bottom_layer_edges(cube, report_progress_callback)
+  st, solution2 = solve_bottom_layer_edges(st, report_progress_callback)
   print(50 * "-")
-  cube, solution3 = solve_bottom_layer_corners(cube, report_progress_callback)
+  st, solution3 = solve_bottom_layer_corners(st, report_progress_callback)
   print(50 * "-")
-  cube, solution4 = solve_endgame(cube, report_progress_callback)
+  st, solution4 = solve_endgame(st, report_progress_callback)
   solution = solution1 + solution2 + solution3 + solution4
+  final_cube = to_cube(st)
   print("Solved cube in %d moves. Final cube:" % len(solution))
-  # print(describe_cube(cube))
-  print("is_cube_solved: ", is_cube_solved(cube))
-  print("cube == solved_cube: ", cube == solved_cube)
+  print("is_cube_solved: ", is_cube_solved(final_cube))
+  print("cube == solved_cube: ", final_cube == solved_cube)
   return solution
 
 def print_stats():
   secs_elapsed = (datetime.now() - STARTUP_TIME).total_seconds()
-  cache_info = apply_move_to_cubelet_rotation.cache_info()
-  moves = (cache_info.hits + cache_info.misses) / len(solved_cube)
   print("- time elapsed: %.1f sec" % secs_elapsed)
-  print("- moves simulated: %d (%.0f moves/sec) " % (
-    moves,
-    moves / secs_elapsed
-  ))
+  print("- moves simulated: %d (%.0f moves/sec)" % (TOTAL_MOVES, TOTAL_MOVES / secs_elapsed))
   cache_info = min_moves_to_solved.cache_info()
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
 
