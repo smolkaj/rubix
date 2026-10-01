@@ -14,6 +14,20 @@ import render
 
 
 class GeometryChecks(unittest.TestCase):
+    def test_sticker_lists_are_bijections_with_inverse_turns(self):
+        slots = render.sticker_slots()
+        self.assertEqual(len(slots), 54)
+        self.assertEqual(len(set(slots)), 54)
+        for move in render.rubix.moves:
+            forward = render.sticker_permutation(move)
+            inverse = render.sticker_permutation((move[0], -move[1]))
+            self.assertEqual(sorted(forward), list(range(54)))
+            self.assertEqual([inverse[index] for index in forward], list(range(54)))
+            for source, destination in enumerate(forward):
+                home, normal = slots[source]
+                rotation = render.rubix.rotation_matrix(move) if np.dot(move[0], home) > 0 else np.eye(3, dtype=int)
+                self.assertEqual(slots[destination], (tuple(rotation @ home), tuple(rotation @ normal)))
+
     def test_every_move_interpolates_a_proper_rotation_to_the_exact_matrix(self):
         for move in render.rubix.moves:
             np.testing.assert_allclose(render.partial_rotation(move, 0), np.eye(3), atol=1e-12)

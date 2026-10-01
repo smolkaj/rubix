@@ -1,683 +1,1155 @@
 1
-00:00:00,547 --> 00:00:02,475
-Turn one face of a Rubik's cube.
+00:00:00,566 --> 00:00:03,608
+Imagine you are writing a program for a Rubik's cube.
 
 2
-00:00:02,756 --> 00:00:03,434
-Now another.
+00:00:03,982 --> 00:00:08,186
+Before it can find a solution, it needs to do something much more basic.
 
 3
-00:00:03,775 --> 00:00:07,779
-Fifty four colored stickers seem to demand fifty four little records.
+00:00:08,546 --> 00:00:10,337
+Turn the top layer correctly.
 
 4
-00:00:09,032 --> 00:00:09,967
-But look closer.
+00:00:12,766 --> 00:00:13,366
+Watch.
 
 5
-00:00:10,309 --> 00:00:12,250
-The stickers never travel alone.
+00:00:13,740 --> 00:00:18,119
+The white face turns, but strips of stickers on the sides move too.
 
 6
-00:00:12,578 --> 00:00:14,968
-They ride on small, rigid cubes.
+00:00:18,493 --> 00:00:19,776
+Which colors go where?
 
 7
-00:00:16,360 --> 00:00:21,650
-Could we remember the geometry of those cubes, and let the colors take care of themselves?
+00:00:22,606 --> 00:00:26,215
+You could record each sticker and write rules for moving it.
 
 8
-00:00:23,833 --> 00:00:25,240
-Rubix does exactly that.
+00:00:26,589 --> 00:00:27,363
+That works.
 
 9
-00:00:25,529 --> 00:00:29,782
-And the surprising part is how much information one tiny home address contains.
+00:00:27,737 --> 00:00:30,415
+But the real cube never consults a list.
 
 10
-00:00:31,693 --> 00:00:34,169
-We will follow this green and white cubelet.
+00:00:30,775 --> 00:00:33,133
+Its shape tells the colors how to move.
 
 11
-00:00:34,483 --> 00:00:36,353
-An edge, with two stickers.
+00:00:35,354 --> 00:00:40,610
+Can we give our program a description that makes those same rules follow from the geometry?
 
 12
-00:00:37,496 --> 00:00:40,449
-First, find an address that identifies it.
+00:00:40,987 --> 00:00:42,824
+That is the problem we will solve.
 
 13
-00:00:40,801 --> 00:00:45,046
-Second, discover how that address already knows its colors.
+00:00:46,525 --> 00:00:48,970
+Start with one small colored square.
 
 14
-00:00:45,426 --> 00:00:49,032
-Third, turn that description into a moving cube.
+00:00:49,344 --> 00:00:51,703
+We will call it a sticker, or facelet.
 
 15
-00:00:50,526 --> 00:00:56,389
-By the end, we will need just two things for each cubelet: its home address, and one rotation.
+00:00:52,062 --> 00:00:54,697
+Nine stickers make up one large face.
 
 16
-00:00:56,677 --> 00:00:57,416
-Let's see why.
+00:00:55,071 --> 00:00:58,432
+There are six faces, and fifty four stickers in all.
 
 17
-00:00:59,146 --> 00:01:01,203
-Put the origin at the middle of the puzzle.
+00:01:00,361 --> 00:01:02,501
+A face is an outside surface.
 
 18
-00:01:01,496 --> 00:01:04,303
-Replace each cubelet by a point at its center.
+00:01:02,875 --> 00:01:06,135
+The objects that carry those stickers live underneath it.
 
 19
-00:01:05,364 --> 00:01:11,346
-Along each axis, there are only three levels: minus one, zero, and one.
+00:01:06,494 --> 00:01:07,370
+Let's look at one.
 
 20
-00:01:11,684 --> 00:01:12,971
-Twenty seven points.
+00:01:10,304 --> 00:01:12,255
+Here is a natural first attempt.
 
 21
-00:01:13,323 --> 00:01:17,984
-The hidden origin has no stickers, so Rubix stores the other twenty six.
+00:01:12,615 --> 00:01:17,444
+Number the fifty four sticker positions, and store their colors in a list.
 
 22
-00:01:19,931 --> 00:01:22,033
-We also need directions that stay put.
+00:01:17,818 --> 00:01:21,078
+This is a perfectly valid way to represent the cube.
 
 23
-00:01:22,365 --> 00:01:29,134
-The six centers give us exactly that: outer face turns spin them in place without changing their positions.
+00:01:23,407 --> 00:01:24,486
+Now turn the top.
 
 24
-00:01:30,315 --> 00:01:35,946
-Choose green as positive x, red as positive y, and white as positive z.
+00:01:24,846 --> 00:01:29,181
+Each moving sticker has to jump from its old list entry to a new one.
 
 25
-00:01:36,295 --> 00:01:39,625
-The opposite faces define the negative directions.
+00:01:29,598 --> 00:01:31,056
+Follow the colored paths.
 
 26
-00:01:40,931 --> 00:01:44,078
-The cube's own anatomy has handed us a coordinate system.
+00:01:31,415 --> 00:01:36,288
+A single smooth turn has become a collection of scattered index changes.
 
 27
-00:01:46,092 --> 00:01:51,456
-Our green and white edge belongs one step toward green and one step toward white.
+00:01:39,527 --> 00:01:43,368
+We could specify those permutations, one move at a time.
 
 28
-00:01:51,811 --> 00:01:55,422
-Its home coordinate is one, zero, one.
+00:01:43,742 --> 00:01:49,196
+But the list order gives us little help in seeing why these stickers belong to the same turn.
 
 29
-00:01:55,776 --> 00:01:56,471
-Call it c.
+00:01:49,556 --> 00:01:52,306
+Can we keep the spatial structure in our description?
 
 30
-00:01:57,773 --> 00:01:59,143
-Now freeze that address.
+00:01:56,191 --> 00:01:58,244
+This little block is a cubelet.
 
 31
-00:01:59,470 --> 00:02:05,814
-The cubelet can travel anywhere, but c keeps saying which cubelet it is, and where it belongs.
+00:01:58,604 --> 00:02:02,111
+It sits on an edge, between two large faces.
 
 32
-00:02:07,849 --> 00:02:10,294
-Before going further, test this choice.
+00:02:02,470 --> 00:02:05,672
+That is why it has two stickers: green and white.
 
 33
-00:02:10,605 --> 00:02:16,047
-A nonzero coordinate means a cubelet touches an outer boundary along that axis.
+00:02:07,618 --> 00:02:10,659
+The stickers are attached to the same rigid object.
 
 34
-00:02:17,261 --> 00:02:19,370
-One such coordinate gives a center.
+00:02:11,034 --> 00:02:14,802
+However we turn it, they stay together, at a right angle.
 
 35
-00:02:19,733 --> 00:02:20,677
-Two give an edge.
+00:02:15,161 --> 00:02:18,872
+Our description should preserve that relationship automatically.
 
 36
-00:02:21,054 --> 00:02:22,026
-Three give a corner.
+00:02:22,289 --> 00:02:23,543
+Put that cubelet back.
 
 37
-00:02:23,216 --> 00:02:26,252
-Add the absolute values, and you have counted its stickers.
+00:02:23,917 --> 00:02:30,084
+When we say turn the top face, we physically rotate the layer of nine cubelets behind it.
 
 38
-00:02:26,549 --> 00:02:28,912
-The address already knows the cubelet type!
+00:02:30,443 --> 00:02:33,005
+This layer is also called an outer slice.
 
 39
-00:02:31,235 --> 00:02:34,921
-That answers our first question: how to identify the cubelet.
+00:02:34,949 --> 00:02:37,802
+Watch the highlighted layer make a quarter turn.
 
 40
-00:02:35,235 --> 00:02:36,171
-Now for the second.
+00:02:38,161 --> 00:02:40,549
+The other eighteen positions stay put.
 
 41
-00:02:36,485 --> 00:02:37,750
-We still need its colors.
+00:02:40,923 --> 00:02:45,098
+The colored squares on the sides move because their cubelets move.
 
 42
-00:02:38,945 --> 00:02:41,303
-Look again at one, zero, one.
+00:02:48,019 --> 00:02:49,476
+So we need two rules.
 
 43
-00:02:41,663 --> 00:02:45,242
-Could the answer already be sitting inside those three numbers?
+00:02:49,835 --> 00:02:50,740
+Choose a layer.
 
 44
-00:02:48,144 --> 00:02:51,639
-At home, a green sticker points toward the green center.
+00:02:51,115 --> 00:02:53,458
+Then rotate everything in it together.
 
 45
-00:02:51,978 --> 00:02:54,223
-A white sticker points toward the white center.
+00:02:56,872 --> 00:03:00,176
+The cube suggests a better starting point for our purpose.
 
 46
-00:02:55,327 --> 00:02:58,146
-Draw an arrow perpendicular to each sticker.
+00:03:00,535 --> 00:03:04,536
+Arrange its small blocks in a three by three by three array.
 
 47
-00:02:58,495 --> 00:03:02,095
-These outward normals are positive x and positive z.
+00:03:04,910 --> 00:03:08,940
+One slot per cubelet position, with its stickers attached.
 
 48
-00:03:03,509 --> 00:03:06,009
-We can identify a color by its home direction.
+00:03:09,300 --> 00:03:12,472
+Now the top layer is an entire plane of this grid.
 
 49
-00:03:06,341 --> 00:03:09,866
-That identity stays fixed, even when the sticker turns.
+00:03:14,790 --> 00:03:17,555
+That makes it easier to see what belongs together.
 
 50
-00:03:11,816 --> 00:03:15,367
-Now split the home address into its axis components.
+00:03:17,915 --> 00:03:23,151
+But we still need a rule for moving those blocks and changing which way their stickers face.
 
 51
-00:03:15,741 --> 00:03:22,489
-One, zero, one becomes one x arrow, no y arrow, and one z arrow.
+00:03:25,478 --> 00:03:30,131
+Is there a simple language that describes a turn of this three dimensional array?
 
 52
-00:03:24,097 --> 00:03:24,703
-There they are.
+00:03:30,508 --> 00:03:35,176
+A language where the motion of the colors follows from the motion of the blocks?
 
 53
-00:03:24,995 --> 00:03:26,924
-The green normal, and the white normal!
+00:03:39,362 --> 00:03:41,153
+Follow our edge through that turn.
 
 54
-00:03:28,700 --> 00:03:33,700
-The coordinate that located our cubelet also contained the directions of its stickers.
+00:03:41,513 --> 00:03:42,738
+Where it sits changes.
 
 55
-00:03:34,019 --> 00:03:38,540
-Negative components work the same way: minus x identifies blue.
+00:03:43,112 --> 00:03:45,630
+Which way its green sticker points changes too.
 
 56
-00:03:40,490 --> 00:03:41,860
-There is just one adjustment.
+00:03:45,990 --> 00:03:50,092
+Knowing only its position would not tell us where to draw its colors.
 
 57
-00:03:42,180 --> 00:03:45,459
-Adding the arrows hides their individual identities.
+00:03:52,007 --> 00:03:54,423
+We need both location and facing.
 
 58
-00:03:45,806 --> 00:03:48,165
-So keep them side by side, as columns.
+00:03:54,783 --> 00:04:00,310
+And because the stickers are rigidly attached, the same physical turn changes both.
 
 59
-00:03:49,474 --> 00:03:51,960
-That gives the diagonal matrix of c.
+00:04:00,669 --> 00:04:03,711
+Could one mathematical operation do both jobs?
 
 60
-00:03:52,390 --> 00:03:56,528
-For our edge, its diagonal is one, zero, one.
+00:04:07,666 --> 00:04:10,315
+First we will give each cubelet an address.
 
 61
-00:03:56,899 --> 00:03:57,436
-Green.
+00:04:10,689 --> 00:04:13,862
+Then we will see what that address tells us about its stickers.
 
 62
-00:03:57,807 --> 00:03:58,805
-An empty column.
+00:04:14,294 --> 00:04:17,205
+Finally, we will put the description into motion.
 
 63
-00:03:59,191 --> 00:03:59,638
-White.
+00:04:19,116 --> 00:04:20,864
+No matrix is needed yet.
 
 64
-00:04:01,281 --> 00:04:05,796
-The zero is doing useful work: it says there is no sticker on that axis.
+00:04:21,296 --> 00:04:24,541
+First, let's make the geometry feel familiar.
 
 65
-00:04:06,110 --> 00:04:09,756
-A corner has three nonzero columns; a center has one.
+00:04:27,441 --> 00:04:29,582
+We need a way to describe where things are.
 
 66
-00:04:11,683 --> 00:04:13,846
-Remember how the address counted stickers?
+00:04:29,941 --> 00:04:32,968
+But what can we use as a reference while the cubelets move?
 
 67
-00:04:14,183 --> 00:04:16,964
-The diagonal matrix tells the same story.
+00:04:33,313 --> 00:04:34,640
+Look at the six centers.
 
 68
-00:04:18,055 --> 00:04:21,271
-Its nonzero columns point along different axes.
+00:04:36,549 --> 00:04:37,963
+Turn the top layer again.
 
 69
-00:04:21,631 --> 00:04:24,745
-Counting those independent columns gives its rank.
+00:04:38,323 --> 00:04:40,041
+Its center spins in place.
 
 70
-00:04:25,105 --> 00:04:27,318
-So rank equals the sticker count.
+00:04:40,416 --> 00:04:42,323
+The other centers stay where they were.
 
 71
-00:04:28,646 --> 00:04:30,685
-This is why the encoding feels elegant.
+00:04:42,683 --> 00:04:46,393
+Outer-layer turns never exchange these six positions.
 
 72
-00:04:30,986 --> 00:04:36,679
-The physical boundaries, the cubelet type, and the color directions all agree, because they came from the
+00:04:49,207 --> 00:04:53,963
+Imagine a cross joining the opposite centers through the middle of the puzzle.
 
 73
-00:04:36,679 --> 00:04:37,690
-same geometry.
+00:04:54,338 --> 00:04:57,990
+Those fixed directions give us a frame for every move.
 
 74
-00:04:40,020 --> 00:04:41,179
-Two discoveries down.
+00:04:58,364 --> 00:05:02,844
+We keep the whole cube in this frame, instead of turning it in our hands.
 
 75
-00:04:41,480 --> 00:04:45,895
-The home address names the cubelet, and its components identify the stickers.
+00:05:05,262 --> 00:05:07,184
+Put zero at the middle of the puzzle.
 
 76
-00:04:47,059 --> 00:04:48,693
-Our final question is motion.
+00:05:07,559 --> 00:05:12,867
+We will call the direction toward green x, toward red y, and toward white z.
 
 77
-00:04:49,032 --> 00:04:54,304
-How can one description carry both the cubelet and its stickers through every turn?
+00:05:14,797 --> 00:05:17,446
+One step toward green is positive x.
 
 78
-00:04:56,559 --> 00:04:59,233
-This is where linear algebra earns its place.
+00:05:17,820 --> 00:05:21,588
+One step the other way, toward blue, is negative x.
 
 79
-00:04:59,548 --> 00:05:03,486
-A rotation matrix tells us where three basis arrows land.
+00:05:21,992 --> 00:05:25,280
+Zero means we have not moved along that direction.
 
 80
-00:05:04,698 --> 00:05:09,576
-Once we know their destinations, we can transform any combination of them.
+00:05:25,654 --> 00:05:27,984
+The other two axes work the same way.
 
 81
-00:05:09,925 --> 00:05:12,772
-Every vector follows from those three arrows.
+00:05:30,405 --> 00:05:31,848
+These names are a choice.
 
 82
-00:05:14,237 --> 00:05:19,252
-Think of the matrix as a motion you can apply, rather than a grid you must memorize.
+00:05:32,207 --> 00:05:35,888
+What matters is using the same fixed directions throughout.
 
 83
-00:05:21,103 --> 00:05:22,848
-Let's watch a concrete top turn.
+00:05:38,275 --> 00:05:40,342
+Let's locate our edge from the middle.
 
 84
-00:05:23,172 --> 00:05:23,945
-Up stays up.
+00:05:40,760 --> 00:05:43,235
+First, take one step toward green.
 
 85
-00:05:24,297 --> 00:05:28,973
-The x direction swings toward minus y, while y swings toward x.
+00:05:43,609 --> 00:05:45,807
+That is the x coordinate: one.
 
 86
-00:05:30,292 --> 00:05:36,240
-Our edge travels from one, zero, one to zero, minus one, one.
+00:05:47,719 --> 00:05:50,426
+Next, take zero steps toward red.
 
 87
-00:05:37,961 --> 00:05:39,818
-Its home address is unchanged.
+00:05:50,800 --> 00:05:52,795
+The y coordinate is zero.
 
 88
-00:05:40,145 --> 00:05:42,607
-The turn has changed what happens to that address.
+00:05:53,227 --> 00:05:55,949
+Finally, take one step up toward white.
 
 89
-00:05:44,582 --> 00:05:47,496
-Store the accumulated rotation as R.
+00:05:56,309 --> 00:05:58,173
+The z coordinate is one.
 
 90
-00:05:47,891 --> 00:05:52,526
-Apply it to the home vector c, and you get the current position, p.
+00:06:01,091 --> 00:06:02,722
+One, zero, one.
 
 91
-00:05:53,936 --> 00:05:56,089
-At the start, R is the identity.
+00:06:03,155 --> 00:06:07,373
+Three numbers, always in x, y, z order.
 
 92
-00:05:56,422 --> 00:06:00,732
-After the turn, R carries that same home address to the new location.
+00:06:07,733 --> 00:06:10,309
+Together they name exactly this position.
 
 93
-00:06:01,825 --> 00:06:03,579
-We have recovered where the cubelet is.
+00:06:10,669 --> 00:06:14,743
+You can read a coordinate as a little set of walking instructions.
 
 94
-00:06:03,867 --> 00:06:06,227
-Now use the very same motion on its stickers.
+00:06:17,816 --> 00:06:23,256
+Each direction has only three levels: minus one, zero, and one.
 
 95
-00:06:07,994 --> 00:06:11,708
-The sticker normals are the columns of the diagonal matrix.
+00:06:23,630 --> 00:06:28,983
+The same three numbers locate every block in a three by three by three grid.
 
 96
-00:06:12,057 --> 00:06:15,543
-Multiplication transforms each column separately.
+00:06:30,923 --> 00:06:33,165
+That gives twenty seven positions.
 
 97
-00:06:16,751 --> 00:06:17,525
-Rotate them.
+00:06:33,525 --> 00:06:40,040
+This is an idealized geometric model of the puzzle, not a diagram of its internal mechanism.
 
 98
-00:06:17,885 --> 00:06:20,040
-Green now points toward minus y.
+00:06:40,414 --> 00:06:42,496
+The middle position has no stickers.
 
 99
-00:06:20,327 --> 00:06:21,595
-White still points up.
+00:06:42,856 --> 00:06:45,200
+Rubix stores the other twenty six.
 
 100
-00:06:21,969 --> 00:06:23,746
-The empty column stays empty.
+00:06:47,608 --> 00:06:50,766
+Now draw one arrow from the middle to our edge.
 
 101
-00:06:25,347 --> 00:06:29,097
-One multiplication gives every sticker direction at once!
+00:06:51,125 --> 00:06:56,042
+Its sideways and upward components are exactly those walking instructions.
 
 102
-00:06:31,398 --> 00:06:32,423
-Now pause here.
+00:06:56,402 --> 00:07:00,548
+This is a vector: an arrow described by three numbers.
 
 103
-00:06:32,778 --> 00:06:36,490
-This is the connection that ties the whole encoding together.
+00:07:02,476 --> 00:07:04,936
+We can write the numbers vertically as a column.
 
 104
-00:06:38,200 --> 00:06:41,196
-Add the home sticker normals, and you get c.
+00:07:05,310 --> 00:07:10,081
+The first row is x, the second is y, the third is z.
 
 105
-00:06:41,664 --> 00:06:46,001
-Rotate those normals, then add them, and you get R times c.
+00:07:10,441 --> 00:07:15,256
+It means the same thing as one, zero, one written across the page.
 
 106
-00:06:47,839 --> 00:06:49,394
-That is the cubelet's position.
+00:07:17,190 --> 00:07:18,183
+Why draw an arrow?
 
 107
-00:06:51,797 --> 00:06:55,484
-So the directions of its stickers already determine where it sits.
+00:07:18,542 --> 00:07:20,653
+Because an arrow can turn with the cube.
 
 108
-00:06:55,794 --> 00:06:59,260
-One rotation keeps location and facing in agreement.
+00:07:21,028 --> 00:07:23,938
+Soon that will let the geometry do our bookkeeping.
 
 109
-00:06:59,583 --> 00:07:00,836
-That is the real payoff.
+00:07:27,233 --> 00:07:32,222
+This address describes where the green and white edge belongs in the solved cube.
 
 110
-00:07:03,467 --> 00:07:04,624
-We can describe motion.
+00:07:32,582 --> 00:07:34,010
+Call that home vector c.
 
 111
-00:07:04,917 --> 00:07:07,087
-Now we must choose which cubelets receive it.
+00:07:35,933 --> 00:07:38,771
+Keep c fixed, even after a scramble.
 
 112
-00:07:07,379 --> 00:07:12,112
-Turning a face rotates the outer layer behind it: nine cubelets together.
+00:07:39,131 --> 00:07:42,114
+It names the same cubelet throughout the story.
 
 113
-00:07:13,183 --> 00:07:14,873
-Let v point out of that face.
+00:07:42,474 --> 00:07:46,169
+Later we will use a different vector for where that cubelet is now.
 
 114
-00:07:15,247 --> 00:07:19,291
-The dot product with p measures position along that direction.
+00:07:49,275 --> 00:07:50,746
+Look at a center cubelet.
 
 115
-00:07:19,651 --> 00:07:22,940
-Positive means the cubelet is in that outer layer.
+00:07:51,106 --> 00:07:54,162
+Its home address has one nonzero coordinate.
 
 116
-00:07:24,466 --> 00:07:26,963
-For the top, that is simply z equals one.
+00:07:54,536 --> 00:07:58,290
+It touches one outside boundary, and carries one sticker.
 
 117
-00:07:27,251 --> 00:07:30,044
-The geometry selects exactly the layer we wanted.
+00:08:00,192 --> 00:08:02,827
+An edge has two nonzero coordinates.
 
 118
-00:07:32,043 --> 00:07:34,004
-Here is a useful check on our story.
+00:08:03,201 --> 00:08:04,702
+Two outside boundaries.
 
 119
-00:07:34,328 --> 00:07:38,507
-Our edge started on the front, but the top turn carried it to the left.
+00:08:05,076 --> 00:08:05,966
+Two stickers.
 
 120
-00:07:39,687 --> 00:07:41,948
-Its home address still identifies it.
+00:08:06,326 --> 00:08:10,428
+A corner has three: three boundaries, three stickers.
 
 121
-00:07:42,302 --> 00:07:47,120
-To choose the moving layer, use its current address: R times c.
+00:08:12,857 --> 00:08:14,269
+This is our first payoff.
 
 122
-00:07:48,645 --> 00:07:51,978
-The two jobs are different, and the notation keeps them clear.
+00:08:14,607 --> 00:08:18,339
+A coordinate of zero stays in the middle along that axis.
 
 123
-00:07:53,733 --> 00:07:55,873
-Suppose the next turn is M.
+00:08:18,677 --> 00:08:22,658
+A coordinate of plus or minus one reaches an outside surface.
 
 124
-00:07:56,160 --> 00:07:59,696
-Apply the old rotation first, then the new turn.
+00:08:22,996 --> 00:08:26,186
+Counting the nonzero coordinates counts the stickers!
 
 125
-00:08:00,070 --> 00:08:01,498
-That gives M times R.
+00:08:29,708 --> 00:08:35,482
+For our edge, one, zero, one gives one plus zero plus one.
 
 126
-00:08:03,005 --> 00:08:04,870
-Update the selected cubelets.
+00:08:35,856 --> 00:08:36,746
+Two stickers.
 
 127
-00:08:05,179 --> 00:08:09,101
-Their past moves collapse into one accumulated transformation.
+00:08:37,106 --> 00:08:41,993
+Now consider the opposite edge, minus one, zero, minus one.
 
 128
-00:08:09,411 --> 00:08:12,018
-We can forget the sequence and keep its effect.
+00:08:42,353 --> 00:08:43,810
+It still has two stickers.
 
 129
-00:08:14,061 --> 00:08:17,417
-The implementation follows the same three steps.
+00:08:45,756 --> 00:08:50,949
+The minus signs choose the opposite faces; they do not subtract stickers.
 
 130
-00:08:17,756 --> 00:08:19,362
-Recover the current position.
+00:08:51,323 --> 00:08:53,638
+Take absolute values, then add.
 
 131
-00:08:19,700 --> 00:08:22,139
-Use the dot product to select the layer.
+00:08:53,997 --> 00:08:58,841
+That little formula counts the exposed surfaces of every cubelet.
 
 132
-00:08:22,478 --> 00:08:26,320
-Multiply the stored rotation by the new move on the left.
+00:09:01,754 --> 00:09:05,754
+Our choice of address has already given us something useful for free.
 
 133
-00:08:27,708 --> 00:08:32,718
-Do this for all twenty six home address and rotation pairs, and you have the complete move rule.
+00:09:06,114 --> 00:09:10,769
+Now ask the next question: can it also tell us which colors those stickers have?
 
 134
-00:08:34,559 --> 00:08:39,122
-Our animation is smooth, but a stored move is exactly a quarter turn.
+00:09:14,456 --> 00:09:19,489
+The green center sits one step along x: one, zero, zero.
 
 135
-00:08:39,450 --> 00:08:43,075
-It only swaps coordinate axes and reverses signs.
+00:09:19,863 --> 00:09:24,939
+The white center sits one step along z: zero, zero, one.
 
 136
-00:08:44,270 --> 00:08:48,867
-So every matrix entry stays minus one, zero, or one.
+00:09:25,313 --> 00:09:31,015
+Blue is the opposite of green, so its vector is minus one, zero, zero.
 
 137
-00:08:49,227 --> 00:08:54,521
-These matrices remain proper rotations; there are twenty four possibilities.
+00:09:32,948 --> 00:09:36,353
+These are unit vectors: arrows one step long.
 
 138
-00:08:55,932 --> 00:08:59,618
-We get geometric motion with exact arithmetic at the endpoints.
+00:09:36,712 --> 00:09:40,873
+We can use each center's fixed vector as the name of its color.
 
 139
-00:09:01,450 --> 00:09:02,862
-There is one final question.
+00:09:41,233 --> 00:09:46,672
+Green means this direction at home, even if a green sticker later points somewhere else.
 
 140
-00:09:03,200 --> 00:09:04,667
-When is a cubelet solved?
+00:09:49,508 --> 00:09:53,421
+The short name for the positive x unit vector is e x.
 
 141
-00:09:06,370 --> 00:09:09,261
-When every sticker points in its home direction.
+00:09:53,534 --> 00:09:56,299
+Likewise e y and e z.
 
 142
-00:09:09,653 --> 00:09:14,155
-The transformed diagonal matrix must equal the original one.
+00:09:56,674 --> 00:10:00,500
+The letter e just names a one-step arrow along an axis.
 
 143
-00:09:16,287 --> 00:09:17,458
-Remember the column sum?
+00:10:02,900 --> 00:10:04,197
+Look at our edge at home.
 
 144
-00:09:17,777 --> 00:09:20,742
-Equal sticker normals also put the cubelet at home.
+00:10:04,557 --> 00:10:07,278
+Draw an arrow straight out of the green sticker.
 
 145
-00:09:21,075 --> 00:09:24,492
-The same equality checks facing and location together.
+00:10:07,638 --> 00:10:09,459
+It points toward the green center.
 
 146
-00:09:26,852 --> 00:09:29,197
-And this condition has a lovely subtlety.
+00:10:09,833 --> 00:10:14,299
+Do the same for white: that arrow points up, toward the white center.
 
 147
-00:09:29,530 --> 00:09:30,955
-Watch the white center spin.
+00:10:16,693 --> 00:10:20,389
+An arrow perpendicular to a surface is called a normal.
 
 148
-00:09:32,445 --> 00:09:37,536
-Its local x and y arrows turn, but the white normal still points up.
+00:10:20,748 --> 00:10:23,586
+These normals tell us which way the stickers face.
 
 149
-00:09:37,904 --> 00:09:42,967
-Its one sticker is home, so an ordinary cube considers this center solved.
+00:10:23,946 --> 00:10:29,328
+At home, they are exactly the unit vectors we just used to name green and white.
 
 150
-00:09:44,392 --> 00:09:50,117
-Demanding the identity matrix would ask for extra information the unmarked sticker cannot show.
+00:10:32,733 --> 00:10:36,894
+Now go back to our home vector: one, zero, one.
 
 151
-00:09:50,432 --> 00:09:53,907
-A picture cube would need that extra orientation constraint.
+00:10:37,253 --> 00:10:40,774
+Split its walking instructions into separate arrows.
 
 152
-00:09:56,006 --> 00:09:59,723
-Four quarter turns bring every cubelet and sticker back.
+00:10:41,134 --> 00:10:42,577
+One green x arrow.
 
 153
-00:10:00,061 --> 00:10:02,709
-A turn followed by its inverse cancels too.
+00:10:42,951 --> 00:10:43,841
+No y arrow.
 
 154
-00:10:04,113 --> 00:10:06,812
-These identities are useful tests of the model.
+00:10:44,201 --> 00:10:45,818
+One white z arrow.
 
 155
-00:10:07,126 --> 00:10:11,299
-More importantly, they let us watch the geometry close its own loop.
+00:10:48,651 --> 00:10:50,972
+There they are: the two sticker normals.
 
 156
-00:10:13,769 --> 00:10:15,709
-Return to the question we started with.
+00:10:51,314 --> 00:10:56,502
+The components of the address point straight out through the cubelet's colored surfaces!
 
 157
-00:10:16,047 --> 00:10:17,973
-What does a computer need to remember?
+00:10:59,701 --> 00:11:02,176
+This is why the coordinate choice matters.
 
 158
-00:10:19,480 --> 00:10:21,645
-A home address, and one rotation.
+00:11:02,550 --> 00:11:05,068
+The numbers do not just locate the block.
 
 159
-00:10:21,994 --> 00:10:26,376
-The address identifies the cubelet and supplies its colors.
+00:11:05,428 --> 00:11:10,388
+Each nonzero component also identifies a sticker and its home direction.
 
 160
-00:10:26,738 --> 00:10:30,424
-The rotation tells us where it is and where its stickers point.
+00:11:13,497 --> 00:11:17,353
+We want to keep those arrows separate, so we can follow each sticker.
 
 161
-00:10:32,022 --> 00:10:36,244
-Selecting a layer and applying a turn now follow from that same geometry.
+00:11:17,713 --> 00:11:22,208
+Write the green arrow as a column: one, zero, zero.
 
 162
-00:10:36,567 --> 00:10:42,872
-The search for a solution is a separate challenge; this is the small, consistent world it searches.
+00:11:22,567 --> 00:11:25,362
+Beside it, leave an empty column for y.
 
 163
-00:10:44,024 --> 00:10:49,181
-That is Rubix's clever choice: find a description in which the facts you need emerge together.
+00:11:25,721 --> 00:11:29,795
+Then write the white arrow: zero, zero, one.
 
 164
-00:10:52,014 --> 00:10:58,619
-This way of seeing matrices was inspired by Grant Sanderson's Essence of Linear Algebra, from Three Blue One
+00:11:31,711 --> 00:11:35,116
+A rectangular arrangement of numbers is a matrix.
 
 165
-00:10:58,619 --> 00:10:59,147
-Brown.
+00:11:35,505 --> 00:11:38,837
+Here it is simply a collection of three column vectors.
 
 166
-00:11:00,218 --> 00:11:01,552
-It is a wonderful series.
+00:11:39,196 --> 00:11:40,813
+Read one column at a time.
 
 167
-00:11:01,836 --> 00:11:06,417
-Grant makes the geometry feel discoverable, and the equations feel earned.
+00:11:41,173 --> 00:11:46,657
+Each column has x, y, and z entries, just like our address.
 
 168
-00:11:06,701 --> 00:11:09,407
-If you enjoyed this connection, I warmly recommend it.
+00:11:49,585 --> 00:11:51,915
+There is no new geometry in the grid.
 
 169
-00:11:10,748 --> 00:11:11,706
-Look at the motion.
+00:11:52,274 --> 00:11:54,735
+It is a way to keep the arrows side by side.
 
 170
-00:11:12,111 --> 00:11:13,368
-Find the right description.
+00:11:57,650 --> 00:12:01,679
+Notice where the nonzero numbers landed: on the diagonal.
 
 171
-00:11:13,716 --> 00:11:16,194
+00:12:02,039 --> 00:12:03,671
+One, zero, one.
+
+172
+00:12:04,045 --> 00:12:06,127
+The same numbers as our home address!
+
+173
+00:12:08,754 --> 00:12:13,554
+We call this the diagonal matrix of c, written diag of c.
+
+174
+00:12:13,913 --> 00:12:20,938
+It is a simple operation: put the three coordinates on the diagonal, and fill the other entries with zeros.
+
+175
+00:12:23,554 --> 00:12:26,130
+A nonzero column is a sticker normal.
+
+176
+00:12:26,490 --> 00:12:30,025
+A zero column says there is no sticker on that axis.
+
+177
+00:12:30,400 --> 00:12:34,764
+Centers, edges, and corners all fit the same rule.
+
+178
+00:12:38,483 --> 00:12:39,737
+Let's collect what we know.
+
+179
+00:12:40,096 --> 00:12:42,804
+The home address identifies a cubelet.
+
+180
+00:12:43,163 --> 00:12:46,001
+Its nonzero coordinates count its stickers.
+
+181
+00:12:46,361 --> 00:12:51,757
+Split that address into axis arrows, and we get the stickers' home directions.
+
+182
+00:12:54,387 --> 00:12:56,004
+We have the static description.
+
+183
+00:12:56,364 --> 00:12:59,652
+To answer our opening problem, we still need to move it.
+
+184
+00:13:00,012 --> 00:13:02,632
+What happens to an arrow when the cube turns?
+
+185
+00:13:06,331 --> 00:13:08,166
+Take the one-step x arrow.
+
+186
+00:13:08,526 --> 00:13:10,055
+Watch it through our top turn.
+
+187
+00:13:10,415 --> 00:13:12,483
+It ends up pointing toward minus y.
+
+188
+00:13:12,857 --> 00:13:15,637
+The one-step y arrow turns toward x.
+
+189
+00:13:15,997 --> 00:13:18,108
+The upward z arrow stays up.
+
+190
+00:13:20,032 --> 00:13:24,789
+Now think of our edge address as one x arrow plus one z arrow.
+
+191
+00:13:25,149 --> 00:13:27,289
+Turn both arrows, and add them.
+
+192
+00:13:27,649 --> 00:13:29,382
+We get minus y plus z.
+
+193
+00:13:29,742 --> 00:13:31,984
+That is the new location of the edge.
+
+194
+00:13:34,992 --> 00:13:37,714
+A rigid rotation preserves this addition.
+
+195
+00:13:38,074 --> 00:13:43,455
+We can turn the ingredients and then add them, or add them first and turn the result.
+
+196
+00:13:43,830 --> 00:13:47,336
+This is the property that makes linear algebra useful here.
+
+197
+00:13:51,247 --> 00:13:53,083
+How do we record that rotation?
+
+198
+00:13:53,442 --> 00:13:57,632
+Keep the destinations of the three one-step arrows as columns.
+
+199
+00:13:58,006 --> 00:14:00,205
+The first column says where x went.
+
+200
+00:14:00,579 --> 00:14:02,414
+The second says where y went.
+
+201
+00:14:02,788 --> 00:14:04,536
+The third says where z went.
+
+202
+00:14:07,561 --> 00:14:09,469
+This is a rotation matrix.
+
+203
+00:14:09,828 --> 00:14:11,140
+Call this turn M.
+
+204
+00:14:11,398 --> 00:14:18,277
+Multiplying it by a vector means: take the indicated amount of each destination arrow, and add.
+
+205
+00:14:18,724 --> 00:14:23,858
+For one, zero, one, take the first column plus the third.
+
+206
+00:14:26,896 --> 00:14:29,997
+The grid now has a job: it describes a motion.
+
+207
+00:14:30,330 --> 00:14:32,401
+We have already seen that motion happen.
+
+208
+00:14:35,651 --> 00:14:38,815
+We will store the accumulated rotation as R.
+
+209
+00:14:39,180 --> 00:14:42,903
+At the start, it leaves every arrow unchanged.
+
+210
+00:14:43,283 --> 00:14:48,653
+This is called the identity matrix: one on the diagonal, zeros elsewhere.
+
+211
+00:14:51,387 --> 00:14:55,953
+Apply R to the home vector c, and you get the current position, p.
+
+212
+00:14:56,302 --> 00:15:00,768
+After our turn, R carries that same home address to the new location.
+
+213
+00:15:01,117 --> 00:15:03,808
+Now use the very same motion on its stickers.
+
+214
+00:15:06,411 --> 00:15:10,182
+The sticker normals are the columns of our diagonal matrix.
+
+215
+00:15:10,530 --> 00:15:14,017
+Multiplication transforms each column separately.
+
+216
+00:15:14,366 --> 00:15:16,744
+Call the collection of current normals N.
+
+217
+00:15:18,852 --> 00:15:19,626
+Rotate them.
+
+218
+00:15:19,985 --> 00:15:22,140
+Green now points toward minus y.
+
+219
+00:15:22,427 --> 00:15:23,695
+White still points up.
+
+220
+00:15:24,070 --> 00:15:25,847
+The empty column stays empty.
+
+221
+00:15:27,958 --> 00:15:32,094
+One multiplication gives every sticker direction at once!
+
+222
+00:15:34,648 --> 00:15:35,673
+Now pause here.
+
+223
+00:15:36,028 --> 00:15:39,740
+This is the connection that ties the whole encoding together.
+
+224
+00:15:41,850 --> 00:15:44,846
+Add the home sticker normals, and you get c.
+
+225
+00:15:45,314 --> 00:15:49,651
+Rotate those normals, then add them, and you get R times c.
+
+226
+00:15:51,789 --> 00:15:53,344
+That is the cubelet's position.
+
+227
+00:15:55,757 --> 00:15:59,769
+So the directions of its stickers already determine where it sits.
+
+228
+00:16:00,118 --> 00:16:03,888
+One rotation keeps location and facing in agreement.
+
+229
+00:16:04,251 --> 00:16:05,607
+That is the real payoff.
+
+230
+00:16:08,275 --> 00:16:09,892
+We can rotate a cubelet.
+
+231
+00:16:10,251 --> 00:16:12,043
+Now choose which ones should move.
+
+232
+00:16:12,402 --> 00:16:15,924
+Remember our first layer: the nine cubelets at the top.
+
+233
+00:16:16,298 --> 00:16:18,772
+Their current z coordinate is one.
+
+234
+00:16:19,147 --> 00:16:22,799
+The middle layer has zero; the bottom has minus one.
+
+235
+00:16:25,427 --> 00:16:29,645
+Let v be the one-step arrow pointing out of the face we want to turn.
+
+236
+00:16:30,020 --> 00:16:36,317
+The dot product of v with the current position reads how far that cubelet lies in this direction.
+
+237
+00:16:36,691 --> 00:16:38,875
+For the top, it simply reads z.
+
+238
+00:16:41,806 --> 00:16:43,808
+Positive selects the outer layer.
+
+239
+00:16:44,155 --> 00:16:48,739
+The same test works for every face, including the negative directions.
+
+240
+00:16:49,086 --> 00:16:52,956
+One geometric rule chooses the nine cubelets to turn.
+
+241
+00:16:56,384 --> 00:16:58,450
+Here is a useful check on our story.
+
+242
+00:16:58,798 --> 00:17:03,208
+Our edge started on the front, but the top turn carried it to the left.
+
+243
+00:17:05,329 --> 00:17:07,589
+Its home address still identifies it.
+
+244
+00:17:07,944 --> 00:17:12,762
+To choose the moving layer, use its current address: R times c.
+
+245
+00:17:14,904 --> 00:17:18,674
+The two jobs are different, and the notation keeps them clear.
+
+246
+00:17:21,233 --> 00:17:23,373
+Suppose the next turn is M.
+
+247
+00:17:23,660 --> 00:17:27,196
+Apply the old rotation first, then the new turn.
+
+248
+00:17:27,570 --> 00:17:28,998
+That gives M times R.
+
+249
+00:17:31,114 --> 00:17:33,138
+Update the selected cubelets.
+
+250
+00:17:33,486 --> 00:17:37,754
+Their past moves collapse into one accumulated transformation.
+
+251
+00:17:38,103 --> 00:17:40,936
+We can forget the sequence and keep its effect.
+
+252
+00:17:43,525 --> 00:17:45,636
+Our animation moves smoothly.
+
+253
+00:17:45,996 --> 00:17:49,328
+Rubix stores only the completed quarter turns.
+
+254
+00:17:49,687 --> 00:17:55,447
+A quarter turn sends each axis to another axis, perhaps reversing its sign.
+
+255
+00:17:57,861 --> 00:18:02,675
+So the stored matrix entries stay minus one, zero, or one.
+
+256
+00:18:03,035 --> 00:18:06,614
+No rounding is needed to represent a completed move.
+
+257
+00:18:06,974 --> 00:18:11,934
+These matrices describe rotations without stretching or reflections.
+
+258
+00:18:12,308 --> 00:18:15,015
+There are twenty four possible orientations.
+
+259
+00:18:18,411 --> 00:18:19,852
+There is one final question.
+
+260
+00:18:20,201 --> 00:18:21,699
+When is a cubelet solved?
+
+261
+00:18:23,824 --> 00:18:26,715
+When every sticker points in its home direction.
+
+262
+00:18:27,107 --> 00:18:31,609
+The transformed diagonal matrix must equal the original one.
+
+263
+00:18:33,749 --> 00:18:34,991
+Remember the column sum?
+
+264
+00:18:35,340 --> 00:18:38,500
+Equal sticker normals also put the cubelet at home.
+
+265
+00:18:38,863 --> 00:18:42,505
+The same equality checks facing and location together.
+
+266
+00:18:45,105 --> 00:18:47,526
+And this condition has a lovely subtlety.
+
+267
+00:18:47,875 --> 00:18:49,345
+Watch the white center spin.
+
+268
+00:18:51,463 --> 00:18:56,554
+Its local x and y arrows turn, but the white normal still points up.
+
+269
+00:18:56,922 --> 00:19:01,985
+Its one sticker is home, so an ordinary cube considers this center solved.
+
+270
+00:19:04,119 --> 00:19:10,291
+Demanding the identity matrix would ask for extra information the unmarked sticker cannot show.
+
+271
+00:19:10,639 --> 00:19:14,382
+A picture cube would need that extra orientation constraint.
+
+272
+00:19:16,941 --> 00:19:18,660
+Return to our opening problem.
+
+273
+00:19:19,020 --> 00:19:23,471
+How do we teach the computer to turn the cube, including every sticker?
+
+274
+00:19:26,101 --> 00:19:29,303
+Give each cubelet a home address and a rotation.
+
+275
+00:19:29,677 --> 00:19:32,093
+The address supplies its sticker normals.
+
+276
+00:19:32,468 --> 00:19:36,585
+The rotation carries those arrows and locates the cubelet.
+
+277
+00:19:36,944 --> 00:19:43,111
+Read its current position to select a layer, then apply the same turn to every cubelet in it.
+
+278
+00:19:46,131 --> 00:19:50,409
+The colors now move correctly because the geometry keeps them attached.
+
+279
+00:19:50,737 --> 00:19:57,107
+That is the elegant choice in Rubix: a description that makes the relationships we need follow together.
+
+280
+00:19:57,504 --> 00:19:59,852
+Finding a solution is another challenge.
+
+281
+00:20:00,180 --> 00:20:02,746
+We have built the world in which that search happens.
+
+282
+00:20:06,397 --> 00:20:13,528
+This way of seeing matrices was inspired by Grant Sanderson's Essence of Linear Algebra, from Three Blue One
+
+283
+00:20:13,528 --> 00:20:14,088
+Brown.
+
+284
+00:20:16,178 --> 00:20:17,614
+It is a wonderful series.
+
+285
+00:20:17,933 --> 00:20:22,893
+Grant makes the geometry feel discoverable, and the equations feel earned.
+
+286
+00:20:23,212 --> 00:20:26,138
+If you enjoyed this connection, I warmly recommend it.
+
+287
+00:20:28,243 --> 00:20:29,855
+Start with a physical question.
+
+288
+00:20:30,246 --> 00:20:32,809
+Find a description that keeps the geometry.
+
+289
+00:20:33,158 --> 00:20:35,636
 Let the mathematics reveal what follows.

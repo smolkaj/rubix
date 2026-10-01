@@ -1,112 +1,144 @@
 # A cube made of transformations
 
-## 00:00:00 — What does a computer need to remember?
+## 00:00:00 — Teach a computer one turn
 
-Turn one face of a Rubik's cube. Now another. Fifty four colored stickers seem to demand fifty four little records. But look closer. The stickers never travel alone. They ride on small, rigid cubes. Could we remember the geometry of those cubes, and let the colors take care of themselves? Rubix does exactly that. And the surprising part is how much information one tiny home address contains.
+Imagine you are writing a program for a Rubik's cube. Before it can find a solution, it needs to do something much more basic. Turn the top layer correctly. Watch. The white face turns, but strips of stickers on the sides move too. Which colors go where? You could record each sticker and write rules for moving it. That works. But the real cube never consults a list. Its shape tells the colors how to move. Can we give our program a description that makes those same rules follow from the geometry? That is the problem we will solve.
 
-## 00:00:31 — One cubelet. Three discoveries.
+## 00:00:45 — First, what are we moving?
 
-We will follow this green and white cubelet. An edge, with two stickers. First, find an address that identifies it. Second, discover how that address already knows its colors. Third, turn that description into a moving cube. By the end, we will need just two things for each cubelet: its home address, and one rotation. Let's see why.
+Start with one small colored square. We will call it a sticker, or facelet. Nine stickers make up one large face. There are six faces, and fifty four stickers in all. A face is an outside surface. The objects that carry those stickers live underneath it. Let's look at one.
 
-## 00:00:58 — Start with the geometry
+## 00:01:09 — A list can record the colors
 
-Put the origin at the middle of the puzzle. Replace each cubelet by a point at its center. Along each axis, there are only three levels: minus one, zero, and one. Twenty seven points. The hidden origin has no stickers, so Rubix stores the other twenty six.
+Here is a natural first attempt. Number the fifty four sticker positions, and store their colors in a list. This is a perfectly valid way to represent the cube. Now turn the top. Each moving sticker has to jump from its old list entry to a new one. Follow the colored paths. A single smooth turn has become a collection of scattered index changes. We could specify those permutations, one move at a time. But the list order gives us little help in seeing why these stickers belong to the same turn. Can we keep the spatial structure in our description?
 
-## 00:01:19 — The centers give us a fixed frame
+## 00:01:55 — Two stickers. One rigid cubelet.
 
-We also need directions that stay put. The six centers give us exactly that: outer face turns spin them in place without changing their positions. Choose green as positive x, red as positive y, and white as positive z. The opposite faces define the negative directions. The cube's own anatomy has handed us a coordinate system.
+This little block is a cubelet. It sits on an edge, between two large faces. That is why it has two stickers: green and white. The stickers are attached to the same rigid object. However we turn it, they stay together, at a right angle. Our description should preserve that relationship automatically.
 
-## 00:01:45 — Give the cubelet a permanent address
+## 00:02:21 — A turn moves a whole layer
 
-Our green and white edge belongs one step toward green and one step toward white. Its home coordinate is one, zero, one. Call it c. Now freeze that address. The cubelet can travel anywhere, but c keeps saying which cubelet it is, and where it belongs.
+Put that cubelet back. When we say turn the top face, we physically rotate the layer of nine cubelets behind it. This layer is also called an outer slice. Watch the highlighted layer make a quarter turn. The other eighteen positions stay put. The colored squares on the sides move because their cubelets move. So we need two rules. Choose a layer. Then rotate everything in it together.
 
-## 00:02:07 — Test the address: what does it give us?
+## 00:02:56 — A 3D array keeps the shape
 
-Before going further, test this choice. A nonzero coordinate means a cubelet touches an outer boundary along that axis. One such coordinate gives a center. Two give an edge. Three give a corner. Add the absolute values, and you have counted its stickers. The address already knows the cubelet type!
+The cube suggests a better starting point for our purpose. Arrange its small blocks in a three by three by three array. One slot per cubelet position, with its stickers attached. Now the top layer is an entire plane of this grid. That makes it easier to see what belongs together. But we still need a rule for moving those blocks and changing which way their stickers face. Is there a simple language that describes a turn of this three dimensional array? A language where the motion of the colors follows from the motion of the blocks?
 
-## 00:02:30 — Can the address also know the colors?
+## 00:03:38 — We need location and facing
 
-That answers our first question: how to identify the cubelet. Now for the second. We still need its colors. Look again at one, zero, one. Could the answer already be sitting inside those three numbers?
+Follow our edge through that turn. Where it sits changes. Which way its green sticker points changes too. Knowing only its position would not tell us where to draw its colors. We need both location and facing. And because the stickers are rigidly attached, the same physical turn changes both. Could one mathematical operation do both jobs?
 
-## 00:02:47 — A color has a home direction
+## 00:04:07 — Build the description, one idea at a time
 
-At home, a green sticker points toward the green center. A white sticker points toward the white center. Draw an arrow perpendicular to each sticker. These outward normals are positive x and positive z. We can identify a color by its home direction. That identity stays fixed, even when the sticker turns.
+First we will give each cubelet an address. Then we will see what that address tells us about its stickers. Finally, we will put the description into motion. No matrix is needed yet. First, let's make the geometry feel familiar.
 
-## 00:03:11 — Split the address into its ingredients
+## 00:04:26 — Find something that stays put
 
-Now split the home address into its axis components. One, zero, one becomes one x arrow, no y arrow, and one z arrow. There they are. The green normal, and the white normal! The coordinate that located our cubelet also contained the directions of its stickers. Negative components work the same way: minus x identifies blue.
+We need a way to describe where things are. But what can we use as a reference while the cubelets move? Look at the six centers. Turn the top layer again. Its center spins in place. The other centers stay where they were. Outer-layer turns never exchange these six positions. Imagine a cross joining the opposite centers through the middle of the puzzle. Those fixed directions give us a frame for every move. We keep the whole cube in this frame, instead of turning it in our hands.
 
-## 00:03:39 — Keep the arrows, instead of adding them
+## 00:05:04 — Three directions, measured from the middle
 
-There is just one adjustment. Adding the arrows hides their individual identities. So keep them side by side, as columns. That gives the diagonal matrix of c. For our edge, its diagonal is one, zero, one. Green. An empty column. White. The zero is doing useful work: it says there is no sticker on that axis. A corner has three nonzero columns; a center has one.
+Put zero at the middle of the puzzle. We will call the direction toward green x, toward red y, and toward white z. One step toward green is positive x. One step the other way, toward blue, is negative x. Zero means we have not moved along that direction. The other two axes work the same way. These names are a choice. What matters is using the same fixed directions throughout.
 
-## 00:04:11 — The same choice pays off twice
+## 00:05:37 — Read an address as three instructions
 
-Remember how the address counted stickers? The diagonal matrix tells the same story. Its nonzero columns point along different axes. Counting those independent columns gives its rank. So rank equals the sticker count. This is why the encoding feels elegant. The physical boundaries, the cubelet type, and the color directions all agree, because they came from the same geometry.
+Let's locate our edge from the middle. First, take one step toward green. That is the x coordinate: one. Next, take zero steps toward red. The y coordinate is zero. Finally, take one step up toward white. The z coordinate is one. One, zero, one. Three numbers, always in x, y, z order. Together they name exactly this position. You can read a coordinate as a little set of walking instructions.
 
-## 00:04:39 — We have an address. We have its colors.
+## 00:06:17 — The whole cube fits on a small grid
 
-Two discoveries down. The home address names the cubelet, and its components identify the stickers. Our final question is motion. How can one description carry both the cubelet and its stickers through every turn?
+Each direction has only three levels: minus one, zero, and one. The same three numbers locate every block in a three by three by three grid. That gives twenty seven positions. This is an idealized geometric model of the puzzle, not a diagram of its internal mechanism. The middle position has no stickers. Rubix stores the other twenty six.
 
-## 00:04:56 — A matrix is a promise about three arrows
+## 00:06:47 — An address can also be an arrow
 
-This is where linear algebra earns its place. A rotation matrix tells us where three basis arrows land. Once we know their destinations, we can transform any combination of them. Every vector follows from those three arrows. Think of the matrix as a motion you can apply, rather than a grid you must memorize.
+Now draw one arrow from the middle to our edge. Its sideways and upward components are exactly those walking instructions. This is a vector: an arrow described by three numbers. We can write the numbers vertically as a column. The first row is x, the second is y, the third is z. It means the same thing as one, zero, one written across the page. Why draw an arrow? Because an arrow can turn with the cube. Soon that will let the geometry do our bookkeeping.
 
-## 00:05:20 — Follow our cubelet through one turn
+## 00:07:26 — Give the cubelet a permanent address
 
-Let's watch a concrete top turn. Up stays up. The x direction swings toward minus y, while y swings toward x. Our edge travels from one, zero, one to zero, minus one, one. Its home address is unchanged. The turn has changed what happens to that address.
+This address describes where the green and white edge belongs in the solved cube. Call that home vector c. Keep c fixed, even after a scramble. It names the same cubelet throughout the story. Later we will use a different vector for where that cubelet is now.
 
-## 00:05:44 — Apply the motion to the home address
+## 00:07:48 — The boundary tells us how many stickers
 
-Store the accumulated rotation as R. Apply it to the home vector c, and you get the current position, p. At the start, R is the identity. After the turn, R carries that same home address to the new location. We have recovered where the cubelet is. Now use the very same motion on its stickers.
+Look at a center cubelet. Its home address has one nonzero coordinate. It touches one outside boundary, and carries one sticker. An edge has two nonzero coordinates. Two outside boundaries. Two stickers. A corner has three: three boundaries, three stickers. This is our first payoff. A coordinate of zero stays in the middle along that axis. A coordinate of plus or minus one reaches an outside surface. Counting the nonzero coordinates counts the stickers!
 
-## 00:06:07 — One rotation carries every sticker
+## 00:08:29 — Signs tell sides. Magnitudes count boundaries.
 
-The sticker normals are the columns of the diagonal matrix. Multiplication transforms each column separately. Rotate them. Green now points toward minus y. White still points up. The empty column stays empty. One multiplication gives every sticker direction at once!
+For our edge, one, zero, one gives one plus zero plus one. Two stickers. Now consider the opposite edge, minus one, zero, minus one. It still has two stickers. The minus signs choose the opposite faces; they do not subtract stickers. Take absolute values, then add. That little formula counts the exposed surfaces of every cubelet. Our choice of address has already given us something useful for free. Now ask the next question: can it also tell us which colors those stickers have?
 
-## 00:06:30 — The position is inside the sticker directions
+## 00:09:13 — Use the centers to name colors
+
+The green center sits one step along x: one, zero, zero. The white center sits one step along z: zero, zero, one. Blue is the opposite of green, so its vector is minus one, zero, zero. These are unit vectors: arrows one step long. We can use each center's fixed vector as the name of its color. Green means this direction at home, even if a green sticker later points somewhere else. The short name for the positive x unit vector is e x. Likewise e y and e z. The letter e just names a one-step arrow along an axis.
+
+## 00:10:02 — A color has a home direction
+
+Look at our edge at home. Draw an arrow straight out of the green sticker. It points toward the green center. Do the same for white: that arrow points up, toward the white center. An arrow perpendicular to a surface is called a normal. These normals tell us which way the stickers face. At home, they are exactly the unit vectors we just used to name green and white.
+
+## 00:10:32 — Split the address into its ingredients
+
+Now go back to our home vector: one, zero, one. Split its walking instructions into separate arrows. One green x arrow. No y arrow. One white z arrow. There they are: the two sticker normals. The components of the address point straight out through the cubelet's colored surfaces! This is why the coordinate choice matters. The numbers do not just locate the block. Each nonzero component also identifies a sticker and its home direction.
+
+## 00:11:12 — A matrix can simply hold arrows
+
+We want to keep those arrows separate, so we can follow each sticker. Write the green arrow as a column: one, zero, zero. Beside it, leave an empty column for y. Then write the white arrow: zero, zero, one. A rectangular arrangement of numbers is a matrix. Here it is simply a collection of three column vectors. Read one column at a time. Each column has x, y, and z entries, just like our address. There is no new geometry in the grid. It is a way to keep the arrows side by side.
+
+## 00:11:57 — The diagonal comes from the address
+
+Notice where the nonzero numbers landed: on the diagonal. One, zero, one. The same numbers as our home address! We call this the diagonal matrix of c, written diag of c. It is a simple operation: put the three coordinates on the diagonal, and fill the other entries with zeros. A nonzero column is a sticker normal. A zero column says there is no sticker on that axis. Centers, edges, and corners all fit the same rule.
+
+## 00:12:37 — We have an address. We have its colors.
+
+Let's collect what we know. The home address identifies a cubelet. Its nonzero coordinates count its stickers. Split that address into axis arrows, and we get the stickers' home directions. We have the static description. To answer our opening problem, we still need to move it. What happens to an arrow when the cube turns?
+
+## 00:13:05 — Turn an arrow before writing a matrix
+
+Take the one-step x arrow. Watch it through our top turn. It ends up pointing toward minus y. The one-step y arrow turns toward x. The upward z arrow stays up. Now think of our edge address as one x arrow plus one z arrow. Turn both arrows, and add them. We get minus y plus z. That is the new location of the edge. A rigid rotation preserves this addition. We can turn the ingredients and then add them, or add them first and turn the result. This is the property that makes linear algebra useful here.
+
+## 00:13:50 — A matrix is a promise about three arrows
+
+How do we record that rotation? Keep the destinations of the three one-step arrows as columns. The first column says where x went. The second says where y went. The third says where z went. This is a rotation matrix. Call this turn M. Multiplying it by a vector means: take the indicated amount of each destination arrow, and add. For one, zero, one, take the first column plus the third. The grid now has a job: it describes a motion. We have already seen that motion happen.
+
+## 00:14:35 — Apply the motion to the home address
+
+We will store the accumulated rotation as R. At the start, it leaves every arrow unchanged. This is called the identity matrix: one on the diagonal, zeros elsewhere. Apply R to the home vector c, and you get the current position, p. After our turn, R carries that same home address to the new location. Now use the very same motion on its stickers.
+
+## 00:15:05 — One rotation carries every sticker
+
+The sticker normals are the columns of our diagonal matrix. Multiplication transforms each column separately. Call the collection of current normals N. Rotate them. Green now points toward minus y. White still points up. The empty column stays empty. One multiplication gives every sticker direction at once!
+
+## 00:15:34 — The position is inside the sticker directions
 
 Now pause here. This is the connection that ties the whole encoding together. Add the home sticker normals, and you get c. Rotate those normals, then add them, and you get R times c. That is the cubelet's position. So the directions of its stickers already determine where it sits. One rotation keeps location and facing in agreement. That is the real payoff.
 
-## 00:07:02 — Choose the layer geometrically
+## 00:16:07 — Choose the layer geometrically
 
-We can describe motion. Now we must choose which cubelets receive it. Turning a face rotates the outer layer behind it: nine cubelets together. Let v point out of that face. The dot product with p measures position along that direction. Positive means the cubelet is in that outer layer. For the top, that is simply z equals one. The geometry selects exactly the layer we wanted.
+We can rotate a cubelet. Now choose which ones should move. Remember our first layer: the nine cubelets at the top. Their current z coordinate is one. The middle layer has zero; the bottom has minus one. Let v be the one-step arrow pointing out of the face we want to turn. The dot product of v with the current position reads how far that cubelet lies in this direction. For the top, it simply reads z. Positive selects the outer layer. The same test works for every face, including the negative directions. One geometric rule chooses the nine cubelets to turn.
 
-## 00:07:31 — Follow where it is, rather than where it belongs
+## 00:16:55 — Follow where it is, rather than where it belongs
 
 Here is a useful check on our story. Our edge started on the front, but the top turn carried it to the left. Its home address still identifies it. To choose the moving layer, use its current address: R times c. The two jobs are different, and the notation keeps them clear.
 
-## 00:07:53 — A history of turns becomes one matrix
+## 00:17:20 — A history of turns becomes one matrix
 
 Suppose the next turn is M. Apply the old rotation first, then the new turn. That gives M times R. Update the selected cubelets. Their past moves collapse into one accumulated transformation. We can forget the sequence and keep its effect.
 
-## 00:08:13 — The idea fits directly into code
+## 00:17:42 — Smooth motion, exact stored states
 
-The implementation follows the same three steps. Recover the current position. Use the dot product to select the layer. Multiply the stored rotation by the new move on the left. Do this for all twenty six home address and rotation pairs, and you have the complete move rule.
+Our animation moves smoothly. Rubix stores only the completed quarter turns. A quarter turn sends each axis to another axis, perhaps reversing its sign. So the stored matrix entries stay minus one, zero, or one. No rounding is needed to represent a completed move. These matrices describe rotations without stretching or reflections. There are twenty four possible orientations.
 
-## 00:08:34 — Smooth motion, exact stored states
-
-Our animation is smooth, but a stored move is exactly a quarter turn. It only swaps coordinate axes and reverses signs. So every matrix entry stays minus one, zero, or one. These matrices remain proper rotations; there are twenty four possibilities. We get geometric motion with exact arithmetic at the endpoints.
-
-## 00:09:00 — The home directions tell us when to stop
+## 00:18:17 — The home directions tell us when to stop
 
 There is one final question. When is a cubelet solved? When every sticker points in its home direction. The transformed diagonal matrix must equal the original one. Remember the column sum? Equal sticker normals also put the cubelet at home. The same equality checks facing and location together.
 
-## 00:09:26 — Measure exactly what the puzzle asks
+## 00:18:44 — Measure exactly what the puzzle asks
 
 And this condition has a lovely subtlety. Watch the white center spin. Its local x and y arrows turn, but the white normal still points up. Its one sticker is home, so an ordinary cube considers this center solved. Demanding the identity matrix would ask for extra information the unmarked sticker cannot show. A picture cube would need that extra orientation constraint.
 
-## 00:09:55 — Close the loop
+## 00:19:16 — Now we can teach the computer a turn
 
-Four quarter turns bring every cubelet and sticker back. A turn followed by its inverse cancels too. These identities are useful tests of the model. More importantly, they let us watch the geometry close its own loop.
+Return to our opening problem. How do we teach the computer to turn the cube, including every sticker? Give each cubelet a home address and a rotation. The address supplies its sticker normals. The rotation carries those arrows and locates the cubelet. Read its current position to select a layer, then apply the same turn to every cubelet in it. The colors now move correctly because the geometry keeps them attached. That is the elegant choice in Rubix: a description that makes the relationships we need follow together. Finding a solution is another challenge. We have built the world in which that search happens.
 
-## 00:10:13 — What did we actually need to remember?
+## 00:20:05 — Learn to see matrices as motion
 
-Return to the question we started with. What does a computer need to remember? A home address, and one rotation. The address identifies the cubelet and supplies its colors. The rotation tells us where it is and where its stickers point. Selecting a layer and applying a turn now follow from that same geometry. The search for a solution is a separate challenge; this is the small, consistent world it searches. That is Rubix's clever choice: find a description in which the facts you need emerge together.
-
-## 00:10:51 — Learn to see matrices as motion
-
-This way of seeing matrices was inspired by Grant Sanderson's Essence of Linear Algebra, from Three Blue One Brown. It is a wonderful series. Grant makes the geometry feel discoverable, and the equations feel earned. If you enjoyed this connection, I warmly recommend it. Look at the motion. Find the right description. Let the mathematics reveal what follows.
+This way of seeing matrices was inspired by Grant Sanderson's Essence of Linear Algebra, from Three Blue One Brown. It is a wonderful series. Grant makes the geometry feel discoverable, and the equations feel earned. If you enjoyed this connection, I warmly recommend it. Start with a physical question. Find a description that keeps the geometry. Let the mathematics reveal what follows.
 
 Narration is synthetic (Microsoft Edge, en-US-AndrewNeural). Original script and animation; no 3Blue1Brown footage, music, or voice.
 

@@ -56,16 +56,18 @@ def font(size, bold=False, math_text=False):
 
 
 def wrap(text, text_font, width):
-    lines, line = [], ""
-    for word in text.split():
-        candidate = f"{line} {word}".strip()
-        if line and text_font.getlength(candidate) > width:
+    lines = []
+    for paragraph in text.splitlines():
+        line = ""
+        for word in paragraph.split():
+            candidate = f"{line} {word}".strip()
+            if line and text_font.getlength(candidate) > width:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
+        if line:
             lines.append(line)
-            line = word
-        else:
-            line = candidate
-    if line:
-        lines.append(line)
     return lines
 
 
@@ -297,22 +299,21 @@ def arrow(draw, start, end, color, width=4, label=None):
         draw.text(tuple(end + [8, -12]), label, font=font(24, True), fill=color)
 
 
-def axes(draw, rotation=IDENTITY, scale=110, length=2.2, center=(330, 350), muted=False):
+def axes(draw, rotation=IDENTITY, scale=110, length=2.2, center=(330, 350), muted=False, labels=True):
     for axis, color, label in zip(np.eye(3), AXIS_COLORS, ["+x", "+y", "+z"]):
         arrow(draw, project(np.zeros(3), center, scale),
-              project(rotation @ axis * length, center, scale), "#516176" if muted else color, label=label)
+              project(rotation @ axis * length, center, scale), "#516176" if muted else color, label=label if labels else None)
 
 
 def cube(draw, state=rubix.solved_cube, move=None, fraction=0., highlight=None,
-         isolate=None, normals=False):
+         isolate=None, normals=False, sticker_highlight=None, center=(320, 355), scale=None):
+    scale = (175 if isolate else 110) if scale is None else scale
     polygons = []
     for home, stored in state:
         if isolate is not None and home != isolate:
             continue
         rotation = animated_rotation(home, stored, move, fraction)
         position = np.zeros(3) if isolate else rotation @ home
-        scale = 175 if isolate else 110
-        center = (320, 355)
         for axis in range(3):
             others = [i for i in range(3) if i != axis]
             for sign in [-1, 1]:
@@ -326,7 +327,8 @@ def cube(draw, state=rubix.solved_cube, move=None, fraction=0., highlight=None,
                     vertices.append(position + rotation @ vertex)
                 colored = home[axis] == sign
                 color = PALETTE[rubix.color_names[tuple(normal.astype(int))]] if colored else "#273143"
-                if highlight and not highlight(home, stored):
+                if ((highlight and not highlight(home, stored)) or
+                        (sticker_highlight and not sticker_highlight(home, normal))):
                     rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
                     color = tuple(round(v * .24 + 18) for v in rgb)
                 polygons.append((np.dot(np.mean(vertices, axis=0), CAMERA),
@@ -341,9 +343,19 @@ def cube(draw, state=rubix.solved_cube, move=None, fraction=0., highlight=None,
                 normal = np.eye(3)[axis] * value
                 color = PALETTE[rubix.color_names[tuple(normal.astype(int))]]
                 current = rotation @ normal
-                arrow(draw, project(.52 * current, (320, 355), 175),
-                      project(1.45 * current, (320, 355), 175), color,
+                arrow(draw, project(.52 * current, center, scale),
+                      project(1.45 * current, center, scale), color,
                       label=rubix.color_names[tuple(normal.astype(int))].title())
+
+
+def vector_column(draw, value, origin=(820, 275), color=ACCENT, labels=True):
+    x, y = origin
+    draw.line([(x + 9, y - 5), (x, y - 5), (x, y + 133), (x + 9, y + 133)], fill=color, width=3)
+    draw.line([(x + 68, y - 5), (x + 77, y - 5), (x + 77, y + 133), (x + 68, y + 133)], fill=color, width=3)
+    for row, number in enumerate(value):
+        mathematical_text(draw, (x + 24, y + row * 46), str(int(number)).replace("-", "−"), 32, color)
+        if labels:
+            draw.text((x + 108, y + row * 46), ["x", "y", "z"][row], font=font(26), fill=MUTED)
 
 
 def matrix(draw, value, origin=(810, 275), caption="", colors=AXIS_COLORS):
@@ -358,6 +370,23 @@ def matrix(draw, value, origin=(810, 275), caption="", colors=AXIS_COLORS):
                       font=font(32), fill=colors[col])
     if caption:
         draw.text((x, y + 150), caption, font=font(24), fill=MUTED)
+
+
+def sticker_slots():
+    """Canonical visible slots, ordered by face then by home coordinate."""
+    return sorted(((home, tuple(np.eye(3, dtype=int)[axis] * value))
+                   for home, _ in rubix.solved_cube
+                   for axis, value in enumerate(home) if value), key=lambda slot: (slot[1], slot[0]))
+
+
+def sticker_permutation(move):
+    """Map each source slot to its destination using Rubix's completed move."""
+    slots = sticker_slots()
+    indices = {slot: index for index, slot in enumerate(slots)}
+    rotations = dict(rubix.apply_move_to_cube(move, rubix.solved_cube))
+    return [indices[(tuple(np.array(rotations[home]) @ home),
+                      tuple(np.array(rotations[home]) @ normal))]
+            for home, normal in slots]
 
 
 def grid(draw):
@@ -382,17 +411,108 @@ def render_beat(beat, local, caption=""):
     draw.text((42, 61), beat["title"], font=font(37, True), fill=INK)
     draw.line([(680, 130), (680, 568)], fill="#293747", width=2)
     grid(draw)
-    progress = local / beat["duration"]
     cues = beat.get("cue_times", {})
     turn_start = cues.get("turn", beat["duration"] * .22)
-    turn = min(1., max(0., (local - turn_start) / 3.))
+    turn = min(1., max(0., (local - turn_start) / beat.get("turn_duration", 3.)))
     if not beat.get("animate", True):
         turn = 0.
     visual = beat["visual"]
     edge_highlight = lambda c, r: c == EDGE
     turned = rubix.apply_move_to_cube(TOP, rubix.solved_cube)
 
-    if visual == "roadmap":
+    if visual == "problem":
+        cube(draw, move=TOP, fraction=turn)
+        for i, text in enumerate(["Which cubelets move?", "Where do they go?", "Where do their stickers point?"]):
+            draw.text((720, 210 + i * 75), text, font=font(27), fill=INK)
+    elif visual == "anatomy_face":
+        whole_face = local >= cues.get("face", beat["duration"] * .5)
+        cube(draw, sticker_highlight=lambda c, n: tuple(n) == (0, 0, 1)
+             and (whole_face or c == EDGE))
+    elif visual == "anatomy_cubelet":
+        cube(draw, isolate=EDGE)
+    elif visual == "anatomy_layer":
+        cube(draw, move=TOP, fraction=turn, highlight=lambda c, r: c[2] == 1)
+    elif visual == "flat_list":
+        cube(draw, move=TOP, fraction=turn)
+        slots, permutation = sticker_slots(), sticker_permutation(TOP)
+        slot_point = lambda index, y: (737 + index % 18 * 27, y + index // 18 * 27)
+        colors = [PALETTE[rubix.color_names[normal]] for _, normal in slots]
+        draw.text((725, 176), "Before: list entries 0–53", font=font(23), fill=INK)
+        for index, destination in enumerate(permutation):
+            start = np.array(slot_point(index, 235))
+            end = np.array(slot_point(destination, 400))
+            if index != destination and turn > 0:
+                draw.line([tuple(start), tuple(end)], fill="#354457", width=1)
+                current = start + ease(turn) * (end - start)
+                draw.ellipse((current[0]-3, current[1]-3, current[0]+3, current[1]+3), fill=colors[index])
+        for index, destination in enumerate(permutation):
+            start = np.array(slot_point(index, 235))
+            end = np.array(slot_point(destination, 400))
+            for point, color in [(start, colors[index]), (end, colors[index] if turn == 1 else "#263345")]:
+                x, y = point
+                draw.rectangle((x - 10, y - 10, x + 10, y + 10), fill=color, outline=BACKGROUND)
+        draw.rounded_rectangle((717, 343, 1088, 383), radius=5, fill=BACKGROUND)
+        draw.text((725, 352), "After: the same list positions", font=font(23), fill=INK)
+    elif visual == "array":
+        cube(draw, highlight=lambda c, r: c[2] == 1)
+        for z in [-1, 0, 1]:
+            color = ACCENT if z == 1 else "#516176"
+            for a in [-1, 0, 1]:
+                for direction in [0, 1]:
+                    points = [[a, -1, z], [a, 1, z]] if direction == 0 else [[-1, a, z], [1, a, z]]
+                    draw.line([project(p, (960, 355), 100) for p in points], fill=color, width=2)
+            for x in [-1, 0, 1]:
+                for y in [-1, 0, 1]:
+                    px, py = project([x, y, z], (960, 355), 100)
+                    draw.ellipse((px-5, py-5, px+5, py+5), fill=color)
+    elif visual == "orientation":
+        cube(draw, move=TOP, fraction=turn, highlight=edge_highlight)
+        cube(draw, move=TOP, fraction=turn, isolate=EDGE, normals=True, center=(970, 395), scale=90)
+    elif visual == "fixed_frame":
+        cube(draw, move=TOP, fraction=turn, highlight=lambda c, r: rubix.norm1(c) == 1)
+        for axis in np.eye(3, dtype=int):
+            for sign in [-1, 1]:
+                normal = axis * sign
+                name = rubix.color_names[tuple(normal)]
+                end = project(normal * 1.85)
+                arrow(draw, project([0, 0, 0]), end, PALETTE[name])
+                point = (end[0] + 8, end[1] - 12)
+                box = draw.textbbox(point, name.title(), font=font(24, True))
+                draw.rectangle((box[0]-4, box[1]-3, box[2]+4, box[3]+3), fill=BACKGROUND)
+                draw.text(point, name.title(), font=font(24, True), fill=PALETTE[name])
+    elif visual in {"coordinates", "vector"}:
+        cube(draw, highlight=edge_highlight)
+        axes(draw, length=1.8, muted=True)
+        if visual == "coordinates":
+            for name, start, end, color in [
+                ("x", [0, 0, 0], [1, 0, 0], AXIS_COLORS[0]),
+                ("z", [1, 0, 0], EDGE, AXIS_COLORS[2]),
+            ]:
+                reveal = ease((local - cues.get(name, 0)) / 1.5)
+                arrow(draw, project(start), project(np.array(start) + reveal * (np.array(end) - start)), color, width=6)
+            for row, (name, value) in enumerate(zip(["x", "y", "z"], EDGE)):
+                if local >= cues.get(name, 0):
+                    draw.text((765, 275 + row * 48), f"{name}: {value} step{'s' if value != 1 else ''}", font=font(29), fill=AXIS_COLORS[row])
+        else:
+            arrow(draw, project([0, 0, 0]), project(EDGE), ACCENT, width=6)
+            if local >= cues.get("column", 0):
+                vector_column(draw, EDGE)
+    elif visual == "count":
+        cube(draw, isolate=EDGE)
+    elif visual == "unit_vectors":
+        axes(draw, length=1.8)
+        for row, (name, vector) in enumerate([("Green", (1, 0, 0)), ("White", (0, 0, 1)), ("Blue", (-1, 0, 0))]):
+            draw.text((725, 285 + row * 48), f"{name}: {vector}", font=font(26), fill=PALETTE[name.upper()])
+    elif visual == "columns":
+        axes(draw, length=1.7, muted=True)
+        for axis, keyword in [(0, "green"), (2, "white")]:
+            reveal = ease((local - cues.get(keyword, 0)) / 1.5)
+            arrow(draw, project([0, 0, 0]), project(np.eye(3)[axis] * reveal), AXIS_COLORS[axis], width=6)
+            if local >= cues.get(keyword, 0):
+                vector_column(draw, np.eye(3, dtype=int)[axis], origin=(760 + axis * 140, 280), color=AXIS_COLORS[axis], labels=False)
+        if local >= cues.get("matrix", 0):
+            vector_column(draw, [0, 0, 0], origin=(900, 280), color=MUTED, labels=False)
+    elif visual == "roadmap":
         cube(draw, highlight=edge_highlight)
         for index, (label, detail) in enumerate([
             ("1  An address", "Which cubelet is it?"),
@@ -403,49 +523,48 @@ def render_beat(beat, local, caption=""):
             color = ACCENT if index == act or act == 0 else INK if index < act else MUTED
             draw.text((725, y), label, font=font(29, True), fill=color)
             draw.text((725, y + 43), detail, font=font(22), fill=MUTED)
-    elif visual == "scramble":
-        sequence = [TOP, ((1, 0, 0), 1), LEFT, ((0, 0, -1), -1),
-                    ((0, 1, 0), 1), TOP, ((-1, 0, 0), -1), LEFT]
-        phase = min(3., local / max(.1, cues.get("freeze", beat["duration"] * .6)) * 3)
-        index = min(2, int(phase))
-        state = rubix.solved_cube
-        for move in sequence[:index]:
-            state = rubix.apply_move_to_cube(move, state)
-        cube(draw, state, sequence[index], phase - index)
-    elif visual in {"home", "turn", "position", "selection", "compose"}:
+    elif visual in {"home", "position", "selection", "compose"}:
         state = turned if visual in {"selection", "compose"} else rubix.solved_cube
-        move = LEFT if visual == "compose" else TOP if visual in {"turn", "position"} else None
+        move = LEFT if visual == "compose" else TOP if visual == "position" else None
         cube(draw, state, move, turn, highlight=edge_highlight)
-        if visual in {"home", "position", "turn", "selection", "compose"}:
-            rotation = np.array(next(r for c, r in state if c == EDGE))
-            if move:
-                rotation = partial_rotation(move, turn) @ rotation
-            arrow(draw, project([0, 0, 0], (320, 355)),
-                  project(rotation @ EDGE, (320, 355)), ACCENT, label="c" if visual == "home" else "p")
-        badge(draw, "Home address: c = (1, 0, 1)ᵀ")
+        rotation = np.array(next(r for c, r in state if c == EDGE))
+        if move:
+            rotation = partial_rotation(move, turn) @ rotation
+        arrow(draw, project([0, 0, 0], (320, 355)),
+              project(rotation @ EDGE, (320, 355)), ACCENT, label="c" if visual == "home" else "p")
+        if visual == "position":
+            if turn in (0., 1.):
+                matrix(draw, rotation, caption="R · accumulated rotation")
+            else:
+                draw.text((760, 315), "The same motion turns c", font=font(26), fill=MUTED)
+        else:
+            badge(draw, "Home address: c = (1, 0, 1)")
     elif visual == "axes":
         cube(draw, highlight=lambda c, r: rubix.norm1(c) == 1)
         axes(draw)
-    elif visual in {"lattice", "types"}:
+    elif visual == "types":
         kind = 3 if local >= cues.get("corner", beat["duration"] * .67) else 2 if local >= cues.get("edge", beat["duration"] * .33) else 1
+        home = [(0, 0, 1), EDGE, (1, -1, 1)][kind - 1]
+        cube(draw, isolate=home)
+        badge(draw, f"{['Center', 'Edge', 'Corner'][kind - 1]}: {home} · {kind} sticker{'s' if kind > 1 else ''}")
+    elif visual == "lattice":
         for c in sorted(rubix.vectors, key=lambda c: np.dot(c, CAMERA)):
             point = project(c)
-            selected = visual == "lattice" or rubix.norm1(c) == kind
-            color = ACCENT if selected and any(c) else "#3a4a60"
-            radius = 7 if selected else 4
+            color = ACCENT if any(c) else "#3a4a60"
+            radius = 7
             draw.ellipse((point[0]-radius, point[1]-radius, point[0]+radius, point[1]+radius), fill=color)
         axes(draw)
-        if visual == "types":
-            name = ["", "Centers: 1 sticker", "Edges: 2 stickers", "Corners: 3 stickers"][kind]
-            draw.text((85, 525), name, font=font(29, True), fill=INK)
-    elif visual in {"basis", "exact"}:
+    elif visual in {"basis", "exact", "rotate_vector"}:
         rotation = partial_rotation(TOP, turn)
-        axes(draw, rotation, scale=145, length=1.5)
+        axes(draw, scale=130, length=1.9, muted=True)
+        arrow(draw, project([0, 0, 0]), project([0, -1.9, 0], scale=130), "#516176", label="−y")
+        axes(draw, rotation, scale=145, length=1.5, labels=False)
         for axis, color in zip(np.eye(3), AXIS_COLORS):
             points = [project(partial_rotation(TOP, f) @ axis * 1.5, scale=145)
                       for f in np.linspace(0, turn, 30)]
             draw.line(points, fill=color, width=2)
-        matrix(draw, TOP_MATRIX, caption="M · the top quarter-turn matrix")
+        if visual != "rotate_vector" and local >= cues.get("matrix", 0):
+            matrix(draw, TOP_MATRIX, caption="The top quarter-turn matrix")
     elif visual in {"normals", "rotate_normals"}:
         cube(draw, move=TOP, fraction=turn, isolate=EDGE, normals=True)
         if visual == "rotate_normals" and turn in (0., 1.):
@@ -478,16 +597,6 @@ def render_beat(beat, local, caption=""):
     elif visual == "slice":
         cube(draw, move=TOP, fraction=turn, highlight=lambda c, r: np.dot(TOP[0], np.array(r) @ c) > 0)
         badge(draw, "v · p ∈ {−1, 0, +1}")
-    elif visual == "code":
-        cube(draw, turned, LEFT, turn, highlight=edge_highlight)
-    elif visual == "cycle":
-        phase = 4 * min(1., max(0., (local - turn_start) / 8.))
-        index = min(3, int(phase))
-        state = rubix.solved_cube
-        for _ in range(index):
-            state = rubix.apply_move_to_cube(TOP, state)
-        cube(draw, state, TOP, phase - index)
-        badge(draw, f"Quarter turn {min(4, int(phase)+1)} of 4")
     elif visual == "solved":
         cube(draw)
         matrix(draw, np.diag(EDGE), caption="R D = D · the edge is solved")
@@ -507,12 +616,6 @@ def render_beat(beat, local, caption=""):
         for line in wrap(beat["equation"], equation_font, 520):
             mathematical_text(draw, (720, y), line, 28, ACCENT)
             y += 41
-    if visual == "code":
-        code = ["p = rotation @ cubelet", "selected = dot(v, p) > 0", "if selected:", "    rotation = M @ rotation"]
-        for i, line in enumerate(code):
-            cue = ["position", "select", "compose", "compose"][i]
-            color = INK if local >= cues.get(cue, 0) else "#344458"
-            draw.text((715, 275 + 40*i), line, font=font(24), fill=color)
     y = 467 if visual not in {"summary", "credits"} else 310
     for note in beat["notes"]:
         for line in wrap(note, font(21, math_text=True), 520):
