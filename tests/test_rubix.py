@@ -350,6 +350,37 @@ class TestRubixCube(unittest.TestCase):
         rubix_gui.draw_text_bubble("Test Offscreen", 10, 10, 200)
         self.assertIs(rubix_gui.screen, custom_surf)
 
+    def test_gui_report_solve_progress(self):
+        """Verify solver progress reporting renders without error and clamps cubelet count."""
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        rubix_gui.init_display()
+
+        bubbles = []
+        orig_bubble = rubix_gui.draw_text_bubble
+        try:
+            rubix_gui.draw_text_bubble = lambda text, *args, **kwargs: bubbles.append((text, kwargs.get("progress"))) or orig_bubble(text, *args, **kwargs)
+            # 1. Fully solved cube (all 26 cubelets solved) must clamp to NUM_CUBELETS (26), not 27
+            rubix_gui.report_solve_progress(solved_cube)
+            self.assertEqual(len(bubbles), 1)
+            text, progress = bubbles[0]
+            self.assertEqual(text, f"Solving: cubelet {NUM_CUBELETS} of {NUM_CUBELETS}")
+            self.assertEqual(progress, 1.0)
+
+            # 2. Scrambled cube
+            bubbles.clear()
+            from rubix import shuffle
+            scrambled = shuffle(solved_cube, iterations=20, seed=42)
+            rubix_gui.report_solve_progress(scrambled)
+            self.assertEqual(len(bubbles), 1)
+            scrambled_text, scrambled_progress = bubbles[0]
+            self.assertTrue(scrambled_text.startswith("Solving: cubelet "))
+            self.assertLessEqual(int(scrambled_text.split()[2]), NUM_CUBELETS)
+            self.assertLessEqual(scrambled_progress, 1.0)
+        finally:
+            rubix_gui.draw_text_bubble = orig_bubble
+
 
 if __name__ == "__main__":
     unittest.main()

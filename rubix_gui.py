@@ -235,8 +235,9 @@ def draw_instructions(y):
 
 def report_solve_progress(cube):
     x, y, width = 10, HEIGHT - 50, WIDTH - 20
-    num_cubelets_solved = sum(is_cubelet_solved(c, r) for c,r in cube)
-    text = f"Solving: cubelet {num_cubelets_solved + 1} of {NUM_CUBELETS}"
+    num_cubelets_solved = sum(is_cubelet_solved(c, r) for c, r in cube)
+    current_cubelet = min(num_cubelets_solved + 1, NUM_CUBELETS)
+    text = f"Solving: cubelet {current_cubelet} of {NUM_CUBELETS}"
     progress = num_cubelets_solved / NUM_CUBELETS
     draw_text_bubble(text, x=x, y=y, width=width, progress=progress, bold_part="Solving:")
     draw_cube_static(cube)
