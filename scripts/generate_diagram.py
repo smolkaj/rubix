@@ -1,7 +1,4 @@
-"""Generate img/basis-colors-diag.png illustrating the geometric intuition behind
-
-basis vectors, colors, and diag(c).
-"""
+"""Generate img/basis-colors-diag.png illustrating the geometric intuition behind basis vectors, colors, and diag(c)."""
 
 import math
 from pathlib import Path

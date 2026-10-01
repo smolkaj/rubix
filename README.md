@@ -16,16 +16,28 @@ Most Rubik's cube software relies on complex combinatorial representations: 54 c
 
 ### Key Terminology
 
-To keep the geometry clear, Rubix uses consistent terminology throughout:
+To keep the geometry crystal clear, Rubix uses consistent and unambiguous terms throughout:
 
-- **Cubelet:** One of the 27 smaller individual constituent cubes that make up the $3 \times 3 \times 3$ puzzle.
-- **Facelet (or Face):** An exposed, colored square face on the exterior of a cubelet. The puzzle has 54 visible facelets in total ($6 \text{ faces} \times 9 \text{ cubelets per face}$).
+- **Cubelet:** One of the 27 smaller constituent 3D cubes that make up the puzzle.
+- **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
+- **Face:** One of the 6 macroscopic sides ($3 \times 3$) of the overall Rubik's Cube (Front, Back, Right, Left, Top, Bottom). Each face consists of 9 facelets.
 - **Slice:** A planar group of 9 cubelets sharing a coordinate plane (e.g. all cubelets with $x = +1$) that rotate together.
 - **Move:** A 90° clockwise or counterclockwise rotation of an outer slice around a coordinate axis.
 
-### 1. Discrete 3D Coordinate Space
+---
 
-Anchor a 3D Cartesian coordinate frame at the center of the cube $(0, 0, 0)$. Each of the 27 smaller *cubelets* has integer coordinates $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$.
+### Step 1: Ditching the Sticker Permutation Nightmare
+
+Most Rubik's cube software begins with flat stickers: a 1D array of 54 color labels, index mappings, and permutation tables. But anyone who has written a solver this way quickly encounters the friction:
+- A single 90° face turn cycles 12 edge and corner stickers across 4 adjacent faces.
+- You must maintain lookup tables for how stickers permute, flip, and twist.
+- The physics of 3D rigid bodies is lost in a tangle of 1D array index math.
+
+**What if we treat the Rubik's Cube as what it physically is: a rigid 3D object in space?**
+
+Instead of 54 independent stickers, there are really only **27 cubelets** arranged in a $3 \times 3 \times 3$ grid. Where should we anchor our coordinate frame? Right at the geometric center of the cube: $(0, 0, 0)$.
+
+Each cubelet now has an integer coordinate $(x, y, z)$ where each coordinate is simply in $\lbrace -1, 0, 1 \rbrace$:
 
 ```
                +Z: Top (White)
@@ -41,64 +53,60 @@ Anchor a 3D Cartesian coordinate frame at the center of the cube $(0, 0, 0)$. Ea
       (Orange)
 ```
 
-Each 3D coordinate axis corresponds to an opposing pair of faces:
+Each coordinate axis corresponds to an opposing pair of faces:
 - **X-axis:** $+X$ points **Front** (Green) and $-X$ points **Back** (Blue).
 - **Y-axis:** $+Y$ points **Right** (Red) and $-Y$ points **Left** (Orange).
 - **Z-axis:** $+Z$ points **Top** (White) and $-Z$ points **Bottom** (Yellow).
 
-How can we determine what kind of cubelet a coordinate represents—a corner, an edge, a center, or the hidden core—just from its $(x, y, z)$ coordinates?
+---
 
-A simple and elegant way is to sum the absolute values of its coordinates, known as the **Manhattan distance** or **$L_1$ norm**:
+### Step 2: Counting Facelets with the Manhattan Distance
+
+Once we anchor the cubelets at $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$, an immediate question arises:
+
+> *How do we determine what kind of cubelet a coordinate represents—a corner, an edge, a center, or the hidden core?*
+
+Do we need a hardcoded lookup dictionary? **No.** Look closely at what the coordinates mean:
+- Along any axis, coordinate $0$ means the cubelet is flush inside the middle slice.
+- Coordinate $+1$ or $-1$ means the cubelet extends outward to the boundary of that axis!
+
+In other words, the absolute value $|x| \in \lbrace 0, 1 \rbrace$ acts as a binary indicator: $1$ if the cubelet touches an outer boundary, and $0$ if it is internal along that axis.
+
+If we sum the absolute values—the **Manhattan distance** or **$L_1$ norm**—it **literally counts how many facelets the cubelet exposes to the outside world**:
 
 $$\|c\|_1 = |x| + |y| + |z|$$
 
-Because each coordinate is either $-1, 0,$ or $1$, the absolute value indicates whether the cubelet extends to an outer boundary:
-- $|x| = 1$ if the cubelet extends outward to an exposed face along that axis.
-- $|x| = 0$ if the cubelet stays flush in the center along that axis.
-
-Adding them together simply counts **how many colored faces the cubelet exposes to the outside world**:
-
-| Visible Faces ($\|c\|_1$) | Cubelet Type | Number of Cubelets | Description |
+| Visible Facelets ($\|c\|_1$) | Cubelet Type | Number of Cubelets | Description |
 |:---:|:---|:---:|:---|
-| **0** | Interior | 1 | The hidden core mechanism; 0 visible faces; never moves. |
-| **1** | Center | 6 | Fixed centers; 1 visible face; rotate in place, define face colors. |
-| **2** | Edge | 12 | 2 visible colored faces. |
-| **3** | Corner | 8 | 3 visible colored faces. |
+| **0** | Interior | 1 | The hidden core mechanism; 0 facelets; never moves. |
+| **1** | Center | 6 | Fixed centers; 1 facelet; rotate in place, define face colors. |
+| **2** | Edge | 12 | 2 visible colored facelets. |
+| **3** | Corner | 8 | 3 visible colored facelets. |
 
 Total: $1 + 6 + 12 + 8 = 27$ cubelets.
 
 ![Types of Cubelets](img/cubelet-types.png)
 
-### 2. State: Vectors and Rotation Matrices
+No lookup tables, no hardcoded classifications. The physical nature of the cubelet falls directly out of its coordinate norm.
 
-A cube state is a mapping from each of the 26 non-interior cubelets to its current rotation matrix:
+---
 
-$$\text{Cube} = \left\lbrace (c, R) \mid c \in \lbrace -1, 0, 1 \rbrace^3 \setminus \lbrace (0,0,0) \rbrace \right\rbrace$$
+### Step 3: Colors *Are* the Center Cubelets
 
-- $c \in \lbrace -1, 0, 1 \rbrace^3$ is the **constant canonical home position** of the cubelet (its coordinate in the solved cube).
-- $R$ is a $3 \times 3$ **rotation matrix** tracking how the cubelet has been turned from its home orientation.
+Now comes the next puzzle: *how do we represent colors?*
 
-**How rotation matrices work here:**
-1. **Initial state:** Every cubelet starts with the $3 \times 3$ identity matrix $I_3$ (meaning "not rotated yet").
-2. **Current position:** The matrix-vector product gives the cubelet's current $(x, y, z)$ position in space:
-   $$p = R \cdot c$$
-   In the solved cube, $p = I_3 \cdot c = c$.
-3. **Face orientation:** The columns of $R$ directly indicate where the cubelet's original Front, Right, and Top faces are pointing in space right now.
-4. **Applying moves:** When a 90° slice rotation matrix $M$ affects a cubelet, its new orientation is simply:
-   $$R_{\text{new}} = M \cdot R$$
-   Because every turn is a 90° rotation along an axis, all entries in $R$ remain simple integers in $\lbrace -1, 0, 1 \rbrace$.
+In traditional programs, colors are arbitrary strings (`'WHITE'`, `'GREEN'`) or integer tags (`0`, `1`). But look at the physical mechanism of a Rubik's Cube:
 
-### 3. Face Colors and Solved Invariant
+Slice moves twist the perimeter cubelets, but the **6 center cubelets are physically anchored to the central core spindle**. They never change their position in 3D space:
+- The Green center is permanently at $(+1, 0, 0)$.
+- The Red center is permanently at $(0, +1, 0)$.
+- The White center is permanently at $(0, 0, +1)$.
 
-#### Intuition: Colors *Are* the Center Cubelets
-
-In a traditional solver, colors are treated as arbitrary labels or sticker indices (`'WHITE'`, `'GREEN'`). In Rubix, colors are **vectors in $\mathbb{R}^3$**.
-
-On a physical Rubik's cube, the internal spider core holds the 6 center cubelets in fixed spatial positions. Slice moves rotate perimeter cubelets around them, but the centers never change their position in space. Therefore, the 6 center cubelets physically establish the coordinate axes:
+Notice what just happened: **the 6 fixed center cubelets define the standard Cartesian basis vectors $\mathbf{e}_x, \mathbf{e}_y, \mathbf{e}_z$!**
 
 $$\mathbf{e}_x = \text{Green Center}, \quad \mathbf{e}_y = \text{Red Center}, \quad \mathbf{e}_z = \text{White Center}$$
 
-A face color is not an abstract sticker ID; **a color identity is simply the constant position vector of its center cubelet**:
+Why invent separate color constants when the center cubelets are already 3D vectors? We don't! **A color's identity is simply the constant position vector of its center cubelet**:
 
 | Direction Vector | Color | Face | Defining Center Cubelet |
 |:---|:---|:---|:---|
@@ -109,63 +117,87 @@ A face color is not an abstract sticker ID; **a color identity is simply the con
 | $(0, 0, +1)$ | White | Top | Center at $(0, 0, +1)$ |
 | $(0, 0, -1)$ | Yellow | Bottom | Center at $(0, 0, -1)$ |
 
-Asking *"which color is on this face?"* is geometrically identical to asking *"which center cubelet does this face point toward in the solved cube?"*.
+With this identification, asking *"which color is on this facelet?"* becomes purely geometric: *"which center cubelet does this facelet point toward in 3D space?"*.
 
-#### Intuition: Why $\mathrm{diag}(c)$ Isolates the Colors of a Cubelet
+---
 
-Take any cubelet coordinate $c = (x, y, z)^T$. Expanding $c$ along the standard basis:
+### Step 4: The $\mathrm{diag}(c)$ Magic Trick (Packing Facelets into a Matrix)
+
+Now consider any cubelet at its canonical home position $c = (x, y, z)^T$. We know what facelets it has, but how do we represent the orientation of all its facelets at the same time?
+
+Let's decompose $c$ along the coordinate axes:
 
 $$c = \begin{pmatrix} x \\ y \\ z \end{pmatrix} = x \begin{pmatrix} 1 \\ 0 \\ 0 \end{pmatrix} + y \begin{pmatrix} 0 \\ 1 \\ 0 \end{pmatrix} + z \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix} = \begin{pmatrix} x \\ 0 \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ y \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ 0 \\ z \end{pmatrix}$$
 
-Each non-zero component vector is an outward normal pointing directly toward one of the center cubelets—which is the color of that face. Placing these three orthogonal component vectors side-by-side as the columns of a $3 \times 3$ matrix yields $\mathrm{diag}(c)$:
+Look at the three component vectors:
+- For the Front-Right-Top corner $c = (1, 1, 1)^T$, they are:
+  - $(1, 0, 0)^T$ $\rightarrow$ Green (Front facelet normal)
+  - $(0, 1, 0)^T$ $\rightarrow$ Red (Right facelet normal)
+  - $(0, 0, 1)^T$ $\rightarrow$ White (Top facelet normal)
+- Each non-zero component vector is an **outward unit normal** pointing directly toward one of the center cubelets!
+
+What happens if we stack these three vectors side-by-side as the columns of a $3 \times 3$ matrix?
 
 $$\mathrm{diag}(c) = \begin{pmatrix} x & 0 & 0 \\ 0 & y & 0 \\ 0 & 0 & z \end{pmatrix} = \begin{pmatrix} \mathbf{n}_x & \mathbf{n}_y & \mathbf{n}_z \end{pmatrix}$$
 
-This representation naturally handles all cubelet types:
-- **Corner** (e.g. $c = (1, 1, 1)^T$): All 3 columns are non-zero unit vectors: Green $(+X)$, Red $(+Y)$, and White $(+Z)$.
-- **Edge** (e.g. $c = (1, 0, 1)^T$): Column 2 is $(0, 0, 0)^T$ (the uncolored inner side where $y=0$); columns 1 and 3 are Green and White.
-- **Center** (e.g. $c = (0, 0, 1)^T$): 2 columns are zero; column 3 is White.
-- **Interior** ($c = (0, 0, 0)^T$): All zero columns; no colored faces.
+This diagonal matrix gives us an extraordinary unification:
+- **Corners** (e.g. $c = (1, 1, 1)^T$): All 3 columns are non-zero unit vectors (Green, Red, White).
+- **Edges** (e.g. $c = (1, 0, 1)^T$): Column 2 is $(0, 0, 0)^T$—the uncolored internal side ($y=0$) automatically drops out as a zero column!
+- **Centers** (e.g. $c = (0, 0, 1)^T$): 2 columns are zero; only column 3 (White) is non-zero.
+- **Interior** ($c = (0, 0, 0)^T$): All zero columns.
 
-Notice the deep connection to Section 1: the matrix rank of $\mathrm{diag}(c)$ is exactly the Manhattan distance:
+And notice the payoff connecting back to Step 2: **the matrix rank of $\mathrm{diag}(c)$ is exactly the Manhattan distance**:
 
-$$\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1 = \text{number of visible colored faces}$$
+$$\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1 = \text{number of visible facelets}$$
 
-#### Simultaneous Rotation and the Solved Invariant
+---
 
-When the cubelet undergoes 3D rotation $R$, matrix multiplication distributes across the columns of $\mathrm{diag}(c)$:
+### Step 5: One-Shot Rotation & The Solved Invariant
 
-$$\text{Color directions} = R \cdot \mathrm{diag}(c) = \begin{pmatrix} R \cdot \mathbf{n}_x & R \cdot \mathbf{n}_y & R \cdot \mathbf{n}_z \end{pmatrix}$$
+Now, how do we track the state of the puzzle as moves are applied?
 
-A single matrix multiplication transforms all of the cubelet's face normals into their current 3D pointing directions simultaneously.
+Every cubelet starts at its canonical home position $c \in \lbrace -1, 0, 1 \rbrace^3$ with an initial $3 \times 3$ identity rotation matrix $I_3$. When a sequence of 90° slice moves turns a cubelet, we accumulate those turns into a single $3 \times 3$ rotation matrix $R$.
+
+1. **Where is the cubelet in 3D space right now?**
+   $$p = R \cdot c$$
+   In the solved cube, $p = I_3 \cdot c = c$.
+2. **Where do all of its colored facelets point right now?**
+   Because matrix multiplication distributes column-by-column:
+   $$\text{Current facelet directions} = R \cdot \mathrm{diag}(c) = \begin{pmatrix} R \cdot \mathbf{n}_x & R \cdot \mathbf{n}_y & R \cdot \mathbf{n}_z \end{pmatrix}$$
+   A single matrix multiply transforms **all facelets of the cubelet simultaneously**!
+3. **When is a cubelet solved?**
+   A cubelet is in its solved position and orientation if and only if all of its facelets point back toward their home center cubelets:
+   $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
 
 ![Geometric Intuition: Basis Vectors, Colors, and diag(c)](img/basis-colors-diag.png)
 
-A cubelet is in its solved position and orientation if and only if all face normals point in their home directions:
+In [`rubix.py`](rubix.py), checking whether a cubelet is solved ([`is_cubelet_solved`](rubix.py#L204-L207)) or reading current facelet orientations ([`describe_config`](rubix.py#L75-L82)) takes just two lines:
 
-$$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
- 
-In [`is_cubelet_solved`](rubix.py), verifying that all faces of a cubelet point home is literally:
 ```python
 colors = np.diag(cubelet)
 color_positions = rotation @ colors
 return np.array_equal(colors, color_positions)
 ```
-And in [`describe_config`](rubix.py), reading current sticker orientations uses the exact same matrix product `rotation @ colors`. No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
 
-### 4. Slice Moves as Hyperplane Rotations
+No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
 
-A move is specified by a unit normal vector $v \in \lbrace \pm e_x, \pm e_y, \pm e_z \rbrace$ and a direction $d \in \lbrace -1, +1 \rbrace$ (clockwise or counterclockwise 90° rotation).
+---
 
-Which cubelets belong to the rotating slice? In linear algebra, this is a half-space test:
+### Step 6: Slice Moves as Hyperplane Dot Products
+
+When a move rotates an outer slice (e.g., turning the Top face clockwise), which cubelets move?
+
+In combinatorial code, you maintain a list of cubelet indices belonging to each face. In linear algebra, a slice is just a half-space!
+
+A move is specified by an axis unit vector $v \in \lbrace \pm e_x, \pm e_y, \pm e_z \rbrace$ and a direction $d \in \lbrace -1, +1 \rbrace$. Which cubelets lie in that slice? A single inner product:
 
 $$v \cdot p > 0 \iff v \cdot (R \cdot c) > 0$$
 
-If this dot product is positive, the cubelet lies in the slice and is rotated by the elementary 90° rotation matrix $M$:
+If this dot product is positive, the cubelet lies in the slice. To turn it, multiply its rotation matrix by the elementary 90° rotation matrix $M$:
 
 $$R_{\text{new}} = M \cdot R$$
 
-No permutations to maintain, no index tables to keep in sync. Moving a slice is a matrix multiplication filtered by an inner product.
+Because every turn is a 90° rotation along a coordinate axis, all matrix entries in $R$ remain simple integers in $\lbrace -1, 0, 1 \rbrace$.
 
 ---
 
@@ -226,7 +258,7 @@ cd rubix
 python3 -m venv rubix_env
 source rubix_env/bin/activate
 
-# Install dependencies (numpy, pygame, opencv-python)
+# Install dependencies (numpy, pygame, opencv-python, Pillow)
 pip install -r requirements.txt
 ```
 
@@ -313,14 +345,17 @@ rubix/
 ├── rubix.py            # Core solver & linear algebra model (< 400 lines)
 ├── rubix_gui.py        # Pygame GUI with animated moves & step playback
 ├── rubix_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
+├── scripts/
+│   └── generate_diagram.py # Geometric intuition diagram generator
 ├── tests/
 │   └── test_rubix.py   # Unit test suite
 ├── img/                # Architectural diagrams & preview snapshots
+│   ├── basis-colors-diag.png
 │   ├── cube.png
 │   ├── cubelet-types.png
 │   ├── cube-in-plane.jpg
 │   └── gui-preview.png
-├── requirements.txt    # numpy, pygame, opencv-python
+├── requirements.txt    # numpy, pygame, opencv-python, Pillow
 └── README.md
 ```
 
