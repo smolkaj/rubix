@@ -2,7 +2,11 @@
 
 import json
 import subprocess
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+import wave
 
 import numpy as np
 
@@ -65,6 +69,36 @@ class CaptionChecks(unittest.TestCase):
                 render.punctuated_words("Hello!", boundaries)
 
 
+class SpeechTimingChecks(unittest.TestCase):
+    def test_pauses_share_the_audio_and_caption_clock_at_different_frame_rates(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(render, "BUILD", Path(directory)):
+            for pause in [0., .65, 1.8]:
+                part = {"text": "Hello.", "rate": "-8%", "pitch": "+3Hz", "pause_after": pause}
+                path = render.speech_path(part, "test")
+                with wave.open(str(path.with_suffix(".wav")), "wb") as pcm:
+                    pcm.setnchannels(1)
+                    pcm.setsampwidth(2)
+                    pcm.setframerate(render.SAMPLE_RATE)
+                    pcm.writeframes(b"\0\0" * render.SAMPLE_RATE)
+                path.with_suffix(".json").write_text(json.dumps([{"text": "Hello", "start": .1, "end": .6}]))
+                for fps in [12, 24, 25, 29, 60]:
+                    frames, words = render.write_beat_audio({"narration": [part, part]}, 0, "test", fps)
+                    self.assertAlmostEqual(words[0]["start"], .55)
+                    self.assertAlmostEqual(words[1]["start"], 1.55 + pause)
+                    with wave.open(str(render.BUILD / "voice-00.wav"), "rb") as pcm:
+                        duration = pcm.getnframes() / pcm.getframerate()
+                    self.assertAlmostEqual(duration, frames / fps, delta=1 / render.SAMPLE_RATE)
+                    self.assertGreaterEqual(duration, 2.45 + 2*pause - 1 / render.SAMPLE_RATE)
+
+    def test_delivery_changes_invalidate_speech_but_pause_edits_reuse_it(self):
+        part = {"text": "A discovery!", "rate": "+2%", "pitch": "+5Hz", "pause_after": 1.}
+        baseline = render.speech_path(part, "voice-a")
+        self.assertEqual(baseline, render.speech_path({**part, "pause_after": 2.}, "voice-a"))
+        for name, value in [("text", "Another discovery!"), ("rate", "-10%"), ("pitch", "+0Hz")]:
+            self.assertNotEqual(baseline, render.speech_path({**part, name: value}, "voice-a"))
+        self.assertNotEqual(baseline, render.speech_path(part, "voice-b"))
+
+
 def verify_film():
     path = render.HERE / "rubix-encoding.mp4"
     data = json.loads(subprocess.check_output([
@@ -90,7 +124,7 @@ def verify_film():
 
 if __name__ == "__main__":
     suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromTestCase(checks)
-                               for checks in [GeometryChecks, CaptionChecks])
+                               for checks in [GeometryChecks, CaptionChecks, SpeechTimingChecks])
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     if not result.wasSuccessful():
         raise SystemExit(1)

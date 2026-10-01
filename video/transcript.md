@@ -1,104 +1,112 @@
 # A cube made of transformations
 
-## 00:00:00 — A cube made of transformations
+## 00:00:00 — What does a computer need to remember?
 
-A Rubik's cube looks like a puzzle about colors. But watch what happens when a face turns. Each little piece travels through space, and its stickers turn with it. What if our program remembered that geometry directly? This is the idea behind Rubix.
+Turn one face of a Rubik's cube. Now another. Fifty four colored stickers seem to demand fifty four little records. But look closer. The stickers never travel alone. They ride on small, rigid cubes. Could we remember the geometry of those cubes, and let the colors take care of themselves? Rubix does exactly that. And the surprising part is how much information one tiny home address contains.
 
-## 00:00:17 — Where is it? Which way does it face?
+## 00:00:31 — One cubelet. Three discoveries.
 
-Follow just this green and white edge. To describe it, we need to answer two questions. Where is the piece? And which way do its two stickers point? Rubix answers both questions with the same rotation matrix. To see why that works, let's first give the cube a coordinate system.
+We will follow this green and white cubelet. An edge, with two stickers. First, find an address that identifies it. Second, discover how that address already knows its colors. Third, turn that description into a moving cube. By the end, we will need just two things for each cubelet: its home address, and one rotation. Let's see why.
 
-## 00:00:36 — Let the centers define the axes
+## 00:00:58 — Start with the geometry
 
-Place the origin at the middle of the cube. In Rubix, positive x points toward the green center, positive y toward red, and positive z toward white. Their opposite directions are blue, orange, and yellow. We keep this frame fixed. Face turns spin the centers in place, but do not move them to other faces.
+Put the origin at the middle of the puzzle. Replace each cubelet by a point at its center. Along each axis, there are only three levels: minus one, zero, and one. Twenty seven points. The hidden origin has no stickers, so Rubix stores the other twenty six.
 
-## 00:00:58 — Replace pieces with their centers
+## 00:01:19 — The centers give us a fixed frame
 
-Now replace every little piece by a point at its center. Along each axis, there are only three possible coordinates: minus one, zero, and one. This gives a three by three by three lattice. The point at the origin has no stickers, so Rubix leaves it out. Twenty six points remain.
+We also need directions that stay put. The six centers give us exactly that: outer face turns spin them in place without changing their positions. Choose green as positive x, red as positive y, and white as positive z. The opposite faces define the negative directions. The cube's own anatomy has handed us a coordinate system.
 
-## 00:01:19 — Coordinates already know the piece type
+## 00:01:45 — Give the cubelet a permanent address
 
-A nonzero coordinate means the piece reaches an outer face along that axis. Count the nonzero coordinates, and you count its stickers. One gives a center. Two gives an edge. Three gives a corner. The geometry already contains the information we might otherwise encode as a separate piece type.
+Our green and white edge belongs one step toward green and one step toward white. Its home coordinate is one, zero, one. Call it c. Now freeze that address. The cubelet can travel anywhere, but c keeps saying which cubelet it is, and where it belongs.
 
-## 00:01:39 — A permanent name for a moving piece
+## 00:02:07 — Test the address: what does it give us?
 
-For our green and white edge, the solved coordinate is one, zero, one. Call this vector c. Here comes an important distinction: c is a permanent name for this particular piece. Even after a scramble, c never changes. It says where the piece belongs, rather than where it happens to be now.
+Before going further, test this choice. A nonzero coordinate means a cubelet touches an outer boundary along that axis. One such coordinate gives a center. Two give an edge. Three give a corner. Add the absolute values, and you have counted its stickers. The address already knows the cubelet type!
 
-## 00:02:00 — A matrix tells us where the axes land
+## 00:02:30 — Can the address also know the colors?
 
-Beside c, store a rotation matrix R. Think of its columns as three arrows: where the original x, y, and z directions have landed. A matrix is a description of a transformation. Once we know what it does to these three basis vectors, we know what it does to every vector.
+That answers our first question: how to identify the cubelet. Now for the second. We still need its colors. Look again at one, zero, one. Could the answer already be sitting inside those three numbers?
 
-## 00:02:21 — Carry the home vector through the turn
+## 00:02:47 — A color has a home direction
 
-In particular, we know what it does to c. Multiplying R by c gives the piece's current position, p. At the start, R is the identity, so p equals c. After a turn, R carries the home position to a new point. We do not need to store a second, independently updated position.
+At home, a green sticker points toward the green center. A white sticker points toward the white center. Draw an arrow perpendicular to each sticker. These outward normals are positive x and positive z. We can identify a color by its home direction. That identity stays fixed, even when the sticker turns.
 
-## 00:02:42 — One concrete quarter turn
+## 00:03:11 — Split the address into its ingredients
 
-Take this top face move from Rubix. It leaves z alone, sends x to minus y, and sends y to x. Our edge travels from one, zero, one to zero, minus one, one. The continuous arc is only an animation. The program stores the exact integer result of the quarter turn.
+Now split the home address into its axis components. One, zero, one becomes one x arrow, no y arrow, and one z arrow. There they are. The green normal, and the white normal! The coordinate that located our cubelet also contained the directions of its stickers. Negative components work the same way: minus x identifies blue.
 
-## 00:03:04 — Read the matrix as three arrow destinations
+## 00:03:39 — Keep the arrows, instead of adding them
 
-Look at the columns of the move matrix. The first is zero, minus one, zero: the destination of the x arrow. The second is one, zero, zero: the destination of the y arrow. The third keeps the z arrow fixed. Matrix multiplication combines these destinations using the coordinates of our vector.
+There is just one adjustment. Adding the arrows hides their individual identities. So keep them side by side, as columns. That gives the diagonal matrix of c. For our edge, its diagonal is one, zero, one. Green. An empty column. White. The zero is doing useful work: it says there is no sticker on that axis. A corner has three nonzero columns; a center has one.
 
-## 00:03:28 — A sticker is a direction
+## 00:04:11 — The same choice pays off twice
 
-Now for the stickers. Represent a sticker by its outward normal: an arrow perpendicular to its surface. Green's permanent color identity is positive x, its direction in the solved cube. After our top turn, that same green sticker points toward negative y. Its identity stays green; its current direction changes.
+Remember how the address counted stickers? The diagonal matrix tells the same story. Its nonzero columns point along different axes. Counting those independent columns gives its rank. So rank equals the sticker count. This is why the encoding feels elegant. The physical boundaries, the cubelet type, and the color directions all agree, because they came from the same geometry.
 
-## 00:03:50 — Split the home vector into sticker normals
+## 00:04:39 — We have an address. We have its colors.
 
-Why does the home coordinate tell us which stickers the piece owns? Split c into its three axis components. Our edge gives one x arrow, no y arrow, and one z arrow. These are exactly its green and white sticker normals at home. Negative components work too: minus x identifies a blue sticker.
+Two discoveries down. The home address names the cubelet, and its components identify the stickers. Our final question is motion. How can one description carry both the cubelet and its stickers through every turn?
 
-## 00:04:12 — Keep those three components as columns
+## 00:04:56 — A matrix is a promise about three arrows
 
-Rather than adding the component arrows, put them side by side as columns. That is the diagonal matrix of c, which we'll call D. For this edge, its diagonal is one, zero, one. The zero column represents an absent sticker. For a corner all three columns are present. For a center only one is.
+This is where linear algebra earns its place. A rotation matrix tells us where three basis arrows land. Once we know their destinations, we can transform any combination of them. Every vector follows from those three arrows. Think of the matrix as a motion you can apply, rather than a grid you must memorize.
 
-## 00:04:34 — Rotate every sticker in one multiplication
+## 00:05:20 — Follow our cubelet through one turn
 
-Multiplication acts on each column separately. So R times D rotates all of the sticker normals at once. The green column now points along negative y. The white column still points up. The zero column stays zero. The very same R that moved the piece also describes where every sticker faces.
+Let's watch a concrete top turn. Up stays up. The x direction swings toward minus y, while y swings toward x. Our edge travels from one, zero, one to zero, minus one, one. Its home address is unchanged. The turn has changed what happens to that address.
 
-## 00:04:55 — Position is already inside the normals
+## 00:05:44 — Apply the motion to the home address
 
-There is an especially satisfying connection here. Add the columns of D and you get c. Rotate them and add again, and you get R c, the current position. So the transformed sticker normals also determine where the piece sits. Location and orientation are two views of one geometric description.
+Store the accumulated rotation as R. Apply it to the home vector c, and you get the current position, p. At the start, R is the identity. After the turn, R carries that same home address to the new location. We have recovered where the cubelet is. Now use the very same motion on its stickers.
 
-## 00:05:17 — Which pieces should turn?
+## 00:06:07 — One rotation carries every sticker
 
-A face turn should affect only one layer. Let v point outward from that face. The dot product v dot p measures the piece's coordinate along that direction. Select the pieces for which it is positive. For the top face, that means z equals one. Exactly nine pieces pass the test.
+The sticker normals are the columns of the diagonal matrix. Multiplication transforms each column separately. Rotate them. Green now points toward minus y. White still points up. The empty column stays empty. One multiplication gives every sticker direction at once!
 
-## 00:05:37 — Select by current position
+## 00:06:30 — The position is inside the sticker directions
 
-The test must use the current position, R c. After our top turn, the green and white edge lives on the left face, even though its home coordinate was on the front. Selecting by c would move the wrong pieces. Selecting by R c automatically follows every piece through the scramble.
+Now pause here. This is the connection that ties the whole encoding together. Add the home sticker normals, and you get c. Rotate those normals, then add them, and you get R times c. That is the cubelet's position. So the directions of its stickers already determine where it sits. One rotation keeps location and facing in agreement. That is the real payoff.
 
-## 00:05:56 — Apply the next turn after the old one
+## 00:07:02 — Choose the layer geometrically
 
-For each selected piece, update R to M times R. The old R acts first, taking the piece from home to its current state. The new move M acts next. That order explains why M goes on the left. Matrix multiplication becomes the record of a piece's entire history of turns.
+We can describe motion. Now we must choose which cubelets receive it. Turning a face rotates the outer layer behind it: nine cubelets together. Let v point out of that face. The dot product with p measures position along that direction. Positive means the cubelet is in that outer layer. For the top, that is simply z equals one. The geometry selects exactly the layer we wanted.
 
-## 00:06:17 — The geometric rule is the code
+## 00:07:31 — Follow where it is, rather than where it belongs
 
-And here is the whole update in the language of the implementation. Compute the current position. Use a dot product to test whether the move applies. If it does, compose the move matrix with the stored rotation. Otherwise keep that rotation. Repeat this rule over the twenty six pairs that make up the cube.
+Here is a useful check on our story. Our edge started on the front, but the top turn carried it to the left. Its home address still identifies it. To choose the moving layer, use its current address: R times c. The two jobs are different, and the notation keeps them clear.
 
-## 00:06:37 — The animation is smooth. The state is exact.
+## 00:07:53 — A history of turns becomes one matrix
 
-The animation passes through arbitrary angles, but stored states never do. Quarter turns only permute the coordinate axes and reverse some signs. Their matrices have entries minus one, zero, and one. They stay orthogonal, with determinant plus one. There are just twenty four such proper rotations of a cube. Exact endpoints avoid accumulated rounding error.
+Suppose the next turn is M. Apply the old rotation first, then the new turn. That gives M times R. Update the selected cubelets. Their past moves collapse into one accumulated transformation. We can forget the sequence and keep its effect.
 
-## 00:07:03 — Four quarter turns close the loop
+## 00:08:13 — The idea fits directly into code
 
-This gives us useful checks as well as an elegant model. Four quarter turns return every piece and sticker to the start. A move followed by its inverse cancels. These identities test the geometry as a whole, rather than checking a few hand written sticker permutations.
+The implementation follows the same three steps. Recover the current position. Use the dot product to select the layer. Multiply the stored rotation by the new move on the left. Do this for all twenty six home address and rotation pairs, and you have the complete move rule.
 
-## 00:07:22 — Every sticker points home
+## 00:08:34 — Smooth motion, exact stored states
 
-When is a piece solved? When every sticker normal points in its original direction. That is precisely R times the diagonal of c equals the diagonal of c. Because position is the sum of those columns, this equality also puts the piece at home. Rubix checks this condition for every piece.
+Our animation is smooth, but a stored move is exactly a quarter turn. It only swaps coordinate axes and reverses signs. So every matrix entry stays minus one, zero, or one. These matrices remain proper rotations; there are twenty four possibilities. We get geometric motion with exact arithmetic at the endpoints.
 
-## 00:07:43 — Solved does not always mean R = I
+## 00:09:00 — The home directions tell us when to stop
 
-Why not simply demand that R be the identity? Watch the white center during a top turn. Its little local x and y arrows rotate, but its only sticker still points up. For an ordinary cube, that center is solved. Rubix correctly ignores the orientation of an unmarked center within its own face. A picture cube would need a stricter condition.
+There is one final question. When is a cubelet solved? When every sticker points in its home direction. The transformed diagonal matrix must equal the original one. Remember the column sum? Equal sticker normals also put the cubelet at home. The same equality checks facing and location together.
 
-## 00:08:07 — One geometric story, four operations
+## 00:09:26 — Measure exactly what the puzzle asks
 
-We now have a complete description of the puzzle's state and motion. A home vector identifies the piece. A rotation gives its position and sticker directions. A dot product chooses a layer. Multiplication applies the move. And an equality recognizes solved pieces. The search for a solution is a separate problem; this encoding supplies its consistent geometric world.
+And this condition has a lovely subtlety. Watch the white center spin. Its local x and y arrows turn, but the white normal still points up. Its one sticker is home, so an ordinary cube considers this center solved. Demanding the identity matrix would ask for extra information the unmarked sticker cannot show. A picture cube would need that extra orientation constraint.
 
-## 00:08:33 — Learn to see matrices as motion
+## 00:09:55 — Close the loop
 
-If this way of seeing matrices appeals to you, watch Grant Sanderson's Essence of Linear Algebra, from Three Blue One Brown. It is a superb series: patient, visual, and beautifully clear about why the mathematics works. It directly inspired Rubix. This original explanation follows that geometric spirit. Once you see a matrix as motion, a cube of colored stickers becomes a small world of vectors and transformations.
+Four quarter turns bring every cubelet and sticker back. A turn followed by its inverse cancels too. These identities are useful tests of the model. More importantly, they let us watch the geometry close its own loop.
+
+## 00:10:13 — What did we actually need to remember?
+
+Return to the question we started with. What does a computer need to remember? A home address, and one rotation. The address identifies the cubelet and supplies its colors. The rotation tells us where it is and where its stickers point. Selecting a layer and applying a turn now follow from that same geometry. The search for a solution is a separate challenge; this is the small, consistent world it searches. That is Rubix's clever choice: find a description in which the facts you need emerge together.
+
+## 00:10:51 — Learn to see matrices as motion
+
+This way of seeing matrices was inspired by Grant Sanderson's Essence of Linear Algebra, from Three Blue One Brown. It is a wonderful series. Grant makes the geometry feel discoverable, and the equations feel earned. If you enjoyed this connection, I warmly recommend it. Look at the motion. Find the right description. Let the mathematics reveal what follows.
 
 Narration is synthetic (Microsoft Edge, en-US-AndrewNeural). Original script and animation; no 3Blue1Brown footage, music, or voice.
 

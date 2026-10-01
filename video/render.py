@@ -2,11 +2,13 @@
 
 import argparse
 import asyncio
+import hashlib
 import json
 import math
 import re
 import subprocess
 import sys
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +42,8 @@ LEFT = ((0, -1, 0), 1)
 TOP_MATRIX = rubix.rotation_matrix(TOP)
 IDENTITY = np.eye(3)
 FONT_CACHE = {}
+SAMPLE_RATE = 48000
+ACTS = ["ADDRESS", "COLORS", "MOTION"]
 
 
 def font(size, bold=False, math_text=False):
@@ -81,13 +85,6 @@ def mathematical_text(draw, point, text, size, fill):
             x += small.getlength("z")
 
 
-def probe(path):
-    return float(subprocess.check_output([
-        "ffprobe", "-v", "error", "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1", str(path),
-    ]))
-
-
 def punctuated_words(text, boundaries):
     """Use speech timestamps, but preserve the storyboard's spelling and punctuation."""
     tokens = text.split()
@@ -100,24 +97,34 @@ def punctuated_words(text, boundaries):
     return [{**boundary, "text": token} for token, boundary in zip(tokens, boundaries)]
 
 
+def narration_text(beat):
+    return " ".join(part["text"] for part in beat["narration"])
+
+
+def speech_request(part, voice):
+    return {"text": part["text"], "voice": voice,
+            "rate": part["rate"], "pitch": part["pitch"], "boundary": "WordBoundary"}
+
+
+def speech_path(part, voice):
+    key = hashlib.sha256(json.dumps(speech_request(part, voice), sort_keys=True).encode()).hexdigest()
+    return BUILD / f"speech-{key}.mp3"
+
+
 async def make_audio(voice):
     import edge_tts
     semaphore = asyncio.Semaphore(3)
 
-    async def segment(index, beat):
-        audio = BUILD / f"voice-{index:02}.mp3"
+    async def segment(part):
+        audio = speech_path(part, voice)
         timing = audio.with_suffix(".json")
         if audio.exists() and timing.exists():
-            cached = json.loads(timing.read_text())
-            if isinstance(cached, dict) and cached.get("voice") == voice and cached.get("text") == beat["voice"]:
-                return
+            return
         async with semaphore:
             boundaries = []
             temporary = audio.with_suffix(".part.mp3")
             with temporary.open("wb") as output:
-                async for chunk in edge_tts.Communicate(
-                    beat["voice"], voice, rate="-8%", boundary="WordBoundary"
-                ).stream():
+                async for chunk in edge_tts.Communicate(**speech_request(part, voice)).stream():
                     if chunk["type"] == "audio":
                         output.write(chunk["data"])
                     elif chunk["type"] == "WordBoundary":
@@ -129,20 +136,60 @@ async def make_audio(voice):
             if not boundaries:
                 raise RuntimeError("Narration arrived without caption timing")
             temporary.replace(audio)
-            timing.write_text(json.dumps({"voice": voice, "text": beat["voice"], "words": boundaries}))
-            print(f"Narration {index + 1}/{len(STORY)}", flush=True)
+            temporary_timing = timing.with_suffix(".part.json")
+            temporary_timing.write_text(json.dumps(boundaries))
+            temporary_timing.replace(timing)
+            print(f"Narrated: {part['text'][:65]}", flush=True)
 
-    await asyncio.gather(*(segment(i, b) for i, b in enumerate(STORY)))
+    # Identical phrases share one synthesis and one content-addressed cache entry.
+    parts = {speech_path(part, voice): part for beat in STORY for part in beat["narration"]}
+    await asyncio.gather(*(segment(part) for part in parts.values()))
+
+
+def write_beat_audio(beat, index, voice, fps):
+    """Assemble PCM and word timestamps on the same sample clock, including pauses."""
+    words, sample_count = [], 0
+    destination = BUILD / f"voice-{index:02}.wav"
+    with wave.open(str(destination), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(SAMPLE_RATE)
+
+        def silence(seconds):
+            nonlocal sample_count
+            samples = round(seconds * SAMPLE_RATE)
+            output.writeframesraw(b"\0\0" * samples)
+            sample_count += samples
+
+        silence(.45)
+        for part in beat["narration"]:
+            audio = speech_path(part, voice)
+            pcm = audio.with_suffix(".wav")
+            if not pcm.exists():
+                temporary_pcm = pcm.with_suffix(".part.wav")
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(audio),
+                                "-ar", str(SAMPLE_RATE), "-ac", "1", "-c:a", "pcm_s16le", str(temporary_pcm)], check=True)
+                temporary_pcm.replace(pcm)
+            boundaries = punctuated_words(part["text"], json.loads(audio.with_suffix(".json").read_text()))
+            offset = sample_count / SAMPLE_RATE
+            words.extend({**word, "start": offset + word["start"], "end": offset + word["end"]}
+                         for word in boundaries)
+            with wave.open(str(pcm), "rb") as source:
+                assert (source.getnchannels(), source.getsampwidth(), source.getframerate()) == (1, 2, SAMPLE_RATE)
+                samples = source.getnframes()
+                output.writeframesraw(source.readframes(samples))
+                sample_count += samples
+            silence(part["pause_after"])
+        frames = math.ceil(sample_count / SAMPLE_RATE * fps)
+        silence(frames / fps - sample_count / SAMPLE_RATE)
+    return frames, words
 
 
 def prepare_timeline(fps, voice):
     timeline, captions = [], []
     cursor = 0
     for index, beat in enumerate(STORY):
-        audio = BUILD / f"voice-{index:02}.mp3"
-        duration = probe(audio)
-        frames = math.ceil((duration + 1.0) * fps)
-        words = punctuated_words(beat["voice"], json.loads(audio.with_suffix(".json").read_text())["words"])
+        frames, words = write_beat_audio(beat, index, voice, fps)
         group = []
         for word in words:
             group.append(word)
@@ -163,12 +210,6 @@ def prepare_timeline(fps, voice):
             cue_times[name] = matches[0]
         timeline.append({**beat, "start": cursor, "duration": frames / fps,
                          "frames": frames, "cue_times": cue_times})
-        padded = BUILD / f"voice-{index:02}.wav"
-        subprocess.run([
-            "ffmpeg", "-v", "error", "-y", "-i", str(audio),
-            "-af", "apad", "-t", str(frames / fps), "-ar", "48000",
-            "-ac", "1", str(padded),
-        ], check=True)
         cursor += frames / fps
     (BUILD / "timeline.json").write_text(json.dumps(timeline, indent=2))
     for previous, following in zip(captions, captions[1:]):
@@ -200,7 +241,7 @@ def write_documents(timeline, captions, voice):
     ))
     (HERE / "transcript.md").write_text(
         "# A cube made of transformations\n\n" + "\n\n".join(
-            f"## {timestamp(b['start'], '.')[:-4]} — {b['title']}\n\n{b['voice']}"
+            f"## {timestamp(b['start'], '.')[:-4]} — {b['title']}\n\n{narration_text(b)}"
             for b in timeline
         ) + f"\n\nNarration is synthetic (Microsoft Edge, {voice}). "
         "Original script and animation; no 3Blue1Brown footage, music, or voice.\n\n"
@@ -251,10 +292,10 @@ def arrow(draw, start, end, color, width=4, label=None):
         draw.text(tuple(end + [8, -12]), label, font=font(24, True), fill=color)
 
 
-def axes(draw, rotation=IDENTITY, scale=110, length=2.2, center=(330, 350)):
+def axes(draw, rotation=IDENTITY, scale=110, length=2.2, center=(330, 350), muted=False):
     for axis, color, label in zip(np.eye(3), AXIS_COLORS, ["+x", "+y", "+z"]):
         arrow(draw, project(np.zeros(3), center, scale),
-              project(rotation @ axis * length, center, scale), color, label=label)
+              project(rotation @ axis * length, center, scale), "#516176" if muted else color, label=label)
 
 
 def cube(draw, state=rubix.solved_cube, move=None, fraction=0., highlight=None,
@@ -327,30 +368,48 @@ def grid(draw):
 def render_beat(beat, local, caption=""):
     image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
-    draw.text((42, 24), beat["chapter"].upper(), font=font(17, True), fill=ACCENT)
-    draw.text((42, 53), beat["title"], font=font(39, True), fill=INK)
+    act = beat["act"]
+    for index, label in enumerate(ACTS, 1):
+        color = ACCENT if act == index else INK if act > index else MUTED
+        draw.text((42 + (index - 1) * 180, 20), f"{index}  {label}", font=font(17, True), fill=color)
+        if act >= index:
+            draw.line([(42 + (index - 1) * 180, 45), (180 + (index - 1) * 180, 45)], fill=color, width=2)
+    draw.text((42, 61), beat["title"], font=font(37, True), fill=INK)
     draw.line([(680, 130), (680, 568)], fill="#293747", width=2)
     grid(draw)
     progress = local / beat["duration"]
     cues = beat.get("cue_times", {})
     turn_start = cues.get("turn", beat["duration"] * .22)
     turn = min(1., max(0., (local - turn_start) / 3.))
+    if not beat.get("animate", True):
+        turn = 0.
     visual = beat["visual"]
     edge_highlight = lambda c, r: c == EDGE
     turned = rubix.apply_move_to_cube(TOP, rubix.solved_cube)
 
-    if visual == "scramble":
+    if visual == "roadmap":
+        cube(draw, highlight=edge_highlight)
+        for index, (label, detail) in enumerate([
+            ("1  An address", "Which cubelet is it?"),
+            ("2  Its colors", "What does the address contain?"),
+            ("3  Its motion", "How do we carry it through a turn?"),
+        ], 1):
+            y = 200 + (index - 1) * 105
+            color = ACCENT if index == act or act == 0 else INK if index < act else MUTED
+            draw.text((725, y), label, font=font(29, True), fill=color)
+            draw.text((725, y + 43), detail, font=font(22), fill=MUTED)
+    elif visual == "scramble":
         sequence = [TOP, ((1, 0, 0), 1), LEFT, ((0, 0, -1), -1),
                     ((0, 1, 0), 1), TOP, ((-1, 0, 0), -1), LEFT]
-        phase = progress * len(sequence)
-        index = min(len(sequence) - 1, int(phase))
+        phase = min(3., local / max(.1, cues.get("freeze", beat["duration"] * .6)) * 3)
+        index = min(2, int(phase))
         state = rubix.solved_cube
         for move in sequence[:index]:
             state = rubix.apply_move_to_cube(move, state)
         cube(draw, state, sequence[index], phase - index)
-    elif visual in {"piece", "home", "turn", "position", "selection", "compose"}:
+    elif visual in {"home", "turn", "position", "selection", "compose"}:
         state = turned if visual in {"selection", "compose"} else rubix.solved_cube
-        move = LEFT if visual == "compose" else TOP if visual in {"piece", "turn", "position"} else None
+        move = LEFT if visual == "compose" else TOP if visual in {"turn", "position"} else None
         cube(draw, state, move, turn, highlight=edge_highlight)
         if visual in {"home", "position", "turn", "selection", "compose"}:
             rotation = np.array(next(r for c, r in state if c == EDGE))
@@ -358,7 +417,7 @@ def render_beat(beat, local, caption=""):
                 rotation = partial_rotation(move, turn) @ rotation
             arrow(draw, project([0, 0, 0], (320, 355)),
                   project(rotation @ EDGE, (320, 355)), ACCENT, label="c" if visual == "home" else "p")
-        draw.text((65, 536), "Permanent identity: c = (1, 0, 1)ᵀ", font=font(24, math_text=True), fill=MUTED)
+        draw.text((65, 536), "Home address: c = (1, 0, 1)ᵀ", font=font(24, math_text=True), fill=MUTED)
     elif visual == "axes":
         cube(draw, highlight=lambda c, r: rubix.norm1(c) == 1)
         axes(draw)
@@ -374,7 +433,7 @@ def render_beat(beat, local, caption=""):
         if visual == "types":
             name = ["", "Centers: 1 sticker", "Edges: 2 stickers", "Corners: 3 stickers"][kind]
             draw.text((85, 525), name, font=font(29, True), fill=INK)
-    elif visual in {"basis", "matrix", "exact"}:
+    elif visual in {"basis", "exact"}:
         rotation = partial_rotation(TOP, turn)
         axes(draw, rotation, scale=145, length=1.5)
         for axis, color in zip(np.eye(3), AXIS_COLORS):
@@ -388,23 +447,29 @@ def render_beat(beat, local, caption=""):
             matrix(draw, TOP_MATRIX @ np.diag(EDGE) if turn == 1. else np.diag(EDGE),
                    caption="R D · current sticker directions")
         else:
-            draw.text((760, 315), "Between stored states", font=font(26), fill=MUTED)
+            draw.text((760, 315), "The arrows turn together", font=font(26), fill=MUTED)
     elif visual in {"decompose", "diag", "sum"}:
-        rotation = TOP_MATRIX if visual == "sum" else IDENTITY
-        axes(draw, length=1.7)
+        rotation = partial_rotation(TOP, turn) if visual == "sum" else IDENTITY
+        axes(draw, length=1.7, muted=True)
         start = np.zeros(3)
         for axis, value in enumerate(EDGE):
             if not value:
                 continue
             vector = rotation @ (np.eye(3)[axis] * value)
             if visual == "sum":
-                arrow(draw, project(start), project(start + vector), AXIS_COLORS[axis], width=6)
+                reveal = ease((local - cues.get("sum", 0)) / 1.3)
+                origin = reveal * start
+                arrow(draw, project(origin), project(origin + vector), AXIS_COLORS[axis], width=6)
                 start += vector
             else:
-                arrow(draw, project([0, 0, 0]), project(vector), AXIS_COLORS[axis], width=6)
-        arrow(draw, project([0, 0, 0]), project(rotation @ EDGE), ACCENT,
-              label="p" if visual == "sum" else "c")
-        matrix(draw, rotation @ np.diag(EDGE), caption="R D" if visual == "sum" else "D = diag(1, 0, 1)")
+                keyword = "green" if axis == 0 else "white"
+                reveal = ease((local - cues.get(keyword, 0)) / .8)
+                arrow(draw, project([0, 0, 0]), project(reveal * vector), AXIS_COLORS[axis], width=6)
+        if visual != "sum" or local >= cues.get("sum", 0):
+            arrow(draw, project([0, 0, 0]), project(rotation @ EDGE), ACCENT,
+                  label="p" if visual == "sum" else "c")
+        if visual != "decompose" and local >= cues.get("matrix", 0) and (visual != "sum" or turn in (0., 1.)):
+            matrix(draw, rotation @ np.diag(EDGE), caption="N = R D" if visual == "sum" else "D = diag(1, 0, 1)")
     elif visual == "slice":
         cube(draw, move=TOP, fraction=turn, highlight=lambda c, r: np.dot(TOP[0], np.array(r) @ c) > 0)
         draw.text((70, 530), "v · p:   −1     0     +1", font=font(28), fill=INK)
@@ -433,13 +498,16 @@ def render_beat(beat, local, caption=""):
 
     y = 152
     equation_font = font(28, math_text=True)
-    for line in wrap(beat["equation"], equation_font, 520):
-        mathematical_text(draw, (720, y), line, 28, ACCENT)
-        y += 41
+    if local >= cues.get("equation", 0) and visual != "roadmap":
+        for line in wrap(beat["equation"], equation_font, 520):
+            mathematical_text(draw, (720, y), line, 28, ACCENT)
+            y += 41
     if visual == "code":
         code = ["p = rotation @ cubelet", "selected = dot(v, p) > 0", "if selected:", "    rotation = M @ rotation"]
         for i, line in enumerate(code):
-            draw.text((715, 275 + 40*i), line, font=font(24), fill=INK)
+            cue = ["position", "select", "compose", "compose"][i]
+            color = INK if local >= cues.get(cue, 0) else "#344458"
+            draw.text((715, 275 + 40*i), line, font=font(24), fill=color)
     y = 467 if visual not in {"summary", "credits"} else 310
     for note in beat["notes"]:
         for line in wrap(note, font(21, math_text=True), 520):
