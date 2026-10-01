@@ -85,6 +85,11 @@ def mathematical_text(draw, point, text, size, fill):
             x += small.getlength("z")
 
 
+def badge(draw, text):
+    draw.rounded_rectangle((715, 330, 1240, 385), radius=10, fill="#1b2938")
+    mathematical_text(draw, (730, 342), text, 23, MUTED)
+
+
 def punctuated_words(text, boundaries):
     """Use speech timestamps, but preserve the storyboard's spelling and punctuation."""
     tokens = text.split()
@@ -417,7 +422,7 @@ def render_beat(beat, local, caption=""):
                 rotation = partial_rotation(move, turn) @ rotation
             arrow(draw, project([0, 0, 0], (320, 355)),
                   project(rotation @ EDGE, (320, 355)), ACCENT, label="c" if visual == "home" else "p")
-        draw.text((65, 536), "Home address: c = (1, 0, 1)ᵀ", font=font(24, math_text=True), fill=MUTED)
+        badge(draw, "Home address: c = (1, 0, 1)ᵀ")
     elif visual == "axes":
         cube(draw, highlight=lambda c, r: rubix.norm1(c) == 1)
         axes(draw)
@@ -472,7 +477,7 @@ def render_beat(beat, local, caption=""):
             matrix(draw, rotation @ np.diag(EDGE), caption="N = R D" if visual == "sum" else "D = diag(1, 0, 1)")
     elif visual == "slice":
         cube(draw, move=TOP, fraction=turn, highlight=lambda c, r: np.dot(TOP[0], np.array(r) @ c) > 0)
-        draw.text((70, 530), "v · p:   −1     0     +1", font=font(28), fill=INK)
+        badge(draw, "v · p ∈ {−1, 0, +1}")
     elif visual == "code":
         cube(draw, turned, LEFT, turn, highlight=edge_highlight)
     elif visual == "cycle":
@@ -482,7 +487,7 @@ def render_beat(beat, local, caption=""):
         for _ in range(index):
             state = rubix.apply_move_to_cube(TOP, state)
         cube(draw, state, TOP, phase - index)
-        draw.text((85, 530), f"Quarter turn {min(4, int(phase)+1)} of 4", font=font(28), fill=INK)
+        badge(draw, f"Quarter turn {min(4, int(phase)+1)} of 4")
     elif visual == "solved":
         cube(draw)
         matrix(draw, np.diag(EDGE), caption="R D = D · the edge is solved")
