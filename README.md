@@ -27,10 +27,10 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
 - **Face:** One of the 6 sides of the cube (Front, Back, Right, Left, Top, Bottom). A face is a 2D exterior surface made of 9 outer facelets pointing in the same direction.
 - **Slice:** A 3D layer of 9 cubelets that rotate together as a rigid unit. An **outer slice** is the physical layer behind a **face**—turning a face physically rotates its corresponding slice.
 - **Cubelet:** One of the 27 constituent $1 \times 1 \times 1$ cubes that make up the puzzle. Mechanically, there are four types:
-  - **Core (1):** Hidden internal mechanism at the origin (0 facelets).
-  - **Center (6):** Center of each face; anchored to the central spindle (1 facelet).
-  - **Edge (12):** Border cubelet between two faces (2 facelets).
-  - **Corner (8):** Vertex cubelet joining three faces (3 facelets).
+  - **Core:** Hidden internal mechanism at the origin.
+  - **Center:** Center of each face, anchored to the central spindle.
+  - **Edge:** Border cubelet between two faces.
+  - **Corner:** Vertex cubelet joining three faces.
 - **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
 - **Move:** A 90° rotation of an outer slice around a coordinate axis.
 
