@@ -27,8 +27,7 @@ _print = print
 def print(*args, **kw):
   _print("[%s]" % (datetime.now().strftime('%H:%M:%S')), *args, **kw)
 
-# Returns the 1-norm of a vector.
-def norm1(v): return sum(abs(x) for x in v)
+def norm1(v): return abs(v[0]) + abs(v[1]) + abs(v[2])
 
 # Returns a 2-dimensional matrix as a tuple.
 def tupled(np_mat): return tuple(tuple(int(x) for x in row) for row in np_mat)
@@ -82,6 +81,7 @@ def describe_config(cubelet, rotation):
      if any(color)
   ))
 
+@functools.cache
 def position(cubelet, rotation): return tuple(np.matmul(rotation, cubelet))
 
 def describe_cubelet(cubelet, rotation):
@@ -246,11 +246,11 @@ def solve_top_and_middle_layer(cube, report_progress_callback):
   for num_solved in range(17):
     report_progress_callback(cube)
     print("solving cubelet #%d" % (num_solved + 1))
-    def is_goal(cube): return all([
-      num_solved_with_criterion(cube, is_top_edge) >= min(4, num_solved + 1),
-      num_solved_with_criterion(cube, is_top_cubelet) >= min(9, num_solved + 1),
-      num_solved_with_criterion(cube, is_top_or_middle_cubelet) >= min(17, num_solved + 1),
-    ])
+    def is_goal(cube): return (
+      num_solved_with_criterion(cube, is_top_edge) >= min(4, num_solved + 1) and
+      num_solved_with_criterion(cube, is_top_cubelet) >= min(9, num_solved + 1) and
+      num_solved_with_criterion(cube, is_top_or_middle_cubelet) >= min(17, num_solved + 1)
+    )
     heuristic = top_layer_heuristic if num_solved < 9 else middle_layer_heuristic
     cube, next_moves = astar(cube, is_goal, apply_move_to_cube,
                              heuristic, random_weight=0.25)
@@ -261,7 +261,7 @@ def solve_top_and_middle_layer(cube, report_progress_callback):
 def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
 def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
 def has_yellow_bottom(cubelet, rotation):
-  return cubelet[2] == -1 and all((rotation @ np.array([0, 0, -1])) == [0, 0, -1])
+  return cubelet[2] == -1 and position((0, 0, -1), rotation) == (0, 0, -1)
 def is_in_right_place(c, r): return position(c, r) == c
 def num_bottom_edges_positioned(cube):
   return sum(is_bottom_edge(c) and has_yellow_bottom(c, r) for c, r in cube)
@@ -273,13 +273,13 @@ def solve_bottom_layer_edges(cube, report_progress_callback):
   for i in range(8):
     report_progress_callback(cube)
     print("solving bottom cross #%d" % (i + 1))
-    def is_goal(cube): return all([
-      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
-      num_bottom_edges_positioned(cube) >= min(4, i + 1),
-      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i-3),
-    ])
+    def is_goal(cube): return (
+      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17 and
+      num_bottom_edges_positioned(cube) >= min(4, i + 1) and
+      num_solved_with_criterion(cube, is_bottom_edge) >= min(4, i - 3)
+    )
     cube, next_moves = astar(cube, is_goal, apply_move_to_cube,
-                             bottom_layer_edge_heuristic)
+                             bottom_layer_edge_heuristic, random_weight=0.25)
     print("-> found solution with %d moves" % len(next_moves))
     solution_moves += next_moves
   return (cube, solution_moves)
@@ -289,11 +289,11 @@ def solve_bottom_layer_corners(cube, report_progress_callback):
   for i in range(4):
     report_progress_callback(cube)
     print("positioning bottom corners #%d" % (i + 1))
-    def is_goal(cube): return all([
-      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17,
-      num_solved_with_criterion(cube, is_bottom_edge) == 4,
-      num_bottom_corners_positioned(cube) >= min(4, i + 1),
-    ])
+    def is_goal(cube): return (
+      num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17 and
+      num_solved_with_criterion(cube, is_bottom_edge) == 4 and
+      num_bottom_corners_positioned(cube) >= min(4, i + 1)
+    )
     cube, next_moves = astar(cube, is_goal, apply_move_to_cube,
                              bottom_layer_corner_heuristic, random_weight=0.3)
     print("-> found solution with %d moves" % len(next_moves))
@@ -332,7 +332,7 @@ def solve_endgame(cube, report_progress_callback):
 def solve(cube, report_progress_callback=lambda cube: None):
   cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube, report_progress_callback)
   print(50 * "-")
-  cube, solution2 = solve_bottom_layer_edges(cube, report_progress_callback)
+  cube, solution2 = with_restarts(20, solve_bottom_layer_edges, cube, report_progress_callback)
   print(50 * "-")
   cube, solution3 = with_restarts(30, solve_bottom_layer_corners, cube, report_progress_callback)
   print(50 * "-")
