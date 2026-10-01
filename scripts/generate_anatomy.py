@@ -192,7 +192,7 @@ panels = [
         "stat": "1 of 6 sides",
         "stat_col": C_WHITE,
         "mode": "face",
-        "desc": "9 outer stickers",
+        "desc": "9 stickers",
     },
     {
         "title": "Cubelet",
