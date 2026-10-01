@@ -252,6 +252,105 @@ class TestRubixCube(unittest.TestCase):
                     self.assertGreater(min_moves_to_solved(c, r), 0)
                     return
 
+    def test_headless_gui_render_with_solution(self):
+        """Verify that rubix_gui renders frames with active solution and progress info."""
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        mock_solution = [((1, 0, 0), 1), ((0, 1, 0), -1)]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            out_path = os.path.join(tmp_dir, "preview_solution.png")
+            result = rubix_gui.render_frame_to_image(
+                solved_cube,
+                out_path,
+                solution=mock_solution,
+                move_index=1,
+                current_move=mock_solution[0],
+            )
+            self.assertEqual(result, out_path)
+            self.assertTrue(os.path.exists(out_path))
+            self.assertGreater(os.path.getsize(out_path), 0)
+
+    def test_gui_text_bubble_and_buttons(self):
+        """Verify GUI button and text bubble components render without error across edge cases."""
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        rubix_gui.init_display()
+
+        # Button creation
+        surf, rect = rubix_gui.create_button("Test Button", 10, 20, 120, 35, (0, 0, 0), (255, 255, 255))
+        self.assertEqual(surf.get_size(), (120, 35))
+        self.assertEqual(rect.topleft, (10, 20))
+
+        # Text bubble edge cases: empty text, bold prefix, progress bar
+        h_plain = rubix_gui.draw_text_bubble("Plain text", 10, 10, 200)
+        h_bold = rubix_gui.draw_text_bubble("Prefix: remaining text", 10, 10, 200, progress=0.5, bold_part="Prefix:")
+        h_empty = rubix_gui.draw_text_bubble("", 10, 10, 200, progress=1.0)
+        self.assertGreater(h_plain, 0)
+        self.assertGreater(h_bold, 0)
+        self.assertGreater(h_empty, 0)
+
+    def test_gui_font_fallback(self):
+        """Verify font loading falls back safely to system fonts if font files cannot be loaded."""
+        from unittest.mock import patch
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        orig_regular, orig_bold = rubix_gui.font_regular, rubix_gui.font_bold
+        orig_max_h = rubix_gui.MAX_TEXT_HEIGHT
+        try:
+            rubix_gui.font_regular = None
+            rubix_gui.font_bold = None
+            with patch("pygame.font.Font", side_effect=Exception("Simulated missing font")):
+                rubix_gui.init_display()
+                self.assertIsNotNone(rubix_gui.font_regular)
+                self.assertIsNotNone(rubix_gui.font_bold)
+                surf, _ = rubix_gui.create_button("Fallback", 0, 0, 100, 30, (0, 0, 0), (255, 255, 255))
+                self.assertEqual(surf.get_size(), (100, 30))
+        finally:
+            rubix_gui.font_regular, rubix_gui.font_bold = orig_regular, orig_bold
+            rubix_gui.MAX_TEXT_HEIGHT = orig_max_h
+
+    def test_gui_main_lifecycle(self):
+        """Verify GUI main loop initializes, creates all UI components, and exits cleanly on QUIT."""
+        import pygame
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        pygame.init()
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
+        rubix_gui.main()
+
+    def test_gui_lifecycle_reinit_after_quit(self):
+        """Verify re-initialization after pygame.quit() does not retain stale font handles or crash."""
+        import pygame
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        rubix_gui.init_display()
+        pygame.quit()
+        # Second session: re-init and ensure font rendering and button creation succeed without segfault
+        rubix_gui.init_display()
+        surf, rect = rubix_gui.create_button("Reinit Test", 0, 0, 100, 30, (0, 0, 0), (255, 255, 255))
+        self.assertEqual(surf.get_size(), (100, 30))
+        h = rubix_gui.draw_text_bubble("Reinit Bubble", 0, 0, 200)
+        self.assertGreater(h, 0)
+
+    def test_gui_offscreen_surface_preservation(self):
+        """Verify passing a custom surface to init_display is preserved across subsequent draw calls."""
+        import pygame
+        import rubix_gui
+
+        custom_surf = pygame.Surface((rubix_gui.WIDTH, rubix_gui.HEIGHT))
+        rubix_gui.init_display(surface=custom_surf)
+        self.assertIs(rubix_gui.screen, custom_surf)
+        rubix_gui.draw_cube_static(solved_cube)
+        self.assertIs(rubix_gui.screen, custom_surf)
+        rubix_gui.draw_text_bubble("Test Offscreen", 10, 10, 200)
+        self.assertIs(rubix_gui.screen, custom_surf)
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -1,5 +1,5 @@
 import pygame
-import pygame.freetype
+import pygame.font
 import numpy as np
 from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move, is_cubelet_solved, NUM_CUBELETS
 
@@ -14,20 +14,23 @@ def init_display(surface=None):
     global screen, font_regular, font_bold, MAX_TEXT_HEIGHT
     if surface is not None:
         screen = surface
-    elif screen is None:
+    elif screen is None or not pygame.display.get_init():
         pygame.init()
         pygame.display.set_caption("Rubik's Cube Solver")
         pygame.key.set_repeat(300, 50)  # delay, interval
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        font_regular = None
+        font_bold = None
 
-    if font_regular is None:
+    if font_regular is None or font_bold is None or not pygame.font.get_init():
+        pygame.font.init()
         try:
-            font_regular = pygame.freetype.Font("fonts/Roboto-Light.ttf", size=TEXT_SIZE)
-            font_bold = pygame.freetype.Font("fonts/Roboto-Medium.ttf", size=TEXT_SIZE)
+            font_regular = pygame.font.Font("fonts/Roboto-Light.ttf", TEXT_SIZE)
+            font_bold = pygame.font.Font("fonts/Roboto-Medium.ttf", TEXT_SIZE)
         except Exception:
-            font_regular = pygame.freetype.SysFont("Arial", size=TEXT_SIZE)
-            font_bold = font_regular
-        MAX_TEXT_HEIGHT = font_bold.get_sized_height(TEXT_SIZE)
+            font_regular = pygame.font.SysFont("Arial", TEXT_SIZE)
+            font_bold = pygame.font.SysFont("Arial", TEXT_SIZE, bold=True)
+        MAX_TEXT_HEIGHT = font_bold.get_height()
     return screen
 
 COLORS = {
@@ -129,14 +132,15 @@ def draw_cube_static(cube): return draw_cube_animated(cube, cube, 1)
 
 def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
     global screen
-    if screen is None or font_bold is None:
+    if screen is None or font_regular is None or font_bold is None or not pygame.font.get_init():
         init_display()
     padding_x = 10
     rect_height = MAX_TEXT_HEIGHT + 20  # Fixed height based on max possible text height plus some padding
 
     # Pre-render both bold and regular parts to ensure consistent spacing
-    bold_surface, _ = font_bold.render(bold_part or "", TEXT_COLOR)
-    regular_surface, _ = font_regular.render(text[len(bold_part or ""):], TEXT_COLOR)
+    bold_prefix = bold_part if bold_part and text.startswith(bold_part) else ""
+    bold_surface = font_bold.render(bold_prefix, True, TEXT_COLOR)
+    regular_surface = font_regular.render(text[len(bold_prefix):], True, TEXT_COLOR)
     
     text_width = bold_surface.get_width() + regular_surface.get_width()
     text_surface = pygame.Surface((text_width, MAX_TEXT_HEIGHT), pygame.SRCALPHA)
@@ -161,21 +165,30 @@ def draw_text_bubble(text, x, y, width, progress=None, bold_part=None):
     pygame.draw.rect(screen, BUBBLE_BORDER, (x, y, width, rect_height), 1)
     
     # Draw text at a fixed position, centered vertically
-    text_y = y + (rect_height - MAX_TEXT_HEIGHT) // 2 + 2
+    text_y = y + (rect_height - text_surface.get_height()) // 2
     screen.blit(text_surface, (x + padding_x, text_y))
 
     return rect_height
 
 def create_button(text, x, y, width, height, color, text_color):
-    if font_bold is None:
+    if font_bold is None or not pygame.font.get_init():
         init_display()
     button_surface = pygame.Surface((width, height))
     button_surface.fill(color)
-    text_surface, _ = font_bold.render(text, text_color)
+    text_surface = font_bold.render(text, True, text_color)
     text_rect = text_surface.get_rect(center=(width/2, height/2))
     button_surface.blit(text_surface, text_rect)
     button_rect = pygame.Rect(x, y, width, height)
     return (button_surface, button_rect)
+
+def create_header_buttons():
+    button_width, button_height = 150, 40
+    button_y = 10
+    button_spacing = (WIDTH - 3 * button_width) / 4
+    scan_btn = create_button("Scan my cube", button_spacing, button_y, button_width, button_height, COLORS["BLUE"], WHITE)
+    shuffle_btn = create_button("Shuffle", 2 * button_spacing + button_width, button_y, button_width, button_height, COLORS["ORANGE"], WHITE)
+    solve_btn = create_button("Solve", 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, COLORS["GREEN"], WHITE)
+    return scan_btn, shuffle_btn, solve_btn
 
 def render_frame_to_image(cube, output_path="img/gui-preview.png", solution=None, move_index=0, current_move=None):
     scr = init_display()
@@ -183,13 +196,7 @@ def render_frame_to_image(cube, output_path="img/gui-preview.png", solution=None
     draw_cube_static(cube)
 
     # Draw header buttons
-    button_width, button_height = 150, 40
-    button_y = 10
-    button_spacing = (WIDTH - 3 * button_width) / 4
-    scan_btn = create_button("Scan my cube", button_spacing, button_y, button_width, button_height, COLORS["BLUE"], WHITE)
-    shuffle_btn = create_button("Shuffle", 2 * button_spacing + button_width, button_y, button_width, button_height, COLORS["ORANGE"], WHITE)
-    solve_btn = create_button("Solve", 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, COLORS["GREEN"], WHITE)
-
+    scan_btn, shuffle_btn, solve_btn = create_header_buttons()
     scr.blit(scan_btn[0], scan_btn[1])
     scr.blit(shuffle_btn[0], shuffle_btn[1])
     scr.blit(solve_btn[0], solve_btn[1])
@@ -236,6 +243,7 @@ def report_solve_progress(cube):
     pygame.display.flip()
 
 def main():
+    global screen, font_regular, font_bold
     init_display()
     cube = shuffle(solved_cube, iterations=20)
     original_cube = cube
@@ -253,12 +261,7 @@ def main():
     key_hold_time = 0
 
     # Create buttons
-    button_width, button_height = 150, 40
-    button_y = 10
-    button_spacing = (WIDTH - 3 * button_width) / 4
-    scan_button = create_button("Scan my cube", button_spacing, button_y, button_width, button_height, COLORS["BLUE"], WHITE)
-    shuffle_button = create_button("Shuffle", 2 * button_spacing + button_width, button_y, button_width, button_height, COLORS["ORANGE"], WHITE)
-    solve_button = create_button("Solve", 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, COLORS["GREEN"], WHITE)
+    scan_button, shuffle_button, solve_button = create_header_buttons()
 
     while running:
         dt = clock.tick(60) / 1000.0  # Delta time in seconds
@@ -335,6 +338,9 @@ def main():
         pygame.display.flip()
 
     pygame.quit()
+    screen = None
+    font_regular = None
+    font_bold = None
 
 if __name__ == "__main__":
     main()
