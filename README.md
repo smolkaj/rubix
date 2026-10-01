@@ -143,7 +143,7 @@ Why invent separate color constants when the centers are already 3D vectors? We 
 | $(0, 0, +1)$ | White | Top | Center at $(0, 0, +1)$ |
 | $(0, 0, -1)$ | Yellow | Bottom | Center at $(0, 0, -1)$ |
 
-With this identification, asking *"which color is on this facelet?"* becomes purely geometric: *"which center cubelet does this facelet point toward in 3D space?"*.
+With this identification, a facelet's intrinsic color is simply the center cubelet it points toward in the solved state (its outward normal vector at rest). When rotated by $R$, its color remains constant while its physical pointing direction becomes $R \cdot c_{\text{center}}$.
 
 > **Key Idea 4 (Rubix): Colors *Are* Basis Vectors**  
 > Because the 6 center cubelets never move, they define the 3D coordinate axes. A color's identity is the constant unit position vector of its center cubelet ($c_{\text{center}}$), replacing arbitrary strings or integer enums with pure vector geometry.
