@@ -180,7 +180,7 @@ def render_cube(draw, cx, cy, sz, mode):
 panels = [
     {
         "title": "Facelet",
-        "sub": "Surface sticker patch",
+        "sub": "Surface sticker",
         "stat": "1 of 54 stickers",
         "stat_col": C_GOLD,
         "mode": "facelet",
