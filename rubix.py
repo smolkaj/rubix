@@ -9,7 +9,6 @@ by a standard unit vector or its opposite.
 
 import numpy as np
 import heapq
-import signal
 import random
 import functools
 from datetime import datetime
@@ -155,10 +154,9 @@ class PrioritizedItem:
   priority: int
 
 def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
-          get_moves = lambda _: moves, random_weight=0):
+          get_moves = lambda _: moves, random_weight=0, max_moves=100_000):
   if is_goal(start): return (start, ())
-  frontier = [PrioritizedItem(start, 0)]
-  came_from, cost_so_far = {}, { start : 0 }
+  budget = max_moves
 
   def reconstruct_solution(dst):
     path, current = [], dst
@@ -168,23 +166,39 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
       current = src
     return (dst, tuple(reversed(path)))
 
-  while frontier:
-    src = heapq.heappop(frontier).item
-    last_move = came_from[src][1] if src in came_from else None
-    for move in get_moves(src):
-      # Never immediately undo the move just taken.
-      if last_move:
-        if move == inverse_move(last_move): continue
-        # Opposite face moves commute; prune duplicate branches by enforcing canonical order.
-        if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
-      dst, cost = apply_move(move, src), cost_so_far[src] + 1
-      if dst in cost_so_far and cost_so_far[dst] <= cost: continue
-      cost_so_far[dst], came_from[dst] = cost, (src, move)
-      if is_goal(dst): return reconstruct_solution(dst)
-      h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
-      priority = cost + h_weight * heuristic(dst)
-      heapq.heappush(frontier, PrioritizedItem(dst, priority))
-  return None
+  while True:
+    frontier = [PrioritizedItem(start, 0)]
+    came_from, cost_so_far = {}, { start : 0 }
+    moves_simulated = 0
+    budget_exceeded = False
+
+    while frontier:
+      src = heapq.heappop(frontier).item
+      last_move = came_from[src][1] if src in came_from else None
+      for move in get_moves(src):
+        # Never immediately undo the move just taken.
+        if last_move:
+          if move == inverse_move(last_move): continue
+          # Opposite face moves commute; prune duplicate branches by enforcing canonical order.
+          if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
+        dst, cost = apply_move(move, src), cost_so_far[src] + 1
+        moves_simulated += 1
+        budget_exceeded = budget is not None and moves_simulated >= budget
+        if dst in cost_so_far and cost_so_far[dst] <= cost:
+          if budget_exceeded: break
+          continue
+        cost_so_far[dst], came_from[dst] = cost, (src, move)
+        if is_goal(dst): return reconstruct_solution(dst)
+        if budget_exceeded: break
+        h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
+        priority = cost + h_weight * heuristic(dst)
+        heapq.heappush(frontier, PrioritizedItem(dst, priority))
+      if budget_exceeded:
+        break
+    if not budget_exceeded or budget is None or random_weight == 0 or not RANDOMIZE_SEARCH:
+      return None
+    print("search budget of %d moves exceeded; restarting" % budget)
+    budget = min(max(int(1.5 * budget), budget + 1), 500_000)
 
 @functools.cache
 def is_cubelet_solved(cubelet, rotation):
@@ -239,19 +253,6 @@ def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
 def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
 
-def with_restarts(timeout, f, *args, **kwargs):
-  def raise_timeout(signum, frame): raise TimeoutError()
-  signal.signal(signal.SIGALRM, raise_timeout)
-  signal.alarm(timeout)
-  while True:
-    try:
-      result = f(*args, **kwargs)
-      signal.alarm(0)
-      return result
-    except TimeoutError:
-      print("timed out after %d seconds; restarting" % timeout)
-      timeout = min(2 * timeout, 300)
-      signal.alarm(timeout)
 
 def solve_top_and_middle_layer(cube, report_progress_callback):
   solution_moves = ()
@@ -342,11 +343,11 @@ def solve_endgame(cube, report_progress_callback):
   return (cube, tuple(solution))
 
 def solve(cube, report_progress_callback=lambda cube: None):
-  cube, solution1 = with_restarts(20, solve_top_and_middle_layer, cube, report_progress_callback)
+  cube, solution1 = solve_top_and_middle_layer(cube, report_progress_callback)
   print(50 * "-")
-  cube, solution2 = with_restarts(20, solve_bottom_layer_edges, cube, report_progress_callback)
+  cube, solution2 = solve_bottom_layer_edges(cube, report_progress_callback)
   print(50 * "-")
-  cube, solution3 = with_restarts(30, solve_bottom_layer_corners, cube, report_progress_callback)
+  cube, solution3 = solve_bottom_layer_corners(cube, report_progress_callback)
   print(50 * "-")
   cube, solution4 = solve_endgame(cube, report_progress_callback)
   solution = solution1 + solution2 + solution3 + solution4

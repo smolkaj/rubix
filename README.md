@@ -136,7 +136,7 @@ A\* needs a sense of direction so it doesn't search aimlessly. Rather than stori
 
 ### Search Performance & Randomized Restarts
 - **Throughput:** Simulates ~50,000 moves/sec via vector dot products and memoized transposition caching.
-- **Randomized Restarts:** To escape deep local plateaus in complex scrambles without storing massive precomputed pattern tables, A\* incorporates subtle priority randomization (`RANDOMIZE_SEARCH = True`) protected by exponential restart timeouts (`with_restarts`). Typical scrambles solve in 5–20 seconds; difficult configurations that trigger a restart typically resolve in under a minute.
+- **Move-Budgeted Restarts:** To escape deep local plateaus in complex scrambles without storing massive precomputed pattern tables, A\* incorporates subtle priority randomization (`RANDOMIZE_SEARCH = True`) bounded by deterministic move budgets (`max_moves=100_000` with gentle $1.5\times$ expansion). Instead of wall-clock timers and OS signals, searches cut losses after exploring ~100k moves (~2s) and retry with fresh randomized weights without discarding prior layer progress. Typical scrambles solve in 5–25 seconds.
 
 ---
 
