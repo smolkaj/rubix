@@ -14,6 +14,8 @@ Most Rubik's cube software relies on complex combinatorial representations: 54 c
 
 ## The Math Behind the Magic
 
+**Watch:** [A cube made of transformations](video/README.md) — a narrated geometric explanation of Rubix's encoding, with animations, captions, and a transcript.
+
 ### 1. Discrete 3D Coordinate Space
 
 Anchor a 3D Cartesian coordinate frame at the center of the cube $(0, 0, 0)$. Each of the 27 smaller *cubelets* has integer coordinates $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$.

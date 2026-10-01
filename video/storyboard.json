@@ -1,0 +1,310 @@
+[
+  {
+    "chapter": "The question",
+    "visual": "scramble",
+    "title": "A cube made of transformations",
+    "equation": "26 pieces. One geometric language.",
+    "notes": [
+      "Rubix · a visual explanation"
+    ],
+    "voice": "A Rubik's cube looks like a puzzle about colors. But watch what happens when a face turns. Each little piece travels through space, and its stickers turn with it. What if our program remembered that geometry directly? This is the idea behind Rubix."
+  },
+  {
+    "chapter": "The question",
+    "visual": "piece",
+    "title": "Where is it? Which way does it face?",
+    "equation": "position + orientation",
+    "notes": [
+      "Follow the green–white edge."
+    ],
+    "voice": "Follow just this green and white edge. To describe it, we need to answer two questions. Where is the piece? And which way do its two stickers point? Rubix answers both questions with the same rotation matrix. To see why that works, let's first give the cube a coordinate system.",
+    "cues": {
+      "turn": "Follow"
+    }
+  },
+  {
+    "chapter": "A coordinate system",
+    "visual": "axes",
+    "title": "Let the centers define the axes",
+    "equation": "green = +eₓ    red = +eᵧ    white = +e_z",
+    "notes": [
+      "Blue, orange and yellow point the opposite way.",
+      "A fixed frame, anchored to the centers."
+    ],
+    "voice": "Place the origin at the middle of the cube. In Rubix, positive x points toward the green center, positive y toward red, and positive z toward white. Their opposite directions are blue, orange, and yellow. We keep this frame fixed. Face turns spin the centers in place, but do not move them to other faces."
+  },
+  {
+    "chapter": "A coordinate system",
+    "visual": "lattice",
+    "title": "Replace pieces with their centers",
+    "equation": "c = (x, y, z)ᵀ     x, y, z ∈ {−1, 0, 1}",
+    "notes": [
+      "The origin is hidden; Rubix stores 26 pieces."
+    ],
+    "voice": "Now replace every little piece by a point at its center. Along each axis, there are only three possible coordinates: minus one, zero, and one. This gives a three by three by three lattice. The point at the origin has no stickers, so Rubix leaves it out. Twenty six points remain."
+  },
+  {
+    "chapter": "A coordinate system",
+    "visual": "types",
+    "title": "Coordinates already know the piece type",
+    "equation": "|x| + |y| + |z| = number of stickers",
+    "notes": [
+      "6 centers · 12 edges · 8 corners"
+    ],
+    "voice": "A nonzero coordinate means the piece reaches an outer face along that axis. Count the nonzero coordinates, and you count its stickers. One gives a center. Two gives an edge. Three gives a corner. The geometry already contains the information we might otherwise encode as a separate piece type.",
+    "cues": {
+      "edge": "Two",
+      "corner": "Three"
+    }
+  },
+  {
+    "chapter": "Identity and motion",
+    "visual": "home",
+    "title": "A permanent name for a moving piece",
+    "equation": "c = (1, 0, 1)ᵀ",
+    "notes": [
+      "c is its home coordinate, forever.",
+      "It identifies the green–white edge."
+    ],
+    "voice": "For our green and white edge, the solved coordinate is one, zero, one. Call this vector c. Here comes an important distinction: c is a permanent name for this particular piece. Even after a scramble, c never changes. It says where the piece belongs, rather than where it happens to be now."
+  },
+  {
+    "chapter": "Identity and motion",
+    "visual": "basis",
+    "title": "A matrix tells us where the axes land",
+    "equation": "R = [ R eₓ | R eᵧ | R e_z ]",
+    "notes": [
+      "Each column is a transformed basis vector."
+    ],
+    "voice": "Beside c, store a rotation matrix R. Think of its columns as three arrows: where the original x, y, and z directions have landed. A matrix is a description of a transformation. Once we know what it does to these three basis vectors, we know what it does to every vector.",
+    "cues": {
+      "turn": "Once"
+    }
+  },
+  {
+    "chapter": "Identity and motion",
+    "visual": "position",
+    "title": "Carry the home vector through the turn",
+    "equation": "p = R c",
+    "notes": [
+      "home c stays fixed · current p moves"
+    ],
+    "voice": "In particular, we know what it does to c. Multiplying R by c gives the piece's current position, p. At the start, R is the identity, so p equals c. After a turn, R carries the home position to a new point. We do not need to store a second, independently updated position.",
+    "cues": {
+      "turn": "After"
+    }
+  },
+  {
+    "chapter": "Identity and motion",
+    "visual": "turn",
+    "title": "One concrete quarter turn",
+    "equation": "(x, y, z) ↦ (y, −x, z)",
+    "notes": [
+      "Top move: v = (0, 0, 1), direction = +1",
+      "This is Rubix's exact matrix convention."
+    ],
+    "voice": "Take this top face move from Rubix. It leaves z alone, sends x to minus y, and sends y to x. Our edge travels from one, zero, one to zero, minus one, one. The continuous arc is only an animation. The program stores the exact integer result of the quarter turn.",
+    "cues": {
+      "turn": "travels"
+    }
+  },
+  {
+    "chapter": "Identity and motion",
+    "visual": "matrix",
+    "title": "Read the matrix as three arrow destinations",
+    "equation": "M c = (0, −1, 1)ᵀ",
+    "notes": [
+      "eₓ → −eᵧ    eᵧ → eₓ    e_z → e_z"
+    ],
+    "voice": "Look at the columns of the move matrix. The first is zero, minus one, zero: the destination of the x arrow. The second is one, zero, zero: the destination of the y arrow. The third keeps the z arrow fixed. Matrix multiplication combines these destinations using the coordinates of our vector.",
+    "cues": {
+      "turn": "first"
+    }
+  },
+  {
+    "chapter": "Stickers as vectors",
+    "visual": "normals",
+    "title": "A sticker is a direction",
+    "equation": "color identity ≠ current direction",
+    "notes": [
+      "Green keeps its identity while its normal turns."
+    ],
+    "voice": "Now for the stickers. Represent a sticker by its outward normal: an arrow perpendicular to its surface. Green's permanent color identity is positive x, its direction in the solved cube. After our top turn, that same green sticker points toward negative y. Its identity stays green; its current direction changes.",
+    "cues": {
+      "turn": "After"
+    }
+  },
+  {
+    "chapter": "Stickers as vectors",
+    "visual": "decompose",
+    "title": "Split the home vector into sticker normals",
+    "equation": "c = x eₓ + y eᵧ + z e_z",
+    "notes": [
+      "(1, 0, 1)ᵀ = eₓ + e_z",
+      "A zero component means no sticker on that axis."
+    ],
+    "voice": "Why does the home coordinate tell us which stickers the piece owns? Split c into its three axis components. Our edge gives one x arrow, no y arrow, and one z arrow. These are exactly its green and white sticker normals at home. Negative components work too: minus x identifies a blue sticker."
+  },
+  {
+    "chapter": "Stickers as vectors",
+    "visual": "diag",
+    "title": "Keep those three components as columns",
+    "equation": "D = diag(c) = [ x eₓ | y eᵧ | z e_z ]",
+    "notes": [
+      "Each nonzero column identifies one sticker.",
+      "The zero column is absence, not a third color."
+    ],
+    "voice": "Rather than adding the component arrows, put them side by side as columns. That is the diagonal matrix of c, which we'll call D. For this edge, its diagonal is one, zero, one. The zero column represents an absent sticker. For a corner all three columns are present. For a center only one is."
+  },
+  {
+    "chapter": "Stickers as vectors",
+    "visual": "rotate_normals",
+    "title": "Rotate every sticker in one multiplication",
+    "equation": "R D = [ R(x eₓ) | R(y eᵧ) | R(z e_z) ]",
+    "notes": [
+      "Green → −eᵧ     White → e_z"
+    ],
+    "voice": "Multiplication acts on each column separately. So R times D rotates all of the sticker normals at once. The green column now points along negative y. The white column still points up. The zero column stays zero. The very same R that moved the piece also describes where every sticker faces.",
+    "cues": {
+      "turn": "rotates"
+    }
+  },
+  {
+    "chapter": "Stickers as vectors",
+    "visual": "sum",
+    "title": "Position is already inside the normals",
+    "equation": "p = R c = sum of the columns of R D",
+    "notes": [
+      "One representation keeps location and facing consistent."
+    ],
+    "voice": "There is an especially satisfying connection here. Add the columns of D and you get c. Rotate them and add again, and you get R c, the current position. So the transformed sticker normals also determine where the piece sits. Location and orientation are two views of one geometric description."
+  },
+  {
+    "chapter": "Choosing a slice",
+    "visual": "slice",
+    "title": "Which pieces should turn?",
+    "equation": "v · p > 0",
+    "notes": [
+      "For the top slice, v = e_z: select z = 1.",
+      "Nine pieces pass; the other seventeen stay still."
+    ],
+    "voice": "A face turn should affect only one layer. Let v point outward from that face. The dot product v dot p measures the piece's coordinate along that direction. Select the pieces for which it is positive. For the top face, that means z equals one. Exactly nine pieces pass the test.",
+    "cues": {
+      "turn": "Exactly"
+    }
+  },
+  {
+    "chapter": "Choosing a slice",
+    "visual": "selection",
+    "title": "Select by current position",
+    "equation": "v · (R c) > 0",
+    "notes": [
+      "A home address is not a current address."
+    ],
+    "voice": "The test must use the current position, R c. After our top turn, the green and white edge lives on the left face, even though its home coordinate was on the front. Selecting by c would move the wrong pieces. Selecting by R c automatically follows every piece through the scramble."
+  },
+  {
+    "chapter": "Composing turns",
+    "visual": "compose",
+    "title": "Apply the next turn after the old one",
+    "equation": "R_new = M R",
+    "notes": [
+      "M(R c) = (M R)c",
+      "Only selected pieces receive this update."
+    ],
+    "voice": "For each selected piece, update R to M times R. The old R acts first, taking the piece from home to its current state. The new move M acts next. That order explains why M goes on the left. Matrix multiplication becomes the record of a piece's entire history of turns.",
+    "cues": {
+      "turn": "update"
+    }
+  },
+  {
+    "chapter": "Composing turns",
+    "visual": "code",
+    "title": "The geometric rule is the code",
+    "equation": "position → selection → composition",
+    "notes": [
+      "A cube is an immutable tuple of (home, rotation) pairs."
+    ],
+    "voice": "And here is the whole update in the language of the implementation. Compute the current position. Use a dot product to test whether the move applies. If it does, compose the move matrix with the stored rotation. Otherwise keep that rotation. Repeat this rule over the twenty six pairs that make up the cube.",
+    "cues": {
+      "turn": "compose"
+    }
+  },
+  {
+    "chapter": "Exact discrete geometry",
+    "visual": "exact",
+    "title": "The animation is smooth. The state is exact.",
+    "equation": "RᵀR = I     det(R) = +1",
+    "notes": [
+      "Entries: −1, 0, +1 · 24 proper cube rotations",
+      "Signed axis permutations; no accumulated rounding."
+    ],
+    "voice": "The animation passes through arbitrary angles, but stored states never do. Quarter turns only permute the coordinate axes and reverse some signs. Their matrices have entries minus one, zero, and one. They stay orthogonal, with determinant plus one. There are just twenty four such proper rotations of a cube. Exact endpoints avoid accumulated rounding error.",
+    "cues": {
+      "turn": "Quarter"
+    }
+  },
+  {
+    "chapter": "What does solved mean?",
+    "visual": "cycle",
+    "title": "Four quarter turns close the loop",
+    "equation": "M⁴ = I     M⁻¹ M = I",
+    "notes": [
+      "The same rules cover every face and either direction."
+    ],
+    "voice": "This gives us useful checks as well as an elegant model. Four quarter turns return every piece and sticker to the start. A move followed by its inverse cancels. These identities test the geometry as a whole, rather than checking a few hand written sticker permutations.",
+    "cues": {
+      "turn": "Four"
+    }
+  },
+  {
+    "chapter": "What does solved mean?",
+    "visual": "solved",
+    "title": "Every sticker points home",
+    "equation": "R diag(c) = diag(c)",
+    "notes": [
+      "Check this for all 26 pieces.",
+      "The column sum also forces R c = c."
+    ],
+    "voice": "When is a piece solved? When every sticker normal points in its original direction. That is precisely R times the diagonal of c equals the diagonal of c. Because position is the sum of those columns, this equality also puts the piece at home. Rubix checks this condition for every piece."
+  },
+  {
+    "chapter": "What does solved mean?",
+    "visual": "center",
+    "title": "Solved does not always mean R = I",
+    "equation": "R e_z = e_z, even when R ≠ I",
+    "notes": [
+      "A plain white center can spin and still be solved.",
+      "Picture cubes would need an extra orientation constraint."
+    ],
+    "voice": "Why not simply demand that R be the identity? Watch the white center during a top turn. Its little local x and y arrows rotate, but its only sticker still points up. For an ordinary cube, that center is solved. Rubix correctly ignores the orientation of an unmarked center within its own face. A picture cube would need a stricter condition.",
+    "cues": {
+      "turn": "rotate"
+    }
+  },
+  {
+    "chapter": "The payoff",
+    "visual": "summary",
+    "title": "One geometric story, four operations",
+    "equation": "p = R c     N = R diag(c)",
+    "notes": [
+      "Select: v · p > 0",
+      "Update: R ← M R",
+      "Solved: N = diag(c)"
+    ],
+    "voice": "We now have a complete description of the puzzle's state and motion. A home vector identifies the piece. A rotation gives its position and sticker directions. A dot product chooses a layer. Multiplication applies the move. And an equality recognizes solved pieces. The search for a solution is a separate problem; this encoding supplies its consistent geometric world."
+  },
+  {
+    "chapter": "Keep exploring",
+    "visual": "credits",
+    "title": "Learn to see matrices as motion",
+    "equation": "Essence of Linear Algebra · 3Blue1Brown",
+    "notes": [
+      "By Grant Sanderson",
+      "A superb guide to geometric intuition.",
+      "Links and full transcript accompany this video.",
+      "3blue1brown.com · Essence of Linear Algebra"
+    ],
+    "voice": "If this way of seeing matrices appeals to you, watch Grant Sanderson's Essence of Linear Algebra, from Three Blue One Brown. It is a superb series: patient, visual, and beautifully clear about why the mathematics works. It directly inspired Rubix. This original explanation follows that geometric spirit. Once you see a matrix as motion, a cube of colored stickers becomes a small world of vectors and transformations."
+  }
+]
