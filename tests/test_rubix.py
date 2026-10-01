@@ -181,6 +181,19 @@ class TestRubixCube(unittest.TestCase):
         self.assertTrue(is_cube_solved(dst))
         self.assertLessEqual(len(path), 2)
 
+    def test_astar_unreachable_frontier_exhaustion(self):
+        """When the goal is unreachable and the frontier empties before budget exhaustion, astar returns None immediately."""
+        # Unreachable goal on empty move set with random_weight > 0
+        res = astar(
+            0,
+            lambda x: x == 5,
+            lambda m, s: s,
+            get_moves=lambda s: [],
+            random_weight=0.25,
+            max_moves=1000,
+        )
+        self.assertIsNone(res)
+
     def test_headless_gui_render(self):
         """Verify that rubix_gui renders a frame headlessly without error."""
         import rubix_gui

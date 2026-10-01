@@ -193,7 +193,7 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
       else:
         continue
       break
-    if random_weight == 0 or budget is None:
+    if budget is None or moves_simulated < budget or random_weight == 0:
       return None
     print("search budget of %d moves exceeded; restarting" % budget)
     budget = min(int(1.5 * budget), 500_000)
