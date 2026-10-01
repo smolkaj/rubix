@@ -225,7 +225,7 @@ panels = [
     {
         "title": "Corner",
         "sub": "Vertex cubelet",
-        "stat": "3 facelets",
+        "stat": "1 of 8 corners",
         "stat_col": C_GOLD,
         "mode": "corner",
         "desc": "Part of 3 faces",
@@ -233,7 +233,7 @@ panels = [
     {
         "title": "Edge",
         "sub": "Border cubelet",
-        "stat": "2 facelets",
+        "stat": "1 of 12 edges",
         "stat_col": C_ACCENT,
         "mode": "edge",
         "desc": "Part of 2 faces",
@@ -241,7 +241,7 @@ panels = [
     {
         "title": "Center",
         "sub": "Face-center cubelet",
-        "stat": "1 facelet",
+        "stat": "1 of 6 centers",
         "stat_col": C_WHITE,
         "mode": "center",
         "desc": "Part of 1 face",
@@ -249,7 +249,7 @@ panels = [
     {
         "title": "Core",
         "sub": "Interior cubelet",
-        "stat": "0 facelets",
+        "stat": "1 of 1 core",
         "stat_col": C_PURPLE,
         "mode": "core",
         "desc": "Part of 0 faces",

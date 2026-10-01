@@ -204,7 +204,7 @@ panels = [
     },
     {
         "title": "Slice",
-        "sub": "3D layer of cubelets",
+        "sub": "3D slice of 9 cubelets",
         "stat": "1 of 9 slices",
         "stat_col": C_ACCENT,
         "mode": "slice",

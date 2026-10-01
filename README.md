@@ -30,7 +30,7 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 </p>
 
 <p align="center">
-  <img src="img/outer-slice-move.png" alt="Outer-Slice Move: A 90° rotation of an outer layer around a coordinate axis" width="1000">
+  <img src="img/outer-slice-move.png" alt="Outer-Slice Move: A 90° rotation of an outer slice around its center" width="1000">
 </p>
 
 > [!TIP]
@@ -50,7 +50,7 @@ At first glance, representing a Rubik's cube might seem straightforward: track 5
 
 Instead of 54 independent stickers, the puzzle is composed of **27 cubelets** arranged in a $3 \times 3 \times 3$ grid. 
 
-Look inside a physical Rubik's cube, and its defining structural backbone becomes immediately apparent: a rigid **3-dimensional cross** connecting the internal core to the six face centers along the coordinate axes. When you turn an outer slice, the layer rotates *around* an arm of this cross.
+Look inside a physical Rubik's cube, and its defining structural backbone becomes immediately apparent: a rigid **3-dimensional cross** connecting the internal core to the six face centers along the coordinate axes. When you turn an outer slice, it rotates *around* an arm of this cross.
 
 By anchoring our origin at the core $(0, 0, 0)$, this 3D cross becomes our Cartesian coordinate frame:
 
