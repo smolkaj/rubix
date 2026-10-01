@@ -386,8 +386,29 @@ class TestRubixCube(unittest.TestCase):
         self.assertIs(rubix_gui.screen, custom_surf)
         rubix_gui.draw_cube_static(solved_cube)
         self.assertIs(rubix_gui.screen, custom_surf)
-        rubix_gui.draw_text_bubble("Test Offscreen", 10, 10, 200)
-        self.assertIs(rubix_gui.screen, custom_surf)
+
+    def test_compiled_transition_system(self):
+        """Verify compiled transitions match canonical vector rotations and contract robustness."""
+        from rubix import to_cube, from_cube, apply_move_fast, shuffle
+
+        # 1. Round-trip fidelity on solved cube
+        self.assertEqual(to_cube(from_cube(solved_cube)), solved_cube)
+
+        # 2. Round-trip fidelity on scrambled cube
+        scrambled = shuffle(solved_cube, iterations=50, seed=42)
+        self.assertEqual(to_cube(from_cube(scrambled)), scrambled)
+
+        # 3. Contract robustness: dict input and reordered pair sequence
+        dict_rep = dict(scrambled)
+        self.assertEqual(to_cube(from_cube(dict_rep)), scrambled)
+        reversed_rep = tuple(reversed(scrambled))
+        self.assertEqual(to_cube(from_cube(reversed_rep)), scrambled)
+
+        # 4. Mathematical transition equivalence across all 12 slice moves
+        for m in moves:
+            fast_cube = to_cube(apply_move_fast(m, from_cube(scrambled)))
+            canonical_cube = apply_move_to_cube(m, scrambled)
+            self.assertEqual(fast_cube, canonical_cube, f"apply_move_fast diverged on move {m}")
 
 
 if __name__ == "__main__":

@@ -18,9 +18,8 @@ from typing import Any
 # Whether or not to use randomization during search.
 RANDOMIZE_SEARCH = True
 
-# Remember start up time for stats.
-STARTUP_TIME = datetime.now()
-TOTAL_MOVES = 0
+# Remember start up time and move count for stats.
+STARTUP_TIME, TOTAL_MOVES = datetime.now(), 0
 
 # Redefine print to include timestamps.
 _print = print
@@ -42,7 +41,8 @@ unit_vectors = [v for v in vectors if norm1(v) == 1]
 # `r`, where each cubelet is encoded as the 3D vector `c` that indicates the
 # position of the cubelet in the solved cube.
 # The cubelets current position is given by the matrix-vector product `c*r`.
-solved_cube = tuple((c, tupled(np.identity(3))) for c in vectors if any(c))
+cubelets = tuple(c for c in vectors if any(c))
+solved_cube = tuple((c, tupled(np.identity(3))) for c in cubelets)
 NUM_CUBELETS = len(solved_cube)
 
 # A move is a clockwise or counterclockwise 90 degree rotation of the
@@ -154,6 +154,7 @@ class PrioritizedItem:
 
 def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
           get_moves = lambda _: moves, random_weight=0, max_moves=100_000):
+  global TOTAL_MOVES
   if is_goal(start): return (start, ())
   budget = max_moves
 
@@ -182,7 +183,7 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
           if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
         dst, cost = apply_move(move, src), cost_so_far[src] + 1
         moves_simulated += 1
-        global TOTAL_MOVES; TOTAL_MOVES += 1
+        TOTAL_MOVES += 1
         budget_exceeded = budget is not None and moves_simulated >= budget
         if dst in cost_so_far and cost_so_far[dst] <= cost:
           if budget_exceeded: break
@@ -208,9 +209,6 @@ def is_cubelet_solved(cubelet, rotation):
 
 def is_cube_solved(cube): return all(is_cubelet_solved(c, r) for c, r in cube)
 
-def num_solved_with_criterion(cube, criterion):
-  return sum(is_cubelet_solved(c, r) for c,r in cube if criterion(c))
-
 @functools.cache
 def min_moves_to_solved(cubelet, rotation):
   _, path = astar(rotation, lambda r: is_cubelet_solved(cubelet, r),
@@ -231,7 +229,6 @@ for r in rotations:
     mr = tupled(rotation_matrix(m) @ r)
     if mr not in rotations: rotations.append(mr)
 rot_to_id = {r: i for i, r in enumerate(rotations)}
-cubelets = tuple(c for c, _ in solved_cube)
 
 # Fast state transitions compiled directly from linear algebra hyperplane tests.
 transitions = tuple(
@@ -245,7 +242,10 @@ transitions = tuple(
 move_to_id = {m: i for i, m in enumerate(moves)}
 
 def to_cube(state): return tuple((cubelets[i], rotations[state[i]]) for i in range(NUM_CUBELETS))
-def from_cube(cube): return tuple(rot_to_id[r] for _, r in cube)
+def from_cube(cube):
+  d = dict(cube)
+  return tuple(rot_to_id[d[c]] for c in cubelets)
+
 def apply_move_fast(m, s):
   t = transitions[move_to_id[m]]
   return tuple(t[i][s[i]] for i in range(NUM_CUBELETS))
@@ -265,20 +265,21 @@ top_or_mid = tuple(i for i, c in enumerate(cubelets) if c[2] >= 0)
 bot_edges = tuple(i for i, c in enumerate(cubelets) if c[2] == -1 and norm1(c) == 2)
 bot_corners = tuple(i for i, c in enumerate(cubelets) if c[2] == -1 and norm1(c) == 3)
 bot_edge_heur_idx = tuple(i for i, c in enumerate(cubelets) if not (c[2] == -1 and norm1(c) == 3))
-bot_corner_c1 = tuple(i for i, c in enumerate(cubelets) if c[2] == 1)
-bot_corner_c2 = tuple(i for i, c in enumerate(cubelets) if c[2] == 0)
-bot_corner_c3 = tuple(i for i, c in enumerate(cubelets) if c[2] == -1)
-is_corner_c3 = tuple(norm1(cubelets[i]) == 3 for i in bot_corner_c3)
+mid_cubelets = tuple(i for i, c in enumerate(cubelets) if c[2] == 0)
+bot_cubelets = tuple(i for i, c in enumerate(cubelets) if c[2] == -1)
+bot_corner_dist = tuple(dist_pos_tab[i] if norm1(c) == 3 else dist_solved_tab[i] for i, c in enumerate(cubelets))
 
 p = 0.5
 def top_layer_heuristic(s): return (sum(dist_solved_tab[i][s[i]]**p for i in top_cubelets)**(1/p)) / 8
 def middle_layer_heuristic(s): return (sum(dist_solved_tab[i][s[i]]**p for i in top_or_mid)**(1/p)) / 4
 def bottom_layer_edge_heuristic(s): return (sum(dist_solved_tab[i][s[i]]**p for i in bot_edge_heur_idx)**(1/p)) / 3
 def bottom_layer_corner_heuristic(s):
-  d1 = sum(dist_solved_tab[i][s[i]]**p for i in bot_corner_c1)**(1/p)
-  d2 = sum(dist_solved_tab[i][s[i]]**p for i in bot_corner_c2)**(1/p)
-  d3 = sum((dist_pos_tab[i][s[i]] if ic else dist_solved_tab[i][s[i]])**p for i, ic in zip(bot_corner_c3, is_corner_c3))**(1/p)
+  d1 = sum(dist_solved_tab[i][s[i]]**p for i in top_cubelets)**(1/p)
+  d2 = sum(dist_solved_tab[i][s[i]]**p for i in mid_cubelets)**(1/p)
+  d3 = sum(bot_corner_dist[i][s[i]]**p for i in bot_cubelets)**(1/p)
   return d1/5 + d2/3 + d3/8
+
+TOTAL_MOVES = 0
 
 def solve_top_and_middle_layer(st, report_progress_callback):
   solution_moves = ()
