@@ -14,16 +14,20 @@ W, H = WIDTH * SCALE, HEIGHT * SCALE
 img = Image.new("RGB", (W, H), (21, 23, 26))
 draw = ImageDraw.Draw(img)
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+FONTS_DIR = REPO_ROOT / "fonts"
+
 # Fonts
-font_title = ImageFont.truetype("fonts/Roboto-Bold.ttf", 34 * SCALE)
-font_subtitle = ImageFont.truetype("fonts/Roboto-Regular.ttf", 20 * SCALE)
-font_section = ImageFont.truetype("fonts/Roboto-Bold.ttf", 23 * SCALE)
-font_label_bold = ImageFont.truetype("fonts/Roboto-Bold.ttf", 19 * SCALE)
-font_body = ImageFont.truetype("fonts/Roboto-Regular.ttf", 17 * SCALE)
-font_code = ImageFont.truetype("fonts/Roboto-Medium.ttf", 20 * SCALE)
-font_math = ImageFont.truetype("fonts/Roboto-Bold.ttf", 22 * SCALE)
-font_small = ImageFont.truetype("fonts/Roboto-Regular.ttf", 15 * SCALE)
-font_small_bold = ImageFont.truetype("fonts/Roboto-Bold.ttf", 15 * SCALE)
+font_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 34 * SCALE)
+font_subtitle = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 20 * SCALE)
+font_section = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 23 * SCALE)
+font_label_bold = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 19 * SCALE)
+font_label = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 18 * SCALE)
+font_body = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 17 * SCALE)
+font_code = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 20 * SCALE)
+font_math = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 22 * SCALE)
+font_small = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 15 * SCALE)
+font_small_bold = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 15 * SCALE)
 
 # Colors
 C_GREEN = (46, 204, 113)
@@ -314,7 +318,7 @@ for i, (p_bold, p_reg) in enumerate(notes3):
         draw.text((p3_x + 28*SCALE + w_bold, ty), p_reg, fill=C_TEXT, font=font_small)
 
 # Output image path
-out_path = Path("img/basis-colors-diag.png")
+out_path = REPO_ROOT / "img" / "basis-colors-diag.png"
 out_path.parent.mkdir(parents=True, exist_ok=True)
 final_img = img.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
 final_img.save(out_path, optimize=True)
