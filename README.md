@@ -30,13 +30,8 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
 - **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
 - **Move:** A 90° rotation of an outer slice around a coordinate axis.
 
-> **Key Idea 1: A Complete, Minimal Action Basis (12 Atomic Moves)**  
-> How can we manipulate a 3D cube, and what is the minimal generating set needed to model it?  
-> - **Whole-cube rotations** tumble the puzzle in space without altering relative states; fixing our reference frame eliminates them.  
-> - **$180^\circ$ and $270^\circ$ turns** decompose directly into sequences of elementary $\pm 90^\circ$ quarter turns.  
-> - **Middle-slice turns** are redundant: turning an equator is physically identical to counter-rotating both opposing outer faces and tilting the cube.  
-> 
-> What remains is a complete, minimal basis: **6 outer faces $\times$ 2 directions ($\pm 90^\circ$) = 12 atomic moves**. As a profound payoff, omitting middle-slice moves and whole-cube rotations keeps all 6 center cubelets permanently stationary in space.
+> **Key Idea 1 (Standard): Fixed Centers via Outer-Slice Moves**  
+> The 12 90° outer-slice rotations (6 faces $\times$ 2 directions) are sufficient to generate any Rubik's Cube configuration. By omitting whole-cube and inner-slice rotations, the center cubelets remain permanently fixed in space.
 
 ---
 
