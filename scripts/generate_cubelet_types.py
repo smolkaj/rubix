@@ -41,18 +41,18 @@ C_DARK_FRONT = (32, 37, 48)
 C_DARK_RIGHT = (25, 29, 39)
 C_DARK_EDGE = (62, 72, 92)
 
-# High-contrast face wash colors (clearly illuminates which 2D faces the cubelet belongs to)
-# Top face wash: cool white/ice-blue wash for the White face (+Z)
-C_WASH_TOP = (140, 160, 192)
-C_WASH_TOP_EDGE = (195, 218, 248)
+# Toned-down face wash colors (subtle background presence; hero cubelet clearly dominates)
+# Top face wash: soft slate-blue wash for the White face (+Z)
+C_WASH_TOP = (88, 100, 122)
+C_WASH_TOP_EDGE = (125, 142, 168)
 
-# Front face wash: rich emerald wash for the Green face (+X)
-C_WASH_FRONT = (40, 118, 86)
-C_WASH_FRONT_EDGE = (82, 202, 150)
+# Front face wash: deep muted emerald wash for the Green face (+X)
+C_WASH_FRONT = (25, 64, 48)
+C_WASH_FRONT_EDGE = (48, 112, 84)
 
-# Right face wash: rich ruby wash for the Red face (+Y)
-C_WASH_RIGHT = (125, 52, 62)
-C_WASH_RIGHT_EDGE = (220, 102, 116)
+# Right face wash: deep muted ruby wash for the Red face (+Y)
+C_WASH_RIGHT = (68, 30, 38)
+C_WASH_RIGHT_EDGE = (120, 55, 66)
 
 # Colors for facelets
 C_WHITE = (255, 255, 255)
@@ -166,11 +166,11 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
             if is_target:
                 fill_t = C_WHITE
                 edge_t = (255, 255, 255)
-                w_t = 2 * SCALE
+                w_t = int(2.5 * SCALE)
             elif "top" in active_faces:
                 fill_t = C_WASH_TOP
                 edge_t = C_WASH_TOP_EDGE
-                w_t = int(1.5 * SCALE)
+                w_t = 1 * SCALE
             else:
                 fill_t = C_DARK_TOP
                 edge_t = C_DARK_EDGE
@@ -182,11 +182,11 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
             if is_target:
                 fill_f = C_GREEN
                 edge_f = (140, 255, 195)
-                w_f = 2 * SCALE
+                w_f = int(2.5 * SCALE)
             elif "front" in active_faces:
                 fill_f = C_WASH_FRONT
                 edge_f = C_WASH_FRONT_EDGE
-                w_f = int(1.5 * SCALE)
+                w_f = 1 * SCALE
             else:
                 fill_f = C_DARK_FRONT
                 edge_f = C_DARK_EDGE
@@ -198,11 +198,11 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
             if is_target:
                 fill_r = C_RED
                 edge_r = (255, 160, 160)
-                w_r = 2 * SCALE
+                w_r = int(2.5 * SCALE)
             elif "right" in active_faces:
                 fill_r = C_WASH_RIGHT
                 edge_r = C_WASH_RIGHT_EDGE
-                w_r = int(1.5 * SCALE)
+                w_r = 1 * SCALE
             else:
                 fill_r = C_DARK_RIGHT
                 edge_r = C_DARK_EDGE
@@ -213,11 +213,11 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
     if target:
         ti, tj, tk = target
         if tk == 1:
-            draw_cubelet_face(draw, ti, tj, tk, "top", cx, cy, sz, C_WHITE, (255, 255, 255), 2 * SCALE)
+            draw_cubelet_face(draw, ti, tj, tk, "top", cx, cy, sz, C_WHITE, (255, 255, 255), int(2.5 * SCALE))
         if ti == 1 and mode in ("corner", "edge"):
-            draw_cubelet_face(draw, ti, tj, tk, "front", cx, cy, sz, C_GREEN, (140, 255, 195), 2 * SCALE)
+            draw_cubelet_face(draw, ti, tj, tk, "front", cx, cy, sz, C_GREEN, (180, 255, 220), int(2.5 * SCALE))
         if tj == 1 and mode == "corner":
-            draw_cubelet_face(draw, ti, tj, tk, "right", cx, cy, sz, C_RED, (255, 160, 160), 2 * SCALE)
+            draw_cubelet_face(draw, ti, tj, tk, "right", cx, cy, sz, C_RED, (255, 180, 180), int(2.5 * SCALE))
 
 
 # Define 4 panels in descending order: 3 -> 2 -> 1 -> 0 faces
