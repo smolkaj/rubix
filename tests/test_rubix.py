@@ -226,6 +226,38 @@ class TestRubixCube(unittest.TestCase):
             self.assertTrue(os.path.exists(solving_path))
             self.assertGreater(os.path.getsize(solving_path), 0)
 
+    def test_background_solve_thread_lifecycle(self):
+        """Verify solver runs cleanly in background daemon thread with atomic progress updates."""
+        import threading
+        # 2-move shallow scramble
+        scramble_moves = [((1, 0, 0), 1), ((0, 1, 0), -1)]
+        cube = solved_cube
+        for m in scramble_moves:
+            cube = apply_move_to_cube(m, cube)
+
+        progress_history = []
+        result_holder = []
+
+        def worker(c):
+            def progress(pc):
+                progress_history.append(pc)
+            sol = solve(c, progress)
+            result_holder.append(sol)
+
+        t = threading.Thread(target=worker, args=(cube,), daemon=True)
+        t.start()
+        t.join(timeout=10.0)
+
+        self.assertFalse(t.is_alive(), "Worker thread timed out")
+        self.assertEqual(len(result_holder), 1)
+        self.assertGreater(len(progress_history), 0)
+
+        # Verify produced solution
+        c = cube
+        for m in result_holder[0]:
+            c = apply_move_to_cube(m, c)
+        self.assertTrue(is_cube_solved(c))
+
     def test_opposite_face_moves_commute(self):
         """Opposite face moves act on disjoint slices and commute: m1 * m2 == m2 * m1."""
         for m1 in moves:

@@ -217,7 +217,8 @@ def draw_move_info(move_index, solution, current_move, solving_cube=None):
 
     if solving_cube:
         num_cubelets_solved = sum(is_cubelet_solved(c, r) for c, r in solving_cube)
-        text = f"Solving: cubelet {num_cubelets_solved + 1} of {NUM_CUBELETS}"
+        displayed_cubelet = min(num_cubelets_solved + 1, NUM_CUBELETS)
+        text = f"Solving: cubelet {displayed_cubelet} of {NUM_CUBELETS}"
         progress = num_cubelets_solved / NUM_CUBELETS
         return draw_text_bubble(text, x=x, y=y, width=width, progress=progress, bold_part="Solving:")
 
@@ -299,7 +300,7 @@ def main():
                     if scan_button[1].collidepoint(event.pos):
                         print("Scan my cube button clicked (no-op for now)")
                     elif shuffle_button[1].collidepoint(event.pos):
-                        if solve_thread is None:
+                        if solve_thread is None and next_cube is None:
                             cube = shuffle(solved_cube, iterations=999, seed=None)
                             original_cube = cube
                             solution = None
@@ -308,7 +309,7 @@ def main():
                             next_cube = None
                             animation_progress = 0
                     elif solve_button[1].collidepoint(event.pos):
-                        if solve_thread is None:
+                        if solve_thread is None and next_cube is None:
                             solution = None
                             solve_result = None
                             solving_cube = cube
@@ -347,7 +348,7 @@ def main():
             if animation_progress >= 1:
                 cube = next_cube
                 next_cube = None
-                if current_move == solution[move_index]:
+                if solution is not None and move_index < len(solution) and current_move == solution[move_index]:
                     move_index += 1
                 animation_progress = 0
         elif solve_thread is not None and solving_cube is not None:
