@@ -6,9 +6,11 @@
   <img src="img/gui-preview.png" alt="Rubix GUI Preview" width="500">
 </p>
 
-Most Rubik's cube software relies on complex combinatorial representations: 54 color stickers mapped across 6 face arrays, lookup tables for permutations, or massive pattern databases.
+Most Rubik's cube solvers rely on complex combinatorial bookkeeping: tracking 54 color stickers mapped across flat arrays, maintaining lookup tables for permutations, or precomputing massive 100MB pattern databases.
 
-**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space, the entire physics and state of the Rubik's Cube reduces to **vectors, rotation matrices, and dot products**. The core solver ([`rubix.py`](rubix.py)) reliably solves full 100,000-move scrambles in **seconds** with zero external puzzle libraries, pattern databases, or precomputed tables (typically ~10–25s).
+**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space, the entire physics, state, and solution of the Rubik's Cube reduce to **vectors, rotation matrices, and dot products**.
+
+The payoff of this linear algebra formulation is radical simplicity: the entire puzzle model, transformations, and multi-phase solver in [`rubix.py`](rubix.py) fit in **under 400 lines of readable Python**—with zero external puzzle libraries, zero lookup tables, and zero precomputed pattern databases.
 
 > **Shoutout:** The core insight for Rubix was directly sparked by Grant Sanderson’s ([3Blue1Brown](https://www.3blue1brown.com)) masterclass YouTube series, [**Essence of Linear Algebra**](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab). The series’ emphasis on geometric intuition—treating matrices as transformations of coordinate space and tracking where standard basis vectors land—inspired ditching messy combinatorial sticker permutations in favor of discrete 3D rotation matrices, vectors, and inner products. Massive praise and props to Grant for making linear algebra so intuitive, visual, and delightful!
 
@@ -22,78 +24,91 @@ Most Rubik's cube software relies on complex combinatorial representations: 54 c
   <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Face, Slice, Cubelet, and Facelet" width="700">
 </p>
 
-- **Face:** One of the 6 macroscopic $3 \times 3$ outer sides of the cube (Front, Back, Right, Left, Top, Bottom). Each face is a 2D exterior surface made of 9 coplanar facelets pointing along the same axis.
-- **Slice:** A planar group of 9 cubelets sharing a coordinate plane (e.g. all cubelets with $x = 1$) that rotate together as a rigid 3D body. An **outer slice** is the physical 3D layer behind a **face**—turning a face physically rotates its corresponding slice.
+- **Face:** One of the 6 sides of the cube (Front, Back, Right, Left, Top, Bottom). A face is a 2D exterior surface made of 9 outer stickers pointing in the same direction.
+- **Slice:** A 3D layer of 9 cubelets that rotate together as a rigid unit. An **outer slice** is the physical layer behind a **face**—turning a face physically rotates its corresponding slice.
 - **Cubelet:** One of the 27 constituent $1 \times 1 \times 1$ cubes that make up the puzzle.
 - **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
-- **Move:** A 90° clockwise or counterclockwise rotation of an outer slice around a coordinate axis.
+- **Move:** A 90° rotation of an outer slice around a coordinate axis.
+  > **Key Simplification:** Why only rotate *outer* slices? Turning a middle slice on a physical cube is mechanically identical to turning both outer slices in the opposite direction and tilting the cube. Restricting moves to outer slices keeps the 6 center cubelets permanently fixed in space, providing stationary reference anchors and drastically pruning the search space.
 
 ---
 
 ### Step 1: Ditching the Sticker Permutation Nightmare
 
-At first glance, representing a Rubik's cube might seem straightforward: just track 54 colored stickers in a flat list or 2D arrays. But this immediately runs into messy combinatorial bookkeeping:
+At first glance, representing a Rubik's cube might seem straightforward: track 54 colored stickers in a flat list. But this immediately runs into messy combinatorial bookkeeping:
 - A single 90° face turn scrambles 12 edge and corner stickers across 4 adjacent faces.
 - You must maintain lookup tables for how stickers permute, flip, and twist.
-- The physics of 3D rigid bodies is lost in a tangle of 1D array index math.
+- The physics of 3D rigid bodies is lost in a tangle of array index math.
 
 **What if we treat the Rubik's Cube as what it physically is: a rigid 3D object in space?**
 
-Instead of 54 independent stickers, there are really only **27 cubelets** arranged in a $3 \times 3 \times 3$ grid. Where should we anchor our coordinate frame? Right at the geometric center of the cube: $(0, 0, 0)$.
+Instead of 54 independent stickers, the puzzle is composed of **27 cubelets** arranged in a $3 \times 3 \times 3$ grid. We anchor our coordinate frame at the geometric center of the cube: $(0, 0, 0)$.
 
-Each cubelet now has an integer coordinate $(x, y, z)$ where each coordinate is simply in $\lbrace -1, 0, 1 \rbrace$:
+Each cubelet has an integer coordinate $(x, y, z)$ with values in $\lbrace -1, 0, 1 \rbrace$:
 
 ```
-               +Z: Top (White)
+               +Z: Top
                 ^
-                |   +Y: Right (Red)
+                |   +Y: Right
                 |  /
     -X: Back    | /
-     (Blue) <----+----> +X: Front (Green)
+            <----+----> +X: Front
                /|
               / |
              v  v
-      -Y: Left  -Z: Bottom (Yellow)
-      (Orange)
+      -Y: Left  -Z: Bottom
 ```
 
 Each coordinate axis corresponds to an opposing pair of faces:
-- **X-axis:** $+X$ points **Front** (Green) and $-X$ points **Back** (Blue).
-- **Y-axis:** $+Y$ points **Right** (Red) and $-Y$ points **Left** (Orange).
-- **Z-axis:** $+Z$ points **Top** (White) and $-Z$ points **Bottom** (Yellow).
+- **X-axis:** $+X$ points **Front** and $-X$ points **Back**.
+- **Y-axis:** $+Y$ points **Right** and $-Y$ points **Left**.
+- **Z-axis:** $+Z$ points **Top** and $-Z$ points **Bottom**.
 
 ---
 
-### Step 2: Counting Facelets with the Manhattan Distance
+### Step 2: Testing the Coordinate System (Counting Stickers for Free)
 
-Once we anchor the cubelets at $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$, an immediate question arises:
+We placed our coordinate origin at the center of the puzzle, assigning each of the 27 cubelets an integer vector $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$.
 
-> *How do we determine what kind of cubelet a coordinate represents—a corner, an edge, a center, or the hidden core?*
+Is this choice actually convenient, or did we just trade one set of headaches for another?
 
-Do we need a hardcoded lookup dictionary? **No.** Look closely at what the coordinates mean:
-- Along any axis, coordinate $0$ means the cubelet is flush inside the middle slice.
-- Coordinate $+1$ or $-1$ means the cubelet extends outward to the boundary of that axis!
+Let's test it. Mechanically, a $3 \times 3 \times 3$ Rubik's cube has four distinct types of blocks, distinguished by how many colored stickers they expose:
+- **The Core (1 block):** The hidden internal mechanism at $(0,0,0)$. Exposes **0** stickers; never visible.
+- **Centers (6 blocks):** One at the center of each face. Exposes **1** sticker; rotates in place.
+- **Edges (12 blocks):** Border blocks between two faces. Exposes **2** stickers.
+- **Corners (8 blocks):** Vertex blocks joining three faces. Exposes **3** stickers.
 
-In other words, the absolute value $|x| \in \lbrace 0, 1 \rbrace$ acts as a binary indicator: $1$ if the cubelet touches an outer boundary, and $0$ if it is internal along that axis.
-
-If we sum the absolute values—the **Manhattan distance** or **$L_1$ norm**—it **literally counts how many facelets the cubelet exposes to the outside world**:
-
-$$\|c\|_1 = |x| + |y| + |z|$$
-
-| Visible Facelets ($\|c\|_1$) | Cubelet Type | Number of Cubelets | Description |
-|:---:|:---|:---:|:---|
-| **0** | Interior | 1 | The hidden core mechanism; 0 facelets; never moves. |
-| **1** | Center | 6 | Fixed centers; 1 facelet; rotate in place, define face colors. |
-| **2** | Edge | 12 | 2 visible colored facelets. |
-| **3** | Corner | 8 | 3 visible colored facelets. |
-
-Total: $1 + 6 + 12 + 8 = 27$ cubelets.
+Notice the sequence of exposed stickers: **0, 1, 2, 3**.
 
 <p align="center">
   <img src="img/cubelet-types.png" alt="Types of Cubelets" width="600">
 </p>
 
-No lookup tables, no hardcoded classifications. The physical nature of the cubelet falls directly out of its coordinate norm.
+Now examine our coordinate values in $\lbrace -1, 0, 1 \rbrace$. Along each axis:
+- A coordinate of $0$ means the block is centered internally along that axis.
+- A coordinate of $\pm 1$ means the block touches the outer surface along that axis.
+
+The absolute value $|x| \in \lbrace 0, 1 \rbrace$ acts as an on/off indicator for whether the block touches an exterior boundary!
+
+What happens if we add up the absolute values $|x| + |y| + |z|$ (the **Manhattan distance** or **$L_1$ norm** from the origin)?
+
+$$\|c\|_1 = |x| + |y| + |z|$$
+
+- At $(0, 0, 0)$: $|0| + |0| + |0| = \mathbf{0}$ $\rightarrow$ **Core** (0 stickers)
+- At $(1, 0, 0)$: $|1| + |0| + |0| = \mathbf{1}$ $\rightarrow$ **Center** (1 sticker)
+- At $(1, 1, 0)$: $|1| + |1| + |0| = \mathbf{2}$ $\rightarrow$ **Edge** (2 stickers)
+- At $(1, 1, 1)$: $|1| + |1| + |1| = \mathbf{3}$ $\rightarrow$ **Corner** (3 stickers)
+
+| Distance $\|c\|_1$ | Cubelet Type | Count | Exposed Stickers | Description |
+|:---:|:---|:---:|:---:|:---|
+| **0** | Core | 1 | 0 | Hidden internal mechanism; permanently at $(0,0,0)$ |
+| **1** | Center | 6 | 1 | Fixed centers; rotate in place, define face colors |
+| **2** | Edge | 12 | 2 | Border blocks between two faces |
+| **3** | Corner | 8 | 3 | Vertex blocks joining three faces |
+
+Total: $1 + 6 + 12 + 8 = 27$ cubelets.
+
+The coordinate norm classifies every single block automatically. Zero classification tables, zero conditional branches—the physical nature of each block falls directly out of its distance from the origin!
 
 ---
 
@@ -101,18 +116,21 @@ No lookup tables, no hardcoded classifications. The physical nature of the cubel
 
 Now comes the next puzzle: *how do we represent colors?*
 
-In traditional programs, colors are arbitrary strings (`'WHITE'`, `'GREEN'`) or integer tags (`0`, `1`). But look at the physical mechanism of a Rubik's Cube:
+In traditional software, colors are arbitrary strings (`'WHITE'`, `'GREEN'`) or integer tags (`0`, `1`). But look at the physical mechanism of a Rubik's Cube:
 
-Slice moves twist the perimeter cubelets, but the **6 center cubelets are physically anchored to the central core spindle**. They never change their position in 3D space:
-- The Green center is permanently at $(+1, 0, 0)$.
-- The Red center is permanently at $(0, +1, 0)$.
-- The White center is permanently at $(0, 0, +1)$.
+Because moves only rotate outer slices, the **6 center cubelets are physically locked to the core spindle**. They never move relative to each other:
+- The Green center is permanently at $(+1, 0, 0)$ [Front].
+- The Blue center is permanently at $(-1, 0, 0)$ [Back].
+- The Red center is permanently at $(0, +1, 0)$ [Right].
+- The Orange center is permanently at $(0, -1, 0)$ [Left].
+- The White center is permanently at $(0, 0, +1)$ [Top].
+- The Yellow center is permanently at $(0, 0, -1)$ [Bottom].
 
-Notice what just happened: **the 6 fixed center cubelets define the standard Cartesian basis vectors $\mathbf{e}_x, \mathbf{e}_y, \mathbf{e}_z$!**
+Notice what just happened: **the 6 center cubelets are literally the standard Cartesian basis vectors $\mathbf{e}_x, \mathbf{e}_y, \mathbf{e}_z$ and their opposites!**
 
 $$\mathbf{e}_x = \text{Green Center}, \quad \mathbf{e}_y = \text{Red Center}, \quad \mathbf{e}_z = \text{White Center}$$
 
-Why invent separate color constants when the center cubelets are already 3D vectors? We don't! **A color's identity is simply the constant position vector of its center cubelet**:
+Why invent separate color constants when the centers are already 3D vectors? We don't! **A color's identity is the constant position vector of its center cubelet**:
 
 | Direction Vector | Color | Face | Defining Center Cubelet |
 |:---|:---|:---|:---|
@@ -195,9 +213,9 @@ No sticker permutation tables, no orientation state machines—just discrete 3D 
 
 When a move rotates an outer slice (e.g., turning the Top face clockwise), which cubelets move?
 
-In combinatorial code, you maintain a list of cubelet indices belonging to each face. In linear algebra, a slice is just a half-space!
+In combinatorial code, you maintain a list of cubelet indices belonging to each face. In linear algebra, an outer slice is a coordinate half-space.
 
-A move is specified by an axis unit vector $v \in \lbrace \pm e_x, \pm e_y, \pm e_z \rbrace$ and a direction $d \in \lbrace -1, +1 \rbrace$. Which cubelets lie in that slice? A single inner product:
+A move is specified by an axis unit vector $v \in \lbrace \pm e_x, \pm e_y, \pm e_z \rbrace$ and a direction $d \in \lbrace -1, +1 \rbrace$. Which cubelets lie in that slice? An inner product:
 
 $$v \cdot p > 0 \iff v \cdot (R \cdot c) > 0$$
 

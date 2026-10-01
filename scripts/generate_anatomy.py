@@ -183,11 +183,11 @@ panels = [
         "stat": "1 of 6 sides",
         "stat_col": C_WHITE,
         "mode": "face",
-        "desc": "9 coplanar facelets",
+        "desc": "9 outer stickers",
     },
     {
         "title": "Slice",
-        "sub": "3D mechanical layer",
+        "sub": "3D layer of cubelets",
         "stat": "1 of 9 slices",
         "stat_col": C_ACCENT,
         "mode": "slice",
@@ -207,7 +207,7 @@ panels = [
         "stat": "1 of 54 stickers",
         "stat_col": C_GOLD,
         "mode": "facelet",
-        "desc": "1×1 colored face",
+        "desc": "1×1 colored sticker",
     },
 ]
 
