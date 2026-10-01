@@ -183,16 +183,13 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
           if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
         dst, cost = apply_move(move, src), cost_so_far[src] + 1
         moves_simulated += 1
+        budget_exceeded = budget is not None and moves_simulated >= budget
         if dst in cost_so_far and cost_so_far[dst] <= cost:
-          if budget is not None and moves_simulated >= budget:
-            budget_exceeded = True
-            break
+          if budget_exceeded: break
           continue
         cost_so_far[dst], came_from[dst] = cost, (src, move)
         if is_goal(dst): return reconstruct_solution(dst)
-        if budget is not None and moves_simulated >= budget:
-          budget_exceeded = True
-          break
+        if budget_exceeded: break
         h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
         priority = cost + h_weight * heuristic(dst)
         heapq.heappush(frontier, PrioritizedItem(dst, priority))
@@ -201,7 +198,7 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
     if not budget_exceeded or budget is None or random_weight == 0 or not RANDOMIZE_SEARCH:
       return None
     print("search budget of %d moves exceeded; restarting" % budget)
-    budget = min(int(1.5 * budget), 500_000)
+    budget = min(max(int(1.5 * budget), budget + 1), 500_000)
 
 @functools.cache
 def is_cubelet_solved(cubelet, rotation):
