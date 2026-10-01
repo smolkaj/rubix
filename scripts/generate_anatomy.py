@@ -195,8 +195,8 @@ panels = [
     },
     {
         "title": "Cubelet",
-        "sub": "Constituent 3D block",
-        "stat": "1 of 27 blocks",
+        "sub": "Constituent 1×1×1 cube",
+        "stat": "1 of 27 cubelets",
         "stat_col": C_GREEN,
         "mode": "cubelet",
         "desc": "Rigid 1×1×1 body",

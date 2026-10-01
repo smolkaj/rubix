@@ -197,7 +197,7 @@ box_h = 48 * SCALE
 bx0 = (W - box_w) // 2
 by0 = H - box_h - 18 * SCALE
 draw.rounded_rectangle([bx0, by0, bx0 + box_w, by0 + box_h], radius=8*SCALE, fill=(24, 26, 31), outline=(45, 48, 58), width=1*SCALE)
-draw.text((bx0 + 20*SCALE, by0 + 8*SCALE), "Invariant: All 7 blocks on the axes (Core + 6 Centers) are fixed points.", fill=C_TEXT_TITLE, font=font_label)
+draw.text((bx0 + 20*SCALE, by0 + 8*SCALE), "Invariant: All 7 axis cubelets (Core + 6 Centers) are fixed points.", fill=C_TEXT_TITLE, font=font_label)
 draw.text((bx0 + 20*SCALE, by0 + 26*SCALE), "Rotating an outer slice leaves its axle and center permanently locked in space.", fill=C_TEXT_SUB, font=font_small)
 
 # Save

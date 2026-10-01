@@ -58,7 +58,7 @@ Each coordinate axis corresponds to an opposing pair of faces:
 - **Z-axis:** $+Z$ points **Top** and $-Z$ points **Bottom**.
 
 > **Key Idea 2 (Rubix): Axis Intersections as Invariant Fixed Points**  
-> All 7 blocks intersecting a coordinate axis are fixed points in Euclidean space: the internal core at $(0,0,0)$ and the 6 face centers at unit distance $(\pm 1, 0, 0)$, $(0, \pm 1, 0)$, $(0, 0, \pm 1)$. Because slice rotations turn strictly *around* these coordinate axes, the spindle axes physically pierce and preserve these stationary anchors throughout every legal move.
+> All 7 cubelets intersecting a coordinate axis are fixed points in Euclidean space: the internal core at $(0,0,0)$ and the 6 face centers at unit distance $(\pm 1, 0, 0)$, $(0, \pm 1, 0)$, $(0, 0, \pm 1)$. Because slice rotations turn strictly *around* these coordinate axes, the spindle axes physically pierce and preserve these stationary anchors throughout every legal move.
 
 ---
 
@@ -68,44 +68,44 @@ We placed our coordinate origin at the center of the puzzle, assigning each of t
 
 Is this choice actually convenient, or did we just trade one set of headaches for another?
 
-Let's test it. Mechanically, a $3 \times 3 \times 3$ Rubik's cube has four distinct types of blocks, distinguished by how many colored stickers they expose:
-- **The Core (1 block):** The hidden internal mechanism at $(0,0,0)$. Exposes **0** stickers; never visible.
-- **Centers (6 blocks):** One at the center of each face. Exposes **1** sticker; rotates in place.
-- **Edges (12 blocks):** Border blocks between two faces. Exposes **2** stickers.
-- **Corners (8 blocks):** Vertex blocks joining three faces. Exposes **3** stickers.
+Let's test it. Mechanically, a $3 \times 3 \times 3$ Rubik's cube has four distinct types of cubelets, distinguished by how many colored facelets they expose:
+- **The Core (1 cubelet):** The hidden internal mechanism at $(0,0,0)$. Exposes **0** facelets; never visible.
+- **Centers (6 cubelets):** One at the center of each face. Exposes **1** facelet; rotates in place.
+- **Edges (12 cubelets):** Border cubelets between two faces. Exposes **2** facelets.
+- **Corners (8 cubelets):** Vertex cubelets joining three faces. Exposes **3** facelets.
 
-Notice the sequence of exposed stickers: **0, 1, 2, 3**.
+Notice the sequence of exposed facelets: **0, 1, 2, 3**.
 
 <p align="center">
   <img src="img/cubelet-types.png" alt="Types of Cubelets" width="600">
 </p>
 
 Now examine our coordinate values in $\lbrace -1, 0, 1 \rbrace$. Along each axis:
-- A coordinate of $0$ means the block is centered internally along that axis.
-- A coordinate of $\pm 1$ means the block touches the outer surface along that axis.
+- A coordinate of $0$ means the cubelet is centered internally along that axis.
+- A coordinate of $\pm 1$ means the cubelet touches the outer surface along that axis.
 
-The absolute value $|x| \in \lbrace 0, 1 \rbrace$ acts as an on/off indicator for whether the block touches an exterior boundary!
+The absolute value $|x| \in \lbrace 0, 1 \rbrace$ acts as an on/off indicator for whether the cubelet touches an exterior boundary!
 
 What happens if we add up the absolute values $|x| + |y| + |z|$ (the **Manhattan distance** or **$L_1$ norm** from the origin)?
 
 $$\|c\|_1 = |x| + |y| + |z|$$
 
-- At $(0, 0, 0)$: $|0| + |0| + |0| = \mathbf{0}$ $\rightarrow$ **Core** (0 stickers)
-- At $(1, 0, 0)$: $|1| + |0| + |0| = \mathbf{1}$ $\rightarrow$ **Center** (1 sticker)
-- At $(1, 1, 0)$: $|1| + |1| + |0| = \mathbf{2}$ $\rightarrow$ **Edge** (2 stickers)
-- At $(1, 1, 1)$: $|1| + |1| + |1| = \mathbf{3}$ $\rightarrow$ **Corner** (3 stickers)
+- At $(0, 0, 0)$: $|0| + |0| + |0| = \mathbf{0}$ $\rightarrow$ **Core** (0 facelets)
+- At $(1, 0, 0)$: $|1| + |0| + |0| = \mathbf{1}$ $\rightarrow$ **Center** (1 facelet)
+- At $(1, 1, 0)$: $|1| + |1| + |0| = \mathbf{2}$ $\rightarrow$ **Edge** (2 facelets)
+- At $(1, 1, 1)$: $|1| + |1| + |1| = \mathbf{3}$ $\rightarrow$ **Corner** (3 facelets)
 
-| Distance $\|c\|_1$ | Cubelet Type | Count | Exposed Stickers | Description |
+| Distance $\|c\|_1$ | Cubelet Type | Count | Exposed Facelets | Description |
 |:---:|:---|:---:|:---:|:---|
 | **0** | Core | 1 | 0 | Hidden internal mechanism; permanently at $(0,0,0)$ |
 | **1** | Center | 6 | 1 | Fixed centers; rotate in place, define face colors |
-| **2** | Edge | 12 | 2 | Border blocks between two faces |
-| **3** | Corner | 8 | 3 | Vertex blocks joining three faces |
+| **2** | Edge | 12 | 2 | Border cubelets between two faces |
+| **3** | Corner | 8 | 3 | Vertex cubelets joining three faces |
 
 Total: $1 + 6 + 12 + 8 = 27$ cubelets.
 
-> **Key Idea 3 (Rubix): The Manhattan Norm Classifies Blocks for Free**  
-> Centering coordinates at $(0, 0, 0) \in \lbrace -1, 0, 1 \rbrace^3$ turns coordinate magnitudes into boundary indicators. The Manhattan distance $\|c\|_1 = |x| + |y| + |z|$ literally counts the number of visible colored stickers ($0 \to \text{Core}$, $1 \to \text{Center}$, $2 \to \text{Edge}$, $3 \to \text{Corner}$) with zero lookup tables or conditional branches.
+> **Key Idea 3 (Rubix): The Manhattan Norm Classifies Cubelets for Free**  
+> Centering coordinates at $(0, 0, 0) \in \lbrace -1, 0, 1 \rbrace^3$ turns coordinate magnitudes into boundary indicators. The Manhattan distance $\|c\|_1 = |x| + |y| + |z|$ literally counts the number of visible colored facelets ($0 \to \text{Core}$, $1 \to \text{Center}$, $2 \to \text{Edge}$, $3 \to \text{Corner}$) with zero lookup tables or conditional branches.
 
 ---
 
