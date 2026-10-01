@@ -48,23 +48,17 @@ Instead of 54 independent stickers, the puzzle is composed of **27 cubelets** ar
 
 Each cubelet has an integer coordinate $(x, y, z)$ with values in $\lbrace -1, 0, 1 \rbrace$:
 
-```
-               +Z: Top
-                ^
-                |   +Y: Right
-                |  /
-    -X: Back    | /
-            <----+----> +X: Front
-               /|
-              / |
-             v  v
-      -Y: Left  -Z: Bottom
-```
+<p align="center">
+  <img src="img/coordinate-frame.png" alt="Discrete 3D Coordinate Space and Spindle Axes" width="600">
+</p>
 
 Each coordinate axis corresponds to an opposing pair of faces:
 - **X-axis:** $+X$ points **Front** and $-X$ points **Back**.
 - **Y-axis:** $+Y$ points **Right** and $-Y$ points **Left**.
 - **Z-axis:** $+Z$ points **Top** and $-Z$ points **Bottom**.
+
+> **Key Idea 2 (Rubix): Axis Intersections as Invariant Fixed Points**  
+> All 7 blocks intersecting a coordinate axis are fixed points in Euclidean space: the internal core at $(0,0,0)$ and the 6 face centers at unit distance $(\pm 1, 0, 0)$, $(0, \pm 1, 0)$, $(0, 0, \pm 1)$. Because slice rotations turn strictly *around* these coordinate axes, the spindle axes physically pierce and preserve these stationary anchors throughout every legal move.
 
 ---
 
@@ -110,7 +104,7 @@ $$\|c\|_1 = |x| + |y| + |z|$$
 
 Total: $1 + 6 + 12 + 8 = 27$ cubelets.
 
-> **Key Idea 2 (Rubix): The Manhattan Norm Classifies Blocks for Free**  
+> **Key Idea 3 (Rubix): The Manhattan Norm Classifies Blocks for Free**  
 > Centering coordinates at $(0, 0, 0) \in \lbrace -1, 0, 1 \rbrace^3$ turns coordinate magnitudes into boundary indicators. The Manhattan distance $\|c\|_1 = |x| + |y| + |z|$ literally counts the number of visible colored stickers ($0 \to \text{Core}$, $1 \to \text{Center}$, $2 \to \text{Edge}$, $3 \to \text{Corner}$) with zero lookup tables or conditional branches.
 
 ---
@@ -146,7 +140,7 @@ Why invent separate color constants when the centers are already 3D vectors? We 
 
 With this identification, asking *"which color is on this facelet?"* becomes purely geometric: *"which center cubelet does this facelet point toward in 3D space?"*.
 
-> **Key Idea 3 (Rubix): Colors *Are* Basis Vectors**  
+> **Key Idea 4 (Rubix): Colors *Are* Basis Vectors**  
 > Because the 6 center cubelets never move, they define the 3D coordinate axes. A color's identity is the constant unit position vector of its center cubelet ($c_{\text{center}}$), replacing arbitrary strings or integer enums with pure vector geometry.
 
 ---
@@ -180,7 +174,7 @@ And notice the payoff connecting back to Step 2: **the matrix rank of $\mathrm{d
 
 $$\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1 = \text{number of visible facelets}$$
 
-> **Key Idea 4 (Rubix): Facelet Normals as Matrix Columns via $\mathrm{diag}(c)$**  
+> **Key Idea 5 (Rubix): Facelet Normals as Matrix Columns via $\mathrm{diag}(c)$**  
 > Expanding coordinate vector $c$ into the diagonal matrix $\mathrm{diag}(c) = [\mathbf{n}_x \;\; \mathbf{n}_y \;\; \mathbf{n}_z]$ packs all outward facelet normal vectors directly into matrix columns. Hidden internal faces automatically vanish as zero columns, and matrix rank equals the Manhattan norm ($\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1$).
 
 ---
@@ -216,7 +210,7 @@ return np.array_equal(colors, color_positions)
 
 No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
 
-> **Key Idea 5 (Rubix): One-Shot Simultaneous Rotation via $R \cdot \mathrm{diag}(c)$**  
+> **Key Idea 6 (Rubix): One-Shot Simultaneous Rotation via $R \cdot \mathrm{diag}(c)$**  
 > Matrix multiplication distributes across columns simultaneously: $R \cdot \mathrm{diag}(c) = [R\mathbf{n}_x \;\; R\mathbf{n}_y \;\; R\mathbf{n}_z]$. A single matrix multiply rotates all facelets at once, reducing the solved test to $R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$ with zero permutation tracking.
 
 ---
@@ -237,7 +231,7 @@ $$R_{\text{new}} = M \cdot R$$
 
 Because every turn is a 90° rotation along a coordinate axis, all matrix entries in $R$ remain integers in $\lbrace -1, 0, 1 \rbrace$.
 
-> **Key Idea 6 (Rubix): Slices as Coordinate Half-Spaces**  
+> **Key Idea 7 (Rubix): Slices as Coordinate Half-Spaces**  
 > Instead of storing index sets for each face, determining which cubelets belong to an active slice is evaluated via a single inner product: $v \cdot (R \cdot c) > 0$.
 
 ---
