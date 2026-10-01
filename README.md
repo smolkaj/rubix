@@ -30,8 +30,13 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
 - **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
 - **Move:** A 90° rotation of an outer slice around a coordinate axis.
 
-> **Key Idea 1 (Standard): Fixed Centers via Outer-Slice Moves**  
-> Turning a middle slice is an illusion—it is mechanically identical to holding the slice still, turning both outer layers backwards, and tilting the cube in your hands. Restricting moves strictly to outer slices keeps the six center cubelets permanently locked in 3D space. They become immovable anchors: Green is always Front, White is always Top, and the solver never wastes energy chasing redundant whole-cube rotations.
+> **Key Idea 1: A Complete, Minimal Action Basis (12 Atomic Moves)**  
+> How can we manipulate a 3D cube, and what is the minimal generating set needed to model it?  
+> - **Whole-cube rotations** tumble the puzzle in space but change zero relative states; quotienting them out fixes our reference frame.  
+> - **$180^\circ$ and $270^\circ$ turns** decompose directly into sequences of elementary $\pm 90^\circ$ quarter turns.  
+> - **Middle-slice turns** are redundant: turning an equator is physically identical to counter-rotating both opposing outer faces and tilting the cube.  
+> 
+> What remains is a complete, minimal basis: **6 outer faces $\times$ 2 directions ($\pm 90^\circ$) = 12 atomic moves**. As a profound payoff, omitting middle slices keeps all 6 center cubelets permanently stationary in space.
 
 ---
 
