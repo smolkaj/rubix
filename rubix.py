@@ -173,7 +173,10 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
     last_move = came_from[src][1] if src in came_from else None
     for move in get_moves(src):
       # Never immediately undo the move just taken.
-      if last_move and move == inverse_move(last_move): continue
+      if last_move:
+        if move == inverse_move(last_move): continue
+        # Opposite face moves commute; prune duplicate branches by enforcing canonical order.
+        if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
       dst, cost = apply_move(move, src), cost_so_far[src] + 1
       if dst in cost_so_far and cost_so_far[dst] <= cost: continue
       cost_so_far[dst], came_from[dst] = cost, (src, move)
@@ -201,6 +204,13 @@ def min_moves_to_solved(cubelet, rotation):
   _, path = astar(rotation, is_dst, apply_move)
   return len(path)
 
+@functools.cache
+def min_moves_to_position(cubelet, rotation):
+  def is_dst(r): return position(cubelet, r) == cubelet
+  def apply_move(m, r): return tupled(rotation_matrix(m) @ r)
+  _, path = astar(rotation, is_dst, apply_move)
+  return len(path)
+
 def top_layer_heuristic(cube):
   p, n = 0.5, 8
   d = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
@@ -221,7 +231,8 @@ def bottom_layer_corner_heuristic(cube):
   p, n1, n2, n3 = 0.5, 5, 3, 8
   d1 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 1) ** (1/p)
   d2 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == 0) ** (1/p)
-  d3 = sum(min_moves_to_solved(c, r)**p for c, r in cube if c[2] == -1) ** (1/p)
+  d3 = sum((min_moves_to_position(c, r) if norm1(c) == 3 else min_moves_to_solved(c, r))**p
+           for c, r in cube if c[2] == -1) ** (1/p)
   return d1/n1 + d2/n2 + d3/n3
 
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2

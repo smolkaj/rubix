@@ -159,6 +159,39 @@ class TestRubixCube(unittest.TestCase):
             self.assertTrue(os.path.exists(out_path))
             self.assertGreater(os.path.getsize(out_path), 0)
 
+    def test_opposite_face_moves_commute(self):
+        """Opposite face moves act on disjoint slices and commute: m1 * m2 == m2 * m1."""
+        for m1 in moves:
+            v1, _ = m1
+            opposite_v = tuple(-x for x in v1)
+            for d2 in [-1, 1]:
+                m2 = (opposite_v, d2)
+                # Apply m1 then m2
+                s1 = apply_move_to_cube(m2, apply_move_to_cube(m1, solved_cube))
+                # Apply m2 then m1
+                s2 = apply_move_to_cube(m1, apply_move_to_cube(m2, solved_cube))
+                self.assertEqual(s1, s2, f"Opposite moves {m1} and {m2} did not commute")
+
+    def test_min_moves_to_position(self):
+        """Verify min_moves_to_position ignores piece orientation."""
+        from rubix import min_moves_to_position, min_moves_to_solved, position
+        corner = (1, 1, -1)
+        # Identity rotation: 0 moves to solved and position
+        identity = ((1, 0, 0), (0, 1, 0), (0, 0, 1))
+        self.assertEqual(min_moves_to_position(corner, identity), 0)
+        self.assertEqual(min_moves_to_solved(corner, identity), 0)
+
+        # Find a rotation where corner is in home place but twisted
+        from rubix import shuffle
+        for seed in range(50):
+            cube = shuffle(solved_cube, iterations=20, seed=seed)
+            for c, r in cube:
+                if c == corner and position(c, r) == corner and r != identity:
+                    # Corner is positioned but twisted
+                    self.assertEqual(min_moves_to_position(c, r), 0)
+                    self.assertGreater(min_moves_to_solved(c, r), 0)
+                    return
+
 
 if __name__ == "__main__":
     unittest.main()
