@@ -182,8 +182,8 @@ class TestRubixCube(unittest.TestCase):
         self.assertLessEqual(len(path), 2)
 
     def test_astar_unreachable_frontier_exhaustion(self):
-        """When the goal is unreachable and the frontier empties before budget exhaustion, astar returns None immediately."""
-        # Unreachable goal on empty move set with random_weight > 0
+        """When the goal is unreachable and the frontier empties, astar returns None immediately without restarting."""
+        # 1. Immediate exhaustion on 0-transition graph
         res = astar(
             0,
             lambda x: x == 5,
@@ -193,6 +193,19 @@ class TestRubixCube(unittest.TestCase):
             max_moves=1000,
         )
         self.assertIsNone(res)
+
+        # 2. Finite 3-state cyclic component {0, 1, 2} with unreachable goal 99
+        # Moves simulated will reach max_moves=2, but once frontier empties it must return None
+        dummy_move = ((1, 0, 0), 1)
+        res_cyclic = astar(
+            0,
+            lambda x: x == 99,
+            lambda m, s: (s + 1) % 3,
+            get_moves=lambda s: [dummy_move],
+            random_weight=0.25,
+            max_moves=2,
+        )
+        self.assertIsNone(res_cyclic)
 
     def test_headless_gui_render(self):
         """Verify that rubix_gui renders a frame headlessly without error."""

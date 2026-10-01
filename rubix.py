@@ -170,6 +170,7 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
     frontier = [PrioritizedItem(start, 0)]
     came_from, cost_so_far = {}, { start : 0 }
     moves_simulated = 0
+    budget_exceeded = False
 
     while frontier:
       src = heapq.heappop(frontier).item
@@ -182,18 +183,22 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
           if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
         dst, cost = apply_move(move, src), cost_so_far[src] + 1
         moves_simulated += 1
-        if dst in cost_so_far and cost_so_far[dst] <= cost: continue
+        if dst in cost_so_far and cost_so_far[dst] <= cost:
+          if budget is not None and moves_simulated >= budget:
+            budget_exceeded = True
+            break
+          continue
         cost_so_far[dst], came_from[dst] = cost, (src, move)
         if is_goal(dst): return reconstruct_solution(dst)
         if budget is not None and moves_simulated >= budget:
+          budget_exceeded = True
           break
         h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
         priority = cost + h_weight * heuristic(dst)
         heapq.heappush(frontier, PrioritizedItem(dst, priority))
-      else:
-        continue
-      break
-    if budget is None or moves_simulated < budget or random_weight == 0:
+      if budget_exceeded:
+        break
+    if not budget_exceeded or budget is None or random_weight == 0 or not RANDOMIZE_SEARCH:
       return None
     print("search budget of %d moves exceeded; restarting" % budget)
     budget = min(int(1.5 * budget), 500_000)
