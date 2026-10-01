@@ -11,6 +11,7 @@ from rubix import (
     apply_move_to_cube,
     is_cube_solved,
     solve,
+    astar,
     norm1,
     rotation_matrix,
     inverse_move,
@@ -146,6 +147,39 @@ class TestRubixCube(unittest.TestCase):
             describe_move(((0, 0, -1), -1)),
             "counterclockwise rotation of bottom slice",
         )
+
+    def test_astar_budget_exhaustion(self):
+        """When random_weight=0, exceeding max_moves returns None instead of searching indefinitely."""
+        # Scramble with 3 moves
+        cube = solved_cube
+        scramble = [((1, 0, 0), 1), ((0, 1, 0), 1), ((0, 0, 1), 1)]
+        for m in scramble:
+            cube = apply_move_to_cube(m, cube)
+
+        # Budget of 2 simulated moves is insufficient to solve a 3-move scramble
+        res = astar(cube, is_cube_solved, apply_move_to_cube, random_weight=0, max_moves=2)
+        self.assertIsNone(res)
+
+        # Sufficient budget succeeds
+        res = astar(cube, is_cube_solved, apply_move_to_cube, random_weight=0, max_moves=5000)
+        self.assertIsNotNone(res)
+        dst, path = res
+        self.assertTrue(is_cube_solved(dst))
+        self.assertEqual(len(path), 3)
+
+    def test_astar_restart_expansion(self):
+        """When random_weight > 0 and budget is tight, A* restarts with 1.5x budget and finds goal."""
+        cube = solved_cube
+        scramble = [((1, 0, 0), 1), ((0, 1, 0), -1)]
+        for m in scramble:
+            cube = apply_move_to_cube(m, cube)
+
+        # Initial budget of 5 moves will trigger restarts but budget expands by 1.5x until solved
+        res = astar(cube, is_cube_solved, apply_move_to_cube, random_weight=0.25, max_moves=5)
+        self.assertIsNotNone(res)
+        dst, path = res
+        self.assertTrue(is_cube_solved(dst))
+        self.assertLessEqual(len(path), 2)
 
     def test_headless_gui_render(self):
         """Verify that rubix_gui renders a frame headlessly without error."""
