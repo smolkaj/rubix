@@ -159,6 +159,39 @@ class TestRubixCube(unittest.TestCase):
             self.assertTrue(os.path.exists(out_path))
             self.assertGreater(os.path.getsize(out_path), 0)
 
+    def test_opposite_face_moves_commute(self):
+        """Opposite face moves act on disjoint slices and commute: m1 * m2 == m2 * m1."""
+        for m1 in moves:
+            v1, _ = m1
+            opposite_v = tuple(-x for x in v1)
+            for d2 in [-1, 1]:
+                m2 = (opposite_v, d2)
+                # Apply m1 then m2
+                s1 = apply_move_to_cube(m2, apply_move_to_cube(m1, solved_cube))
+                # Apply m2 then m1
+                s2 = apply_move_to_cube(m1, apply_move_to_cube(m2, solved_cube))
+                self.assertEqual(s1, s2, f"Opposite moves {m1} and {m2} did not commute")
+
+    def test_min_moves_to_position(self):
+        """Verify min_moves_to_position ignores piece orientation."""
+        from rubix import min_moves_to_position, min_moves_to_solved, position
+        corner = (1, 1, -1)
+        # Identity rotation: 0 moves to solved and position
+        identity = ((1, 0, 0), (0, 1, 0), (0, 0, 1))
+        self.assertEqual(min_moves_to_position(corner, identity), 0)
+        self.assertEqual(min_moves_to_solved(corner, identity), 0)
+
+        # Find a rotation where corner is in home place but twisted
+        from rubix import shuffle
+        for seed in range(50):
+            cube = shuffle(solved_cube, iterations=20, seed=seed)
+            for c, r in cube:
+                if c == corner and position(c, r) == corner and r != identity:
+                    # Corner is positioned but twisted
+                    self.assertEqual(min_moves_to_position(c, r), 0)
+                    self.assertGreater(min_moves_to_solved(c, r), 0)
+                    return
+
     def test_headless_gui_render_with_solution(self):
         """Verify that rubix_gui renders frames with active solution and progress info."""
         import rubix_gui
@@ -205,6 +238,7 @@ class TestRubixCube(unittest.TestCase):
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         orig_regular, orig_bold = rubix_gui.font_regular, rubix_gui.font_bold
+        orig_max_h = rubix_gui.MAX_TEXT_HEIGHT
         try:
             rubix_gui.font_regular = None
             rubix_gui.font_bold = None
@@ -216,6 +250,7 @@ class TestRubixCube(unittest.TestCase):
                 self.assertEqual(surf.get_size(), (100, 30))
         finally:
             rubix_gui.font_regular, rubix_gui.font_bold = orig_regular, orig_bold
+            rubix_gui.MAX_TEXT_HEIGHT = orig_max_h
 
     def test_gui_main_lifecycle(self):
         """Verify GUI main loop initializes, creates all UI components, and exits cleanly on QUIT."""
@@ -226,6 +261,34 @@ class TestRubixCube(unittest.TestCase):
         pygame.init()
         pygame.event.post(pygame.event.Event(pygame.QUIT))
         rubix_gui.main()
+
+    def test_gui_lifecycle_reinit_after_quit(self):
+        """Verify re-initialization after pygame.quit() does not retain stale font handles or crash."""
+        import pygame
+        import rubix_gui
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        rubix_gui.init_display()
+        pygame.quit()
+        # Second session: re-init and ensure font rendering and button creation succeed without segfault
+        rubix_gui.init_display()
+        surf, rect = rubix_gui.create_button("Reinit Test", 0, 0, 100, 30, (0, 0, 0), (255, 255, 255))
+        self.assertEqual(surf.get_size(), (100, 30))
+        h = rubix_gui.draw_text_bubble("Reinit Bubble", 0, 0, 200)
+        self.assertGreater(h, 0)
+
+    def test_gui_offscreen_surface_preservation(self):
+        """Verify passing a custom surface to init_display is preserved across subsequent draw calls."""
+        import pygame
+        import rubix_gui
+
+        custom_surf = pygame.Surface((rubix_gui.WIDTH, rubix_gui.HEIGHT))
+        rubix_gui.init_display(surface=custom_surf)
+        self.assertIs(rubix_gui.screen, custom_surf)
+        rubix_gui.draw_cube_static(solved_cube)
+        self.assertIs(rubix_gui.screen, custom_surf)
+        rubix_gui.draw_text_bubble("Test Offscreen", 10, 10, 200)
+        self.assertIs(rubix_gui.screen, custom_surf)
 
 
 if __name__ == "__main__":
