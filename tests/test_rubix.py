@@ -219,6 +219,13 @@ class TestRubixCube(unittest.TestCase):
             self.assertTrue(os.path.exists(out_path))
             self.assertGreater(os.path.getsize(out_path), 0)
 
+            # Test solving progress frame rendering
+            solving_path = os.path.join(tmp_dir, "solving.png")
+            result_solving = rubix_gui.render_frame_to_image(solved_cube, solving_path, solving_cube=solved_cube)
+            self.assertEqual(result_solving, solving_path)
+            self.assertTrue(os.path.exists(solving_path))
+            self.assertGreater(os.path.getsize(solving_path), 0)
+
     def test_opposite_face_moves_commute(self):
         """Opposite face moves act on disjoint slices and commute: m1 * m2 == m2 * m1."""
         for m1 in moves:

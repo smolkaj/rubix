@@ -1,3 +1,4 @@
+import threading
 import pygame
 import pygame.font
 import numpy as np
@@ -181,36 +182,44 @@ def create_button(text, x, y, width, height, color, text_color):
     button_rect = pygame.Rect(x, y, width, height)
     return (button_surface, button_rect)
 
-def create_header_buttons():
+def create_header_buttons(solving=False):
     button_width, button_height = 150, 40
     button_y = 10
     button_spacing = (WIDTH - 3 * button_width) / 4
     scan_btn = create_button("Scan my cube", button_spacing, button_y, button_width, button_height, COLORS["BLUE"], WHITE)
     shuffle_btn = create_button("Shuffle", 2 * button_spacing + button_width, button_y, button_width, button_height, COLORS["ORANGE"], WHITE)
-    solve_btn = create_button("Solve", 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, COLORS["GREEN"], WHITE)
+    solve_text = "Solving..." if solving else "Solve"
+    solve_color = COLORS["PROGRESS_BAR"] if solving else COLORS["GREEN"]
+    solve_btn = create_button(solve_text, 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, solve_color, WHITE)
     return scan_btn, shuffle_btn, solve_btn
 
-def render_frame_to_image(cube, output_path="img/gui-preview.png", solution=None, move_index=0, current_move=None):
+def render_frame_to_image(cube, output_path="img/gui-preview.png", solution=None, move_index=0, current_move=None, solving_cube=None):
     scr = init_display()
     scr.fill(BACKGROUND)
-    draw_cube_static(cube)
+    draw_cube_static(solving_cube if solving_cube else cube)
 
     # Draw header buttons
-    scan_btn, shuffle_btn, solve_btn = create_header_buttons()
+    scan_btn, shuffle_btn, solve_btn = create_header_buttons(solving=bool(solving_cube))
     scr.blit(scan_btn[0], scan_btn[1])
     scr.blit(shuffle_btn[0], shuffle_btn[1])
     scr.blit(solve_btn[0], solve_btn[1])
 
     # Draw instructions and move info
-    if solution:
+    if solution and not solving_cube:
         draw_instructions(HEIGHT - 60)
-    draw_move_info(move_index, solution, current_move)
+    draw_move_info(move_index, solution, current_move, solving_cube=solving_cube)
 
     pygame.image.save(scr, output_path)
     return output_path
 
-def draw_move_info(move_index, solution, current_move):
+def draw_move_info(move_index, solution, current_move, solving_cube=None):
     x, y, width = 10, HEIGHT - 50, WIDTH - 20
+
+    if solving_cube:
+        num_cubelets_solved = sum(is_cubelet_solved(c, r) for c, r in solving_cube)
+        text = f"Solving: cubelet {num_cubelets_solved + 1} of {NUM_CUBELETS}"
+        progress = num_cubelets_solved / NUM_CUBELETS
+        return draw_text_bubble(text, x=x, y=y, width=width, progress=progress, bold_part="Solving:")
 
     if not solution:
         return draw_text_bubble("Press \"Solve\" to compute solution.", x=x, y=y, width=width, progress=0)
@@ -233,15 +242,6 @@ def draw_instructions(y):
     for i, instruction in enumerate(instructions):
         draw_text_bubble(instruction, x = WIDTH - 275, y = y - (len(instructions) - i) * 45, width=265, bold_part=instruction.split(':')[0] + ':')
 
-def report_solve_progress(cube):
-    x, y, width = 10, HEIGHT - 50, WIDTH - 20
-    num_cubelets_solved = sum(is_cubelet_solved(c, r) for c,r in cube)
-    text = f"Solving: cubelet {num_cubelets_solved + 1} of {NUM_CUBELETS}"
-    progress = num_cubelets_solved / NUM_CUBELETS
-    draw_text_bubble(text, x=x, y=y, width=width, progress=progress, bold_part="Solving:")
-    draw_cube_static(cube)
-    pygame.display.flip()
-
 def main():
     global screen, font_regular, font_bold
     init_display()
@@ -260,11 +260,36 @@ def main():
     speed_up_factor = 1
     key_hold_time = 0
 
+    # Worker thread state for background solve
+    solve_thread = None
+    solving_cube = None
+    solve_result = None
+
+    def solve_worker(c):
+        nonlocal solve_result, solving_cube
+        def progress_callback(pc):
+            nonlocal solving_cube
+            solving_cube = pc
+        solve_result = solve(c, progress_callback)
+
     # Create buttons
-    scan_button, shuffle_button, solve_button = create_header_buttons()
+    scan_button, shuffle_button, solve_button = create_header_buttons(solving=False)
+    _, _, solving_button = create_header_buttons(solving=True)
 
     while running:
         dt = clock.tick(60) / 1000.0  # Delta time in seconds
+
+        # Check for background solver completion
+        if solve_thread is not None and not solve_thread.is_alive():
+            solve_thread.join()
+            solve_thread = None
+            solution = solve_result
+            solving_cube = None
+            cube = original_cube
+            move_index = 0
+            current_move = None
+            next_cube = None
+            animation_progress = 0
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -274,20 +299,22 @@ def main():
                     if scan_button[1].collidepoint(event.pos):
                         print("Scan my cube button clicked (no-op for now)")
                     elif shuffle_button[1].collidepoint(event.pos):
-                        cube = shuffle(solved_cube, iterations=999, seed=None)
-                        original_cube = cube
-                        solution = None
-                        move_index = 0
-                        current_move = None
-                        next_cube = None
-                        animation_progress = 0
+                        if solve_thread is None:
+                            cube = shuffle(solved_cube, iterations=999, seed=None)
+                            original_cube = cube
+                            solution = None
+                            move_index = 0
+                            current_move = None
+                            next_cube = None
+                            animation_progress = 0
                     elif solve_button[1].collidepoint(event.pos):
-                        solution = solve(cube, report_solve_progress)
-                        move_index = 0
-                        current_move = None
-                        next_cube = None
-                        animation_progress = 0
-                        original_cube = cube
+                        if solve_thread is None:
+                            solution = None
+                            solve_result = None
+                            solving_cube = cube
+                            original_cube = cube
+                            solve_thread = threading.Thread(target=solve_worker, args=(cube,), daemon=True)
+                            solve_thread.start()
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_RIGHT] or keys[pygame.K_LEFT]:
@@ -297,7 +324,7 @@ def main():
             key_hold_time = 0
             speed_up_factor = 1
 
-        if solution and next_cube is None:
+        if solution and next_cube is None and solve_thread is None:
             if keys[pygame.K_RIGHT] and move_index < len(solution):
                 current_move = solution[move_index]
                 next_cube = apply_move_to_cube(current_move, cube)
@@ -323,17 +350,23 @@ def main():
                 if current_move == solution[move_index]:
                     move_index += 1
                 animation_progress = 0
+        elif solve_thread is not None and solving_cube is not None:
+            draw_cube_static(solving_cube)
         else:
             draw_cube_static(cube)
 
         # Draw buttons
         screen.blit(scan_button[0], scan_button[1])
         screen.blit(shuffle_button[0], shuffle_button[1])
-        screen.blit(solve_button[0], solve_button[1])
+        if solve_thread is not None:
+            screen.blit(solving_button[0], solving_button[1])
+        else:
+            screen.blit(solve_button[0], solve_button[1])
 
         # Draw instructions and move info
-        if solution: draw_instructions(HEIGHT - 60)
-        draw_move_info(move_index, solution, current_move)
+        if solution and solve_thread is None:
+            draw_instructions(HEIGHT - 60)
+        draw_move_info(move_index, solution, current_move, solving_cube=solving_cube if solve_thread is not None else None)
 
         pygame.display.flip()
 
