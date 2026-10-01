@@ -35,10 +35,12 @@ The $L_1$ norm (Manhattan distance from origin) naturally and bijectively classi
 
 $$\|c\|_1 = |x| + |y| + |z|$$
 
+Because coordinates $x, y, z \in \lbrace -1, 0, 1 \rbrace$, each absolute value $|x|, |y|, |z| \in \lbrace 0, 1 \rbrace$ is a binary indicator: $1$ if the cubelet reaches the outer boundary along that axis, and $0$ if it is interior along that axis. Consequently, the Manhattan distance **literally counts the number of visible colored faces**:
+
 | $\|c\|_1$ | Cubelet Type | Count | Description |
 |:---:|:---|:---:|:---|
-| **0** | Interior | 1 | The hidden center mechanism; never moves. |
-| **1** | Center | 6 | Fixed centers; rotate in place, define face colors. |
+| **0** | Interior | 1 | The hidden center mechanism; 0 visible faces; never moves. |
+| **1** | Center | 6 | Fixed centers; 1 visible face; rotate in place, define face colors. |
 | **2** | Edge | 12 | 2 visible colored faces. |
 | **3** | Corner | 8 | 3 visible colored faces. |
 
@@ -67,24 +69,67 @@ $$\text{Cube} = \left\lbrace (c, R) \mid c \in \lbrace -1, 0, 1 \rbrace^3 \setmi
 
 ### 3. Face Colors and Solved Invariant
 
-Each of the 6 face colors is associated with a standard unit normal vector:
+#### Intuition: Colors *Are* the Center Cubelets
 
-| Direction Vector | Color | Face |
-|:---|:---|:---|
-| $(+1, 0, 0)$ | Green | Front |
-| $(-1, 0, 0)$ | Blue | Back |
-| $(0, +1, 0)$ | Red | Right |
-| $(0, -1, 0)$ | Orange | Left |
-| $(0, 0, +1)$ | White | Top |
-| $(0, 0, -1)$ | Yellow | Bottom |
+In a traditional solver, colors are treated as arbitrary labels or sticker indices (`'WHITE'`, `'GREEN'`). In Rubix, colors are **vectors in $\mathbb{R}^3$**.
 
-For any cubelet $c$, its colors in the solved cube point in directions given by the columns of the diagonal matrix $\mathrm{diag}(c)$. When the cubelet undergoes orientation $R$, its colored faces now point in directions:
+On a physical Rubik's cube, the internal spider core holds the 6 center pieces in fixed spatial positions. Slice moves rotate perimeter pieces around them, but the centers never change their position in space. Therefore, the 6 center cubelets physically establish the coordinate axes:
 
-$$\text{Color directions} = R \cdot \mathrm{diag}(c)$$
+$$\mathbf{e}_x = \text{Green Center}, \quad \mathbf{e}_y = \text{Red Center}, \quad \mathbf{e}_z = \text{White Center}$$
 
-A cubelet is in its solved position and orientation if and only if:
+A face color is not an abstract sticker ID; **a color identity is simply the constant position vector of its center cubelet**:
+
+| Direction Vector | Color | Face | Defining Center Cubelet |
+|:---|:---|:---|:---|
+| $(+1, 0, 0)$ | Green | Front | Center at $(+1, 0, 0)$ |
+| $(-1, 0, 0)$ | Blue | Back | Center at $(-1, 0, 0)$ |
+| $(0, +1, 0)$ | Red | Right | Center at $(0, +1, 0)$ |
+| $(0, -1, 0)$ | Orange | Left | Center at $(0, -1, 0)$ |
+| $(0, 0, +1)$ | White | Top | Center at $(0, 0, +1)$ |
+| $(0, 0, -1)$ | Yellow | Bottom | Center at $(0, 0, -1)$ |
+
+Asking *"which color is on this face?"* is geometrically identical to asking *"which center cubelet does this face point toward in the solved cube?"*.
+
+#### Intuition: Why $\mathrm{diag}(c)$ Isolates the Colors of a Cubelet
+
+Take any cubelet coordinate $c = (x, y, z)^T$. Expanding $c$ along the standard basis:
+
+$$c = \begin{pmatrix} x \\ y \\ z \end{pmatrix} = x \begin{pmatrix} 1 \\ 0 \\ 0 \end{pmatrix} + y \begin{pmatrix} 0 \\ 1 \\ 0 \end{pmatrix} + z \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix} = \begin{pmatrix} x \\ 0 \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ y \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ 0 \\ z \end{pmatrix}$$
+
+Each non-zero component vector is an outward normal pointing directly toward one of the center pieces—which is the color of that face. Placing these three orthogonal component vectors side-by-side as the columns of a $3 \times 3$ matrix yields $\mathrm{diag}(c)$:
+
+$$\mathrm{diag}(c) = \begin{pmatrix} x & 0 & 0 \\ 0 & y & 0 \\ 0 & 0 & z \end{pmatrix} = \begin{pmatrix} \mathbf{n}_x & \mathbf{n}_y & \mathbf{n}_z \end{pmatrix}$$
+
+This representation naturally handles all cubelet types:
+- **Corner** (e.g. $c = (1, 1, 1)^T$): All 3 columns are non-zero unit vectors: Green $(+X)$, Red $(+Y)$, and White $(+Z)$.
+- **Edge** (e.g. $c = (1, 0, 1)^T$): Column 2 is $(0, 0, 0)^T$ (the uncolored inner side where $y=0$); columns 1 and 3 are Green and White.
+- **Center** (e.g. $c = (0, 0, 1)^T$): 2 columns are zero; column 3 is White.
+- **Interior** ($c = (0, 0, 0)^T$): All zero columns; no colored faces.
+
+Notice the deep connection to Section 1: the matrix rank of $\mathrm{diag}(c)$ is exactly the Manhattan distance:
+
+$$\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1 = \text{number of visible colored faces}$$
+
+#### Simultaneous Rotation and the Solved Invariant
+
+When the cubelet undergoes 3D rotation $R$, matrix multiplication distributes across the columns of $\mathrm{diag}(c)$:
+
+$$\text{Color directions} = R \cdot \mathrm{diag}(c) = \begin{pmatrix} R \cdot \mathbf{n}_x & R \cdot \mathbf{n}_y & R \cdot \mathbf{n}_z \end{pmatrix}$$
+
+A single matrix multiplication transforms all of the cubelet's face normals into their current 3D pointing directions simultaneously.
+
+![Geometric Intuition: Basis Vectors, Colors, and diag(c)](img/basis-colors-diag.png)
+
+A cubelet is in its solved position and orientation if and only if all face normals point in their home directions:
 
 $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
+
+In [`describe_config`](rubix.py), checking where stickers point is just:
+```python
+colors = np.diag(cubelet)
+color_positions = rotation @ colors
+```
+No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
 
 ### 4. Slice Moves as Hyperplane Rotations
 
