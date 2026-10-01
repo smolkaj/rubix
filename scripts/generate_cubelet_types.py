@@ -231,7 +231,7 @@ panels = [
     },
     {
         "title": "Center",
-        "sub": "Face anchor",
+        "sub": "Face-center cubelet",
         "stat": "1 facelet",
         "stat_col": C_WHITE,
         "mode": "center",

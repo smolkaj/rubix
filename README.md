@@ -22,14 +22,16 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 ### Key Terminology
 
 <p align="center">
-  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Facelet, Face, Cubelet, and Slice" width="800">
+  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Facelet, Face, Cubelet, and Slice" width="1000">
 </p>
 
 <p align="center">
-  <img src="img/cubelet-types.png" alt="Cubelet Types: Core, Center, Edge, and Corner" width="800">
+  <img src="img/cubelet-types.png" alt="Cubelet Types: Core, Center, Edge, and Corner" width="1000">
 </p>
 
-A **Move** is a 90° rotation of an outer slice around a coordinate axis.
+<p align="center">
+  <img src="img/outer-slice-move.png" alt="Outer-Slice Move: A 90° rotation of an outer layer around a coordinate axis" width="1000">
+</p>
 
 > [!TIP]
 > **Key Idea 1 (Standard): Fix Centers by Restricting to Outer-Slice Moves**  
