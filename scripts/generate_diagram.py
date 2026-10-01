@@ -144,12 +144,12 @@ draw.text((cx1 + 12*SCALE, cy1 - 10*SCALE), "Core (0,0,0)", fill=C_MUTED, font=f
 box1_y = card_y + 420 * SCALE
 draw.rounded_rectangle([p1_x + 18*SCALE, box1_y, p1_x + card_w - 18*SCALE, card_y + card_h - 18*SCALE], radius=10*SCALE, fill=(24, 26, 30))
 notes1 = [
-    ("The 6 center pieces never move", " relative to the core."),
-    ("Slice moves rotate perimeter pieces around them.", ""),
+    ("The 6 center cubelets never move", " relative to the core."),
+    ("Slice moves rotate perimeter cubelets around them.", ""),
     ("Therefore, ", "colors ARE the constant center vectors:"),
     ("  e_x = Green Center,  e_y = Red Center,  e_z = White Center", ""),
     ("Sticker colors are not arbitrary labels—they are normal", ""),
-    ("vectors pointing toward the corresponding center piece.", "")
+    ("vectors pointing toward the corresponding center cubelet.", "")
 ]
 for i, (p_bold, p_reg) in enumerate(notes1):
     ty = box1_y + (14 + i*29)*SCALE

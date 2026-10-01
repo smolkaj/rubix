@@ -14,6 +14,15 @@ Most Rubik's cube software relies on complex combinatorial representations: 54 c
 
 ## The Math Behind the Magic
 
+### Key Terminology
+
+To keep the geometry clear, Rubix uses consistent terminology throughout:
+
+- **Cubelet:** One of the 27 smaller individual constituent cubes that make up the $3 \times 3 \times 3$ puzzle.
+- **Facelet (or Face):** An exposed, colored square face on the exterior of a cubelet. The puzzle has 54 visible facelets in total ($6 \text{ faces} \times 9 \text{ cubelets per face}$).
+- **Slice:** A planar group of 9 cubelets sharing a coordinate plane (e.g. all cubelets with $x = +1$) that rotate together.
+- **Move:** A 90° clockwise or counterclockwise rotation of an outer slice around a coordinate axis.
+
 ### 1. Discrete 3D Coordinate Space
 
 Anchor a 3D Cartesian coordinate frame at the center of the cube $(0, 0, 0)$. Each of the 27 smaller *cubelets* has integer coordinates $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$.
@@ -37,19 +46,19 @@ Each 3D coordinate axis corresponds to an opposing pair of faces:
 - **Y-axis:** $+Y$ points **Right** (Red) and $-Y$ points **Left** (Orange).
 - **Z-axis:** $+Z$ points **Top** (White) and $-Z$ points **Bottom** (Yellow).
 
-How can we determine what kind of piece a cubelet is—a corner, an edge, a center, or the hidden core—just from its $(x, y, z)$ coordinates?
+How can we determine what kind of cubelet a coordinate represents—a corner, an edge, a center, or the hidden core—just from its $(x, y, z)$ coordinates?
 
 A simple and elegant way is to sum the absolute values of its coordinates, known as the **Manhattan distance** or **$L_1$ norm**:
 
 $$\|c\|_1 = |x| + |y| + |z|$$
 
-Because each coordinate is either $-1, 0,$ or $1$, the absolute value simply indicates whether the piece reaches an outer boundary:
-- $|x| = 1$ if the piece extends outward to a boundary face along that axis.
-- $|x| = 0$ if the piece stays flush in the center along that axis.
+Because each coordinate is either $-1, 0,$ or $1$, the absolute value indicates whether the cubelet extends to an outer boundary:
+- $|x| = 1$ if the cubelet extends outward to an exposed face along that axis.
+- $|x| = 0$ if the cubelet stays flush in the center along that axis.
 
 Adding them together simply counts **how many colored faces the cubelet exposes to the outside world**:
 
-| Visible Faces ($\|c\|_1$) | Cubelet Type | Number of Pieces | Description |
+| Visible Faces ($\|c\|_1$) | Cubelet Type | Number of Cubelets | Description |
 |:---:|:---|:---:|:---|
 | **0** | Interior | 1 | The hidden core mechanism; 0 visible faces; never moves. |
 | **1** | Center | 6 | Fixed centers; 1 visible face; rotate in place, define face colors. |
@@ -85,7 +94,7 @@ $$\text{Cube} = \left\lbrace (c, R) \mid c \in \lbrace -1, 0, 1 \rbrace^3 \setmi
 
 In a traditional solver, colors are treated as arbitrary labels or sticker indices (`'WHITE'`, `'GREEN'`). In Rubix, colors are **vectors in $\mathbb{R}^3$**.
 
-On a physical Rubik's cube, the internal spider core holds the 6 center pieces in fixed spatial positions. Slice moves rotate perimeter pieces around them, but the centers never change their position in space. Therefore, the 6 center cubelets physically establish the coordinate axes:
+On a physical Rubik's cube, the internal spider core holds the 6 center cubelets in fixed spatial positions. Slice moves rotate perimeter cubelets around them, but the centers never change their position in space. Therefore, the 6 center cubelets physically establish the coordinate axes:
 
 $$\mathbf{e}_x = \text{Green Center}, \quad \mathbf{e}_y = \text{Red Center}, \quad \mathbf{e}_z = \text{White Center}$$
 
@@ -108,7 +117,7 @@ Take any cubelet coordinate $c = (x, y, z)^T$. Expanding $c$ along the standard 
 
 $$c = \begin{pmatrix} x \\ y \\ z \end{pmatrix} = x \begin{pmatrix} 1 \\ 0 \\ 0 \end{pmatrix} + y \begin{pmatrix} 0 \\ 1 \\ 0 \end{pmatrix} + z \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix} = \begin{pmatrix} x \\ 0 \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ y \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ 0 \\ z \end{pmatrix}$$
 
-Each non-zero component vector is an outward normal pointing directly toward one of the center pieces—which is the color of that face. Placing these three orthogonal component vectors side-by-side as the columns of a $3 \times 3$ matrix yields $\mathrm{diag}(c)$:
+Each non-zero component vector is an outward normal pointing directly toward one of the center cubelets—which is the color of that face. Placing these three orthogonal component vectors side-by-side as the columns of a $3 \times 3$ matrix yields $\mathrm{diag}(c)$:
 
 $$\mathrm{diag}(c) = \begin{pmatrix} x & 0 & 0 \\ 0 & y & 0 \\ 0 & 0 & z \end{pmatrix} = \begin{pmatrix} \mathbf{n}_x & \mathbf{n}_y & \mathbf{n}_z \end{pmatrix}$$
 
@@ -136,7 +145,7 @@ A cubelet is in its solved position and orientation if and only if all face norm
 
 $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
  
-In [`is_cubelet_solved`](rubix.py), verifying that all faces of a piece point home is literally:
+In [`is_cubelet_solved`](rubix.py), verifying that all faces of a cubelet point home is literally:
 ```python
 colors = np.diag(cubelet)
 color_positions = rotation @ colors
@@ -190,8 +199,8 @@ Phase 5: Endgame Permutation Alignment
 
 ### Guiding the Search: Distance Estimation
 A\* needs a sense of direction so it doesn't search aimlessly. Rather than storing gigabytes of precomputed lookup tables, Rubix calculates a quick distance estimate on the fly:
-- **Individual piece distance (`min_moves_to_solved`):** Calculates how many 90° turns an isolated cubelet needs to reach its solved coordinate and orientation if no other pieces were in the way.
-- **Layer distance:** Combines the individual estimates of the active layer's target pieces into a single distance score, pulling the search toward states where more pieces are closer to home.
+- **Individual cubelet distance (`min_moves_to_solved`):** Calculates how many 90° turns an isolated cubelet needs to reach its solved coordinate and orientation if no other cubelets were in the way.
+- **Layer distance:** Combines the individual estimates of the active layer's target cubelets into a single distance score, pulling the search toward states where more cubelets are closer to home.
 - **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
 
 ### Search Performance & Randomized Restarts
