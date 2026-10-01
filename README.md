@@ -1,25 +1,57 @@
 # Rubix
 
-> A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
+**A Rubik's Cube is 26 rotation matrices.**
+
+Stickers, colors, faces, turns, even what "solved" means all follow from that one sentence. Rubix is a complete Rubik's Cube solver and visualizer. Its model and solver fit in [`rubix.py`](rubix.py), under 400 lines of plain Python and NumPy, with no sticker arrays, no permutation tables, and no pattern databases. It runs on vectors, matrices, and the occasional dot product.
 
 <p align="center">
   <img src="img/gui-preview.png" alt="Rubix GUI Preview" width="500">
 </p>
 
-Most Rubik's cube solvers rely on complex combinatorial bookkeeping: tracking 54 color stickers mapped across flat arrays, maintaining lookup tables for permutations, or precomputing massive 100MB pattern databases.
-
-**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space using linear algebra, the entire physics, state, and solution of the Rubik's Cube reduce to **vectors, rotation matrices, and dot products**.
-
-The payoff of this linear algebra formulation is **radical simplicity**: the entire puzzle model, transformations, and multi-phase solver in [`rubix.py`](rubix.py) fit in **under 400 lines of readable Python**—with zero external puzzle libraries, zero lookup tables, and zero precomputed pattern databases.
-
 > [!NOTE]
-> **Shoutout:** The core insight for Rubix was directly sparked by Grant Sanderson’s ([3Blue1Brown](https://www.3blue1brown.com)) masterclass YouTube series, [**Essence of Linear Algebra**](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab). The series’ emphasis on geometric intuition—treating matrices as transformations of coordinate space and tracking where standard basis vectors land—inspired ditching messy combinatorial sticker permutations in favor of discrete 3D rotation matrices, vectors, and inner products. Massive praise and props to Grant for making linear algebra so intuitive, visual, and delightful!
+> The core idea comes straight from Grant Sanderson's ([3Blue1Brown](https://www.3blue1brown.com)) [**Essence of Linear Algebra**](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab), and its habit of asking *"where do the basis vectors land?"* Ask that about a Rubik's Cube and the puzzle falls apart in your hands, in a good way. Thank you, Grant.
 
 ---
 
-## The Math Behind the Magic
+## The whole model on one screen
 
-### Key Terminology
+This is the cube's state and all the rules of the game, taken from [`rubix.py`](rubix.py) with the memoization decorators and tuple conversions left out:
+
+```python
+# Each cubelet is named by its home in the solved cube, c ∈ {-1, 0, 1}³.
+# The state of the cube is one rotation matrix per cubelet.
+solved_cube = tuple((c, identity) for c in vectors if any(c))
+
+# Where is a cubelet now? Rotate its home.
+def position(cubelet, rotation): return rotation @ cubelet
+
+# A move turns one slice: the cubelets on the far side of a plane rotate.
+def apply_move_to_cubelet_rotation(move, cubelet, rotation):
+  v, direction = move
+  move_applies = np.dot(v, position(cubelet, rotation)) > 0
+  return rotation_matrix(move) @ rotation if move_applies else rotation
+
+# A cubelet is solved when each of its stickers points back where it started.
+def is_cubelet_solved(cubelet, rotation):
+  colors = np.diag(cubelet)
+  color_positions = rotation @ colors
+  return np.array_equal(colors, color_positions)
+```
+
+That looks too short to be a Rubik's Cube. The rest of this page explains why each line is needed and why nothing else is.
+
+---
+
+## 1. Stop counting stickers
+
+The usual way to encode a cube is as 54 colored stickers in a flat array. Then the trouble starts. A single quarter turn moves 20 of those stickers across five faces, so every move needs its own hand-written permutation table, and each table entry is a place for a typo to hide. The geometry is gone, replaced by index arithmetic.
+
+Rubix starts from what a Rubik's Cube physically is: 26 small plastic blocks called **cubelets**, riding on a rigid skeleton. A move does not shuffle stickers. It **rotates blocks**, and the stickers are glued on, so they rotate along with them.
+
+So the full state of a cubelet is *which rotation has been applied to it*, and a rotation is a 3×3 matrix.
+
+<details>
+<summary><b>Vocabulary:</b> facelets, faces, cubelets, slices</summary>
 
 <p align="center">
   <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Facelet, Face, Cubelet, and Slice" width="1000">
@@ -29,384 +61,233 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
   <img src="img/cubelet-types.png" alt="Cubelet Types: Corner, Edge, Center, and Core" width="1000">
 </p>
 
-<p align="center">
-  <img src="img/outer-slice-move.png" alt="Outer-Slice Move: A 90° rotation of an outer slice around its center" width="1000">
-</p>
-
-> [!TIP]
-> **Key Idea 1 (Standard): Fix Centers by Restricting to Outer-Slice Moves**  
-> The 12 90° outer-slice rotations (6 faces $\times$ 2 directions) are sufficient to generate any Rubik's Cube configuration. By omitting whole-cube and inner-slice rotations, the center cubelets remain permanently fixed in space.
+</details>
 
 ---
 
-### Step 1: Ditching the Sticker Permutation Nightmare
+## 2. Put the origin in the middle
 
-At first glance, representing a Rubik's cube might seem straightforward: track 54 colored stickers in a flat list. But this immediately runs into messy combinatorial bookkeeping:
-- A single 90° face turn scrambles 12 edge and corner stickers across 4 adjacent faces.
-- You must maintain lookup tables for how stickers permute, flip, and twist.
-- The physics of 3D rigid bodies is lost in a tangle of array index math.
+Take a cube apart and look at what holds it together.
 
-**What if we treat the Rubik's Cube as what it physically is: a rigid 3D object in space?**
+<p align="center">
+  <img src="img/cube-interior.jpg" alt="The inside of a Rubik's Cube: a core with six arms holding the center pieces" width="600">
+</p>
 
-Instead of 54 independent stickers, the puzzle is composed of **27 cubelets** arranged in a $3 \times 3 \times 3$ grid. 
+At the heart of the cube is a **3D cross**: a core with six arms, each ending in a center piece. Every face turn spins one slice *around* one arm, and the cross itself never moves. (Turning the six outer faces is enough to reach every position, so Rubix never turns a middle slice or the whole cube. That restriction is what keeps the cross fixed.)
 
-Look inside a physical Rubik's cube, and its defining structural backbone becomes immediately apparent: a rigid **3-dimensional cross** connecting the internal core to the six face centers along the coordinate axes. When you turn an outer slice, it rotates *around* an arm of this cross.
-
-By anchoring our origin at the core $(0, 0, 0)$, this 3D cross becomes our Cartesian coordinate frame:
+The cross is a ready-made coordinate system. Put the origin at the core and run the axes along the arms: **+x** is front, **+y** is right, **+z** is top. Every cubelet now has an integer address $c \in \lbrace -1, 0, 1 \rbrace^3$.
 
 <p align="center">
   <img src="img/coordinate-frame.png" alt="Discrete 3D Coordinate Space: The 3D Cross and Fixed Points" width="600">
 </p>
 
-Each axis corresponds to an opposing pair of faces, with cubelet coordinates $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$:
-- **X-axis:** $+X$ points **Front** and $-X$ points **Back**.
-- **Y-axis:** $+Y$ points **Right** and $-Y$ points **Left**.
-- **Z-axis:** $+Z$ points **Top** and $-Z$ points **Bottom**.
+The coordinates pay off right away. A nonzero coordinate means "this cubelet touches the outside along this axis," and touching the outside means carrying a sticker there. So counting nonzero coordinates counts stickers, and that count is the $L_1$ norm:
 
-> [!TIP]
-> **Key Idea 2 (Rubix): The 3D Cross as an Invariant Coordinate Frame**  
-> All 7 cubelets forming the 3D cross (the internal core at $(0,0,0)$ and the 6 face centers at unit distance) are invariant fixed points in Euclidean space. Because every outer-slice move rotates strictly *around* an arm of this cross, the entire cross remains permanently stationary—anchoring our 3D reference frame throughout every legal move.
+$$\|c\|_1 = |x| + |y| + |z| = \text{number of stickers}$$
 
----
+| $\|c\|_1$ | Cubelet | Count | Example |
+|:---:|:---|:---:|:---|
+| 0 | core | 1 | $(0, 0, 0)$ |
+| 1 | center | 6 | $(0, 0, 1)$ |
+| 2 | edge | 12 | $(1, 0, 1)$ |
+| 3 | corner | 8 | $(1, 1, 1)$ |
 
-### Step 2: Testing the Coordinate System (Counting Facelets for Free)
+That turns cubelet classification into a single tuple lookup:
 
-We placed our coordinate origin at the center of the puzzle, assigning each of the 27 cubelets an integer vector $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$.
+```python
+cubelet_types = ("hidden", "center", "edge", "corner")
+def describe_cubelet_type(cubelet): return cubelet_types[norm1(cubelet)]
+```
 
-Is this choice actually convenient, or did we just trade one set of headaches for another?
-
-Recall that the four types of cubelets expose an arithmetic progression of colored facelets:
-- **The Core (1 cubelet):** Exposes **0** facelets (hidden inside at the origin).
-- **Centers (6 cubelets):** Expose **1** facelet (rotate in place, define face colors).
-- **Edges (12 cubelets):** Expose **2** facelets.
-- **Corners (8 cubelets):** Expose **3** facelets.
-
-Notice the sequence of exposed facelets: **0, 1, 2, 3**.
-
-<p align="center">
-  <img src="img/cubelet-types.png" alt="Types of Cubelets" width="600">
-</p>
-
-Now examine our coordinate values in $\lbrace -1, 0, 1 \rbrace$. Along each axis:
-- A coordinate of $0$ means the cubelet is centered internally along that axis.
-- A coordinate of $\pm 1$ means the cubelet touches the outer surface along that axis.
-
-The absolute value $|x| \in \lbrace 0, 1 \rbrace$ acts as an on/off indicator for whether the cubelet touches an exterior boundary!
-
-What happens if we add up the absolute values $|x| + |y| + |z|$ (the **Manhattan distance** or **$L_1$ norm** from the origin)?
-
-$$\|c\|_1 = |x| + |y| + |z|$$
-
-- At $(0, 0, 0)$: $|0| + |0| + |0| = \mathbf{0}$ $\rightarrow$ **Core** (0 facelets)
-- At $(1, 0, 0)$: $|1| + |0| + |0| = \mathbf{1}$ $\rightarrow$ **Center** (1 facelet)
-- At $(1, 1, 0)$: $|1| + |1| + |0| = \mathbf{2}$ $\rightarrow$ **Edge** (2 facelets)
-- At $(1, 1, 1)$: $|1| + |1| + |1| = \mathbf{3}$ $\rightarrow$ **Corner** (3 facelets)
-
-| Distance $\|c\|_1$ | Cubelet Type | Count | Exposed Facelets | Description |
-|:---:|:---|:---:|:---:|:---|
-| **0** | Core | 1 | 0 | Hidden internal mechanism; permanently at $(0,0,0)$ |
-| **1** | Center | 6 | 1 | Fixed centers; rotate in place, define face colors |
-| **2** | Edge | 12 | 2 | Border cubelets between two faces |
-| **3** | Corner | 8 | 3 | Vertex cubelets joining three faces |
-
-Total: $1 + 6 + 12 + 8 = 27$ cubelets.
-
-> [!TIP]
-> **Key Idea 3 (Rubix): The Manhattan Norm Classifies Cubelets for Free**  
-> Centering coordinates at $(0, 0, 0) \in \lbrace -1, 0, 1 \rbrace^3$ turns coordinate magnitudes into boundary indicators. The Manhattan distance $\|c\|_1 = |x| + |y| + |z|$ literally counts the number of visible colored facelets ($0 \to \text{Core}$, $1 \to \text{Center}$, $2 \to \text{Edge}$, $3 \to \text{Corner}$) with zero lookup tables or conditional branches.
+The core has no stickers, and every rotation leaves the origin where it is. Nothing about it can change, so Rubix doesn't store it: that is the `if any(c)` in `solved_cube`, and it is why the cube has **26** rotation matrices instead of 27.
 
 ---
 
-### Step 3: Colors *Are* the Center Cubelets
+## 3. A color is a direction
 
-Now comes the next puzzle: *how do we represent colors?*
+What is "green"? In a solved cube, green is the face whose stickers all point toward $+x$. The centers never move, so that stays true for the whole solve. A color doesn't need its own enum, because it is already a unit vector:
 
-In traditional software, colors are arbitrary strings (`'WHITE'`, `'GREEN'`) or integer tags (`0`, `1`). But look at the physical mechanism of a Rubik's Cube:
+```python
+color_names = {
+  (+1, 0, 0): "GREEN",   # front
+  (0, +1, 0): "RED",     # right
+  (0, 0, +1): "WHITE",   # top
+  (-1, 0, 0): "BLUE",    # back
+  (0, -1, 0): "ORANGE",  # left
+  (0, 0, -1): "YELLOW",  # bottom
+}
+```
 
-Because moves only rotate outer slices, the **6 center cubelets are the immovable arms of the 3D cross**. They never move relative to each other:
-- The Green center is permanently at $(+1, 0, 0)$ [Front].
-- The Blue center is permanently at $(-1, 0, 0)$ [Back].
-- The Red center is permanently at $(0, +1, 0)$ [Right].
-- The Orange center is permanently at $(0, -1, 0)$ [Left].
-- The White center is permanently at $(0, 0, +1)$ [Top].
-- The Yellow center is permanently at $(0, 0, -1)$ [Bottom].
-
-Notice what just happened: **the 6 center cubelets are literally the standard Cartesian basis vectors $\mathbf{e}_x, \mathbf{e}_y, \mathbf{e}_z$ and their opposites!**
-
-$$\mathbf{e}_x = \text{Green Center}, \quad \mathbf{e}_y = \text{Red Center}, \quad \mathbf{e}_z = \text{White Center}$$
-
-Why invent separate color constants when the centers are already 3D vectors? We don't! **A color's identity is the constant position vector of its center cubelet**:
-
-| Direction Vector | Color | Face | Defining Center Cubelet |
-|:---|:---|:---|:---|
-| $(+1, 0, 0)$ | Green | Front | Center at $(+1, 0, 0)$ |
-| $(-1, 0, 0)$ | Blue | Back | Center at $(-1, 0, 0)$ |
-| $(0, +1, 0)$ | Red | Right | Center at $(0, +1, 0)$ |
-| $(0, -1, 0)$ | Orange | Left | Center at $(0, -1, 0)$ |
-| $(0, 0, +1)$ | White | Top | Center at $(0, 0, +1)$ |
-| $(0, 0, -1)$ | Yellow | Bottom | Center at $(0, 0, -1)$ |
-
-With this identification, a facelet's intrinsic color is simply the center cubelet it points toward in the solved state (its outward normal vector at rest). When rotated by $R$, its color remains constant while its physical pointing direction becomes $R \cdot c_{\text{center}}$.
-
-> [!TIP]
-> **Key Idea 4 (Rubix): Colors *Are* Basis Vectors**  
-> Because the 6 center cubelets never move, they define the 3D coordinate axes. A color's identity is the constant unit position vector of its center cubelet ($c_{\text{center}}$), replacing arbitrary strings or integer enums with pure vector geometry.
+The six colors are the six standard basis vectors and their negatives. The names are only there for printing.
 
 ---
 
-### Step 4: The $\mathrm{diag}(c)$ Magic Trick (Packing Facelets into a Matrix)
+## 4. A cubelet's stickers are a matrix
 
-Now consider any cubelet at its canonical home position $c = (x, y, z)^T$. We know what facelets it has, but how do we represent the orientation of all its facelets at the same time?
+Take the front-right-top corner, $c = (1, 1, 1)$. Its three stickers point along $(1,0,0)$, $(0,1,0)$, and $(0,0,1)$, which are exactly the components of $c$. Put them side by side as the columns of a matrix:
 
-Let's decompose $c$ along the coordinate axes:
+$$\mathrm{diag}(c) = \begin{pmatrix} x & 0 & 0 \\ 0 & y & 0 \\ 0 & 0 & z \end{pmatrix}$$
 
-$$c = \begin{pmatrix} x \\ y \\ z \end{pmatrix} = x \begin{pmatrix} 1 \\ 0 \\ 0 \end{pmatrix} + y \begin{pmatrix} 0 \\ 1 \\ 0 \end{pmatrix} + z \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix} = \begin{pmatrix} x \\ 0 \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ y \\ 0 \end{pmatrix} + \begin{pmatrix} 0 \\ 0 \\ z \end{pmatrix}$$
+Every cubelet fits this one shape. A corner has three nonzero columns, one per sticker. An edge like $(1, 0, 1)$ has a **zero column** where its hidden side is, so the hidden side drops out with no special case. A center has a single nonzero column. As a bonus, $\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1$, so the sticker count from step 2 shows up again.
 
-Look at the three component vectors:
-- For the Front-Right-Top corner $c = (1, 1, 1)^T$, they are:
-  - $(1, 0, 0)^T$ $\rightarrow$ Green (Front facelet normal)
-  - $(0, 1, 0)^T$ $\rightarrow$ Red (Right facelet normal)
-  - $(0, 0, 1)^T$ $\rightarrow$ White (Top facelet normal)
-- Each non-zero component vector is an **outward unit normal** pointing directly toward one of the center cubelets!
-
-What happens if we stack these three vectors side-by-side as the columns of a $3 \times 3$ matrix?
-
-$$\mathrm{diag}(c) = \begin{pmatrix} x & 0 & 0 \\ 0 & y & 0 \\ 0 & 0 & z \end{pmatrix} = \begin{pmatrix} \mathbf{n}_x & \mathbf{n}_y & \mathbf{n}_z \end{pmatrix}$$
-
-This diagonal matrix gives us an extraordinary unification:
-- **Corners** (e.g. $c = (1, 1, 1)^T$): All 3 columns are non-zero unit vectors (Green, Red, White).
-- **Edges** (e.g. $c = (1, 0, 1)^T$): Column 2 is $(0, 0, 0)^T$—the uncolored internal side ($y=0$) automatically drops out as a zero column!
-- **Centers** (e.g. $c = (0, 0, 1)^T$): 2 columns are zero; only column 3 (White) is non-zero.
-- **Interior** ($c = (0, 0, 0)^T$): All zero columns.
-
-And notice the payoff connecting back to Step 2: **the matrix rank of $\mathrm{diag}(c)$ is exactly the Manhattan distance**:
-
-$$\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1 = \text{number of visible facelets}$$
-
-> [!TIP]
-> **Key Idea 5 (Rubix): Facelet Normals as Matrix Columns via $\mathrm{diag}(c)$**  
-> Expanding coordinate vector $c$ into the diagonal matrix $\mathrm{diag}(c) = [\mathbf{n}_x \;\; \mathbf{n}_y \;\; \mathbf{n}_z]$ packs all outward facelet normal vectors directly into matrix columns. Hidden internal faces automatically vanish as zero columns, and matrix rank equals the Manhattan norm ($\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1$).
-
----
-
-### Step 5: One-Shot Rotation & The Solved Invariant
-
-Now, how do we track the state of the puzzle as moves are applied?
-
-Every cubelet starts at its canonical home position $c \in \lbrace -1, 0, 1 \rbrace^3$ with an initial $3 \times 3$ identity rotation matrix $I_3$. When a sequence of 90° slice moves turns a cubelet, we accumulate those turns into a single $3 \times 3$ rotation matrix $R$.
-
-1. **Where is the cubelet in 3D space right now?**
-   $$p = R \cdot c$$
-   In the solved cube, $p = I_3 \cdot c = c$.
-2. **Where do all of its colored facelets point right now?**
-   Because matrix multiplication distributes column-by-column:
-   $$\text{Current facelet directions} = R \cdot \mathrm{diag}(c) = \begin{pmatrix} R \cdot \mathbf{n}_x & R \cdot \mathbf{n}_y & R \cdot \mathbf{n}_z \end{pmatrix}$$
-   A single matrix multiply transforms **all facelets of the cubelet simultaneously**!
-3. **When is a cubelet solved?**
-   A cubelet is in its solved position and orientation if and only if all of its facelets point back toward their home center cubelets:
-   $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
+Each column means two things at once. By step 3, it is the sticker's **color**. It is also the direction the sticker **points**. In the solved cube the two coincide. Rotate the cubelet and they separate: the columns of $\mathrm{diag}(c)$ still give the colors, and the columns of $R \cdot \mathrm{diag}(c)$ give where those colors face now. One matrix product moves all of a cubelet's stickers at once.
 
 <p align="center">
   <img src="img/basis-colors-diag.png" alt="The Geometric Trick: Facelet Normals as Matrix Columns" width="700">
 </p>
 
-In [`rubix.py`](rubix.py), checking whether a cubelet is solved ([`is_cubelet_solved`](rubix.py#L204-L207)) or reading current facelet orientations ([`describe_config`](rubix.py#L75-L82)) takes just two lines:
+Reading a cubelet's colors is just a matter of pairing the two sets of columns ([`describe_config`](rubix.py#L75-L82)):
 
 ```python
 colors = np.diag(cubelet)
 color_positions = rotation @ colors
-return np.array_equal(colors, color_positions)
+for color, pos in zip(colors.T, color_positions.T): ...
 ```
-
-No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
-
-> [!TIP]
-> **Key Idea 6 (Rubix): One-Shot Simultaneous Rotation via $R \cdot \mathrm{diag}(c)$**  
-> Matrix multiplication distributes across columns simultaneously: $R \cdot \mathrm{diag}(c) = [R\mathbf{n}_x \;\; R\mathbf{n}_y \;\; R\mathbf{n}_z]$. A single matrix multiply rotates all facelets at once, reducing the solved test to $R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$ with zero permutation tracking.
 
 ---
 
-### Step 6: Slice Moves as Hyperplane Dot Products
+## 5. A move is a dot product and a matrix product
 
-When a move rotates an outer slice (e.g., turning the Top face clockwise), which cubelets move?
+<p align="center">
+  <img src="img/outer-slice-move.png" alt="Outer-Slice Move: A 90° rotation of an outer slice around its center" width="1000">
+</p>
 
-In combinatorial code, you maintain a list of cubelet indices belonging to each face. In linear algebra, an outer slice is a coordinate half-space.
+A move is a unit vector $v$ (which face) and a direction (which way to turn). Which cubelets does it carry? The ones currently on the $v$ side of the cube, and one inner product finds them:
 
-A move is specified by an axis unit vector $v \in \lbrace \pm e_x, \pm e_y, \pm e_z \rbrace$ and a direction $d \in \lbrace -1, +1 \rbrace$. Which cubelets lie in that slice? An inner product:
+$$v \cdot (R\,c) > 0$$
 
-$$v \cdot p > 0 \iff v \cdot (R \cdot c) > 0$$
+No list of which cubelets belong to which face. Membership is geometry. The cubelets that pass the test get rotated, $R \leftarrow M_v R$, where $M_v$ is the 90° rotation about $v$ ([`apply_move_to_cubelet_rotation`](rubix.py#L123-L127)).
 
-If this dot product is positive, the cubelet lies in the slice. To turn it, multiply its rotation matrix by the elementary 90° rotation matrix $M$:
+Some properties come for free:
 
-$$R_{\text{new}} = M \cdot R$$
-
-Because every turn is a 90° rotation along a coordinate axis, all matrix entries in $R$ remain integers in $\lbrace -1, 0, 1 \rbrace$.
-
-> [!TIP]
-> **Key Idea 7 (Rubix): Slices as Coordinate Half-Spaces**  
-> Instead of storing index sets for each face, determining which cubelets belong to an active slice is evaluated via a single inner product: $v \cdot (R \cdot c) > 0$.
+- **Everything stays an integer.** Every $R$ is a product of 90° turns about coordinate axes, so it is a signed permutation matrix. Every entry stays in $\lbrace -1, 0, 1 \rbrace$, and there are only **24** such rotations: the symmetry group of the cube.
+- **Corners stay corners.** Signed permutations preserve the $L_1$ norm, so $\|Rc\|_1 = \|c\|_1$ and no move can turn a corner into an edge. Nobody wrote that rule. It follows from what a rotation is.
+- **Centers stay put.** A center lies on the axis of its own face's turn, and its dot product with every other face's vector is $0$ or $-1$, which fails the test. The cross from step 2 is fixed because of arithmetic, not because of bookkeeping.
 
 ---
 
-## Solver Architecture
+## 6. Solved means every sticker is home
 
-Finding the optimal solution to an arbitrary Rubik's cube is NP-hard, and God's Number (20 moves) requires massive precomputed pattern databases.
+A cubelet is solved when each sticker points back toward the center of its own color:
 
-[`rubix.py`](rubix.py) implements a **hierarchical multi-phase A\* search** that mimics human layer-by-layer reduction, staying strictly under 400 lines without precomputed databases:
+$$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
+
+Now ask how much this equation actually constrains $R$:
+
+| Cubelet | Nonzero columns | Rotations $R$ that count as solved |
+|:---|:---:|:---|
+| corner | 3 | only $I$, since three fixed columns pin $R$ down |
+| edge | 2 | only $I$, since a rotation's third column is the cross product of the other two |
+| center | 1 | **4 of 24**: any spin about its own axis |
+
+The last row matters. A center with only one sticker can spin 90° in place and you can't see the difference. The equation can't see it either. Run the solver and it reports:
 
 ```
-[Scrambled Cube]
-       |
-       v
-Phase 1: Top Layer & Centers (17 cubelets)
-       |
-       v
-Phase 2: Middle Layer Edges (4 cubelets)
-       |
-       v
-Phase 3: Bottom Cross (4 edge orientations & positions)
-       |
-       v
-Phase 4: Bottom Corners (4 corner placements & twists)
-       |
-       v
-Phase 5: Endgame Permutation Alignment
-       |
-       v
- [Solved Cube]
+$ python rubix.py
+...
+is_cube_solved:  True
+cube == solved_cube:  False
 ```
 
-### Guiding the Search: Distance Estimation
-A\* needs a sense of direction so it doesn't search aimlessly. Rather than storing gigabytes of precomputed lookup tables, Rubix calculates a quick distance estimate on the fly:
-- **Individual cubelet distance (`min_moves_to_solved`):** Calculates how many 90° turns an isolated cubelet needs to reach its solved coordinate and orientation if no other cubelets were in the way.
-- **Layer distance:** Combines the individual estimates of the active layer's target cubelets into a single distance score, pulling the search toward states where more cubelets are closer to home.
-- **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
-
-### Search Performance & Randomized Restarts
-- **Throughput:** Simulates ~50,000 moves/sec via vector dot products and memoized transposition caching.
-- **Move-Budgeted Restarts:** To escape deep local plateaus in complex scrambles without storing massive precomputed pattern tables, A\* incorporates subtle priority randomization (`RANDOMIZE_SEARCH = True`) bounded by deterministic move budgets (`max_moves=100_000` with gentle $1.5\times$ expansion). Instead of wall-clock timers and OS signals, searches cut losses after exploring ~100k moves (~2s) and retry with fresh randomized weights without discarding prior layer progress. Typical scrambles solve in 5–25 seconds.
+These two lines don't contradict each other. The cube is solved, and some centers ended up turned relative to where they started. A sticker array has no way to represent that difference, and a model that tracks the full state would need a special case to ignore it. `diag(c)` handles it with no extra code, because **the equation constrains exactly what the stickers can show**.
 
 ---
 
-## Getting Started
+## The dictionary
 
-### Prerequisites
-- Python 3.10+
-- Virtual environment (`venv`)
+| Rubik's Cube | Linear algebra |
+|:---|:---|
+| a cubelet | its home position $c \in \lbrace -1, 0, 1 \rbrace^3 \setminus \lbrace 0 \rbrace$ |
+| corner, edge, or center | $\|c\|_1 = 3, 2, 1$ |
+| a color | a unit vector $\pm e_i$ |
+| a cubelet's stickers | the columns of $\mathrm{diag}(c)$ |
+| the cube's state | one rotation matrix $R$ per cubelet |
+| where a cubelet is | $R\,c$ |
+| where its stickers face | $R \cdot \mathrm{diag}(c)$ |
+| turning face $v$ | if $v \cdot Rc > 0$ then $R \leftarrow M_v R$ |
+| solved | $R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$ |
 
-### Installation
+---
+
+## The solver
+
+Rubix is not trying to find the shortest solution, and it doesn't claim to. It solves the cube **layer by layer, the way a person would**. Each step is an [A\*](https://en.wikipedia.org/wiki/A*_search_algorithm) search for "one more cubelet in place, without breaking the ones already placed":
+
+1. **Top and middle layers.** 17 cubelets, one search each.
+2. **Bottom cross.** Move the four bottom edges into place, then orient them.
+3. **Bottom corners.** Move the four corners into their slots.
+4. **Endgame.** Twist each corner with the classic `(L' U' L U) × 2` sequence. No search is needed here.
+
+The encoding helps the search too. A\* needs an estimate of how far each cubelet is from home. In the rotation-matrix model, one cubelet in isolation has only **24 possible states**. So Rubix runs *the same `astar` function* over the rotation group of a single cubelet, memoizes the answer ([`min_moves_to_solved`](rubix.py#L214-L219)), and combines the results across the layer it is working on. The heuristic is computed on the fly from the model's own geometry, with no precomputed tables.
+
+When a search stalls, it restarts with slightly randomized heuristic weights and a 1.5× larger move budget, keeping all progress from earlier layers. On a 100,000-move scramble, a solve usually takes **5–30 seconds** and **120–150 moves**, while simulating about 50,000 moves per second.
+
+---
+
+## Getting started
+
+Requires Python 3.10+.
 
 ```bash
-# Clone the repository
 git clone https://github.com/smolkaj/rubix.git
 cd rubix
-
-# Create and activate a virtual environment
-python3 -m venv rubix_env
-source rubix_env/bin/activate
-
-# Install dependencies (numpy, pygame, opencv-python, Pillow)
-pip install -r requirements.txt
+python3 -m venv rubix_env && source rubix_env/bin/activate
+pip install -r requirements.txt   # numpy, pygame, opencv-python, Pillow
 ```
 
----
-
-## Usage
-
-### 1. Interactive Pygame Visualizer
-
-Launch the 2D cube net visualizer:
+### Interactive visualizer
 
 ```bash
 python rubix_gui.py
 ```
 
-- **Shuffle:** Click the **Shuffle** button to apply a 999-move scramble.
-- **Solve:** Click the **Solve** button to run the A\* solver with a real-time progress bar.
-- **Playback:**
-  - `Right Arrow`: Step forward through the solution moves (hold to fast-forward at 15×).
-  - `Left Arrow`: Step backward through the solution moves (rewind).
+- **Shuffle** applies a 999-move scramble.
+- **Solve** runs the solver in the background and shows a live progress bar.
+- **→ / ←** step forward and backward through the solution. Hold → to fast-forward.
 
-### 2. Command-Line Solver
-
-Solve a scrambled cube directly from the terminal:
+### Command line
 
 ```bash
-# Solve a 100,000-move scramble with default seed (42)
-python rubix.py
-
-# Solve with a specific random seed
-python rubix.py 123
-
-# Run benchmark across 100 random scrambles
-python rubix.py --benchmark
+python rubix.py              # solve a 100,000-move scramble (seed 42)
+python rubix.py 123          # ...with a different seed
+python rubix.py --benchmark  # 100 seeds in a row
 ```
 
-### 3. Programmatic Python API
-
-Use `rubix` as a lightweight puzzle simulation and solving library:
+### As a library
 
 ```python
 from rubix import solved_cube, shuffle, solve, describe_move, is_cube_solved, apply_move_to_cube
 
-# Create a scrambled cube
 scrambled = shuffle(solved_cube, iterations=1000, seed=42)
-print("Is solved?", is_cube_solved(scrambled))  # False
-
-# Compute solution moves
 solution = solve(scrambled)
-print(f"Solved in {len(solution)} moves:")
 for move in solution:
-    print(" -", describe_move(move))
+    print(describe_move(move))   # e.g. "clockwise rotation of top slice"
 
-# Apply solution and verify final state
-final_cube = scrambled
+cube = scrambled
 for move in solution:
-    final_cube = apply_move_to_cube(move, final_cube)
-print("Is solved?", is_cube_solved(final_cube))  # True
+    cube = apply_move_to_cube(move, cube)
+assert is_cube_solved(cube)
 ```
 
----
-
-## Testing
-
-Run the test suite:
+### Tests
 
 ```bash
 python3 -m unittest discover tests
 ```
 
-The test suite covers:
-- Representation invariants (cubelet counts, $L_1$ norms, canonical positions).
-- Rotation matrix algebra (orthogonality $R^T R = I$, $\det(R) = 1$, axis preservation).
-- Scramble reproducibility and seed determinism.
-- End-to-end multi-phase solver execution on scrambled states.
-- Headless GUI snapshot rendering verification.
+The tests are built around algebraic identities. Four quarter turns are the identity, a move followed by its inverse cancels, the "sexy move" `R U R' U'` has order 6, and opposite faces commute. Alongside those are end-to-end solves and headless GUI rendering checks.
 
 ---
 
-## Codebase Structure
+## Layout
 
-```
-rubix/
-├── rubix.py            # Core solver & linear algebra model (< 400 lines)
-├── rubix_gui.py        # Pygame GUI with animated moves & step playback
-├── rubix_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
-├── scripts/
-│   ├── generate_anatomy.py # Cube anatomy diagram generator
-│   └── generate_diagram.py # Geometric intuition diagram generator
-├── tests/
-│   └── test_rubix.py   # Unit test suite
-├── img/                # Architectural diagrams & preview snapshots
-│   ├── basis-colors-diag.png
-│   ├── cube.png
-│   ├── cubelet-types.png
-│   ├── cube-anatomy.png
-│   ├── cube-in-plane.jpg
-│   └── gui-preview.png
-├── requirements.txt    # numpy, pygame, opencv-python, Pillow
-└── README.md
-```
+| File | |
+|:---|:---|
+| [`rubix.py`](rubix.py) | The model and solver, under 400 lines |
+| [`rubix_gui.py`](rubix_gui.py) | Pygame visualizer with animated playback |
+| [`rubix_scanner.py`](rubix_scanner.py) | Experimental OpenCV scanner for physical cubes |
+| [`scripts/`](scripts) | Generators for the diagrams on this page |
+| [`tests/`](tests) | Unit and end-to-end tests |
 
 ---
 
