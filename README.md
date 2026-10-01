@@ -24,14 +24,14 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
   <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Face, Slice, Cubelet, and Facelet" width="700">
 </p>
 
-- **Face:** One of the 6 sides of the cube (Front, Back, Right, Left, Top, Bottom). A face is a 2D exterior surface made of 9 outer stickers pointing in the same direction.
+- **Face:** One of the 6 sides of the cube (Front, Back, Right, Left, Top, Bottom). A face is a 2D exterior surface made of 9 outer facelets pointing in the same direction.
 - **Slice:** A 3D layer of 9 cubelets that rotate together as a rigid unit. An **outer slice** is the physical layer behind a **face**—turning a face physically rotates its corresponding slice.
 - **Cubelet:** One of the 27 constituent $1 \times 1 \times 1$ cubes that make up the puzzle.
 - **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
 - **Move:** A 90° rotation of an outer slice around a coordinate axis.
 
 > **Key Idea 1 (Standard): Fixed Centers via Outer-Slice Moves**  
-> *Why only rotate outer slices?* Turning a middle slice on a physical cube is mechanically identical to turning both outer slices in the opposite direction and tilting the cube. By speedcubing standard, restricting moves to outer slices keeps the 6 center cubelets permanently fixed in space. This provides stationary reference anchors and dramatically prunes the search space (just 12 face moves rather than searching middle slices or whole-cube orientations).
+> Turning a middle slice is an illusion—it is mechanically identical to holding the slice still, turning both outer layers backwards, and tilting the cube in your hands. Restricting moves strictly to outer slices keeps the six center cubelets permanently locked in 3D space. They become immovable anchors: Green is always Front, White is always Top, and the solver never wastes energy chasing redundant whole-cube rotations.
 
 ---
 
