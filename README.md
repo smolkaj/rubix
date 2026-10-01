@@ -2,7 +2,9 @@
 
 > A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
-<img src="img/gui-preview.png" alt="Rubix GUI Preview" width="500">
+<p align="center">
+  <img src="img/gui-preview.png" alt="Rubix GUI Preview" width="500">
+</p>
 
 Most Rubik's cube software relies on complex combinatorial representations: 54 color stickers mapped across 6 face arrays, lookup tables for permutations, or massive pattern databases.
 
@@ -16,20 +18,22 @@ Most Rubik's cube software relies on complex combinatorial representations: 54 c
 
 ### Key Terminology
 
-To keep the geometry crystal clear, Rubix uses consistent and unambiguous terms throughout:
+<p align="center">
+  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Face, Slice, Cubelet, and Facelet" width="700">
+</p>
 
-- **Cubelet:** One of the 27 smaller constituent 3D cubes that make up the puzzle.
+- **Face:** One of the 6 macroscopic $3 \times 3$ outer sides of the cube (Front, Back, Right, Left, Top, Bottom). Each face is a 2D exterior surface made of 9 coplanar facelets pointing along the same axis.
+- **Slice:** A planar group of 9 cubelets sharing a coordinate plane (e.g. all cubelets with $x = 1$) that rotate together as a rigid 3D body. An **outer slice** is the physical 3D layer behind a **face**—turning a face physically rotates its corresponding slice.
+- **Cubelet:** One of the 27 constituent $1 \times 1 \times 1$ cubes that make up the puzzle.
 - **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
-- **Face:** One of the 6 macroscopic sides ($3 \times 3$) of the overall Rubik's Cube (Front, Back, Right, Left, Top, Bottom). Each face consists of 9 facelets.
-- **Slice:** A planar group of 9 cubelets sharing a coordinate plane (e.g. all cubelets with $x = +1$) that rotate together.
 - **Move:** A 90° clockwise or counterclockwise rotation of an outer slice around a coordinate axis.
 
 ---
 
 ### Step 1: Ditching the Sticker Permutation Nightmare
 
-Most Rubik's cube software begins with flat stickers: a 1D array of 54 color labels, index mappings, and permutation tables. But anyone who has written a solver this way quickly encounters the friction:
-- A single 90° face turn cycles 12 edge and corner stickers across 4 adjacent faces.
+At first glance, representing a Rubik's cube might seem straightforward: just track 54 colored stickers in a flat list or 2D arrays. But this immediately runs into messy combinatorial bookkeeping:
+- A single 90° face turn scrambles 12 edge and corner stickers across 4 adjacent faces.
 - You must maintain lookup tables for how stickers permute, flip, and twist.
 - The physics of 3D rigid bodies is lost in a tangle of 1D array index math.
 
@@ -169,7 +173,9 @@ Every cubelet starts at its canonical home position $c \in \lbrace -1, 0, 1 \rbr
    A cubelet is in its solved position and orientation if and only if all of its facelets point back toward their home center cubelets:
    $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
 
-<img src="img/basis-colors-diag.png" alt="The Geometric Trick: Facelet Normals as Matrix Columns" width="700">
+<p align="center">
+  <img src="img/basis-colors-diag.png" alt="The Geometric Trick: Facelet Normals as Matrix Columns" width="700">
+</p>
 
 In [`rubix.py`](rubix.py), checking whether a cubelet is solved ([`is_cubelet_solved`](rubix.py#L204-L207)) or reading current facelet orientations ([`describe_config`](rubix.py#L75-L82)) takes just two lines:
 
@@ -346,6 +352,7 @@ rubix/
 ├── rubix_gui.py        # Pygame GUI with animated moves & step playback
 ├── rubix_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
 ├── scripts/
+│   ├── generate_anatomy.py # Cube anatomy diagram generator
 │   └── generate_diagram.py # Geometric intuition diagram generator
 ├── tests/
 │   └── test_rubix.py   # Unit test suite
@@ -353,6 +360,7 @@ rubix/
 │   ├── basis-colors-diag.png
 │   ├── cube.png
 │   ├── cubelet-types.png
+│   ├── cube-anatomy.png
 │   ├── cube-in-plane.jpg
 │   └── gui-preview.png
 ├── requirements.txt    # numpy, pygame, opencv-python, Pillow

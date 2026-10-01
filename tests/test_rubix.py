@@ -272,7 +272,7 @@ class TestRubixCube(unittest.TestCase):
                 self.assertEqual(s1, s2, f"Opposite moves {m1} and {m2} did not commute")
 
     def test_min_moves_to_position(self):
-        """Verify min_moves_to_position ignores piece orientation."""
+        """Verify min_moves_to_position ignores cubelet orientation."""
         from rubix import min_moves_to_position, min_moves_to_solved, position
         corner = (1, 1, -1)
         # Identity rotation: 0 moves to solved and position
