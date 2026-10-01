@@ -198,7 +198,7 @@ def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
     if not budget_exceeded or budget is None or random_weight == 0 or not RANDOMIZE_SEARCH:
       return None
     print("search budget of %d moves exceeded; restarting" % budget)
-    budget = min(max(int(1.5 * budget), budget + 1), 500_000)
+    budget = max(int(1.5 * budget), budget + 1)
 
 @functools.cache
 def is_cubelet_solved(cubelet, rotation):
