@@ -32,7 +32,7 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
 
 > **Key Idea 1: A Complete, Minimal Action Basis (12 Atomic Moves)**  
 > How can we manipulate a 3D cube, and what is the minimal generating set needed to model it?  
-> - **Whole-cube rotations** tumble the puzzle in space but change zero relative states; quotienting them out fixes our reference frame.  
+> - **Whole-cube rotations** tumble the puzzle in space without altering relative states; fixing our reference frame eliminates them.  
 > - **$180^\circ$ and $270^\circ$ turns** decompose directly into sequences of elementary $\pm 90^\circ$ quarter turns.  
 > - **Middle-slice turns** are redundant: turning an equator is physically identical to counter-rotating both opposing outer faces and tilting the cube.  
 > 
