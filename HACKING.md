@@ -41,6 +41,7 @@ SDL_VIDEODRIVER=dummy python3 -m unittest discover tests
 ## Architectural Invariants
 
 - **A Functional Pearl (Maximally elegant, simple, and educational):** The solver is conceived as a functional pearl: an instructive, beautiful demonstration of group actions and linear algebra. Code clarity and pedagogical elegance always take priority over performance micro-optimizations.
+- **Self-documenting, transparent code:** Reject cryptic abbreviations, obscure domain shorthand, or dense tuple indexing. Code must read as self-explanatory prose (`left, top, bottom` rather than `L, U, D`).
 - **Strict line count invariant:** `rubix.py` must strictly remain under 400 lines of code (`wc -l rubix.py < 400`). Verify with:
   ```bash
   [ $(wc -l < rubix.py) -lt 400 ] && echo "OK" || echo "FAIL: Exceeds 400 lines"
