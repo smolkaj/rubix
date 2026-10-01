@@ -2,7 +2,7 @@
 
 > A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
-![Rubix GUI Preview](img/gui-preview.png)
+<img src="img/gui-preview.png" alt="Rubix GUI Preview" width="500">
 
 Most Rubik's cube software relies on complex combinatorial representations: 54 color stickers mapped across 6 face arrays, lookup tables for permutations, or massive pattern databases.
 
@@ -19,27 +19,39 @@ Most Rubik's cube software relies on complex combinatorial representations: 54 c
 Anchor a 3D Cartesian coordinate frame at the center of the cube $(0, 0, 0)$. Each of the 27 smaller *cubelets* has integer coordinates $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$.
 
 ```
-           +Z (Top / White)
-            ^
-            |   +Y (Right / Red)
-            |  /
-            | /
-  (-X) <----+----> +X (Front / Green)
- (Blue)    /|
-          / |
-         v  v
- (-Orange)  (-Yellow)
+               +Z: Top (White)
+                ^
+                |   +Y: Right (Red)
+                |  /
+    -X: Back    | /
+     (Blue) <----+----> +X: Front (Green)
+               /|
+              / |
+             v  v
+      -Y: Left  -Z: Bottom (Yellow)
+      (Orange)
 ```
 
-The $L_1$ norm (Manhattan distance from origin) naturally and bijectively classifies every cubelet:
+Each 3D coordinate axis corresponds to an opposing pair of faces:
+- **X-axis:** $+X$ points **Front** (Green) and $-X$ points **Back** (Blue).
+- **Y-axis:** $+Y$ points **Right** (Red) and $-Y$ points **Left** (Orange).
+- **Z-axis:** $+Z$ points **Top** (White) and $-Z$ points **Bottom** (Yellow).
+
+How can we determine what kind of piece a cubelet is—a corner, an edge, a center, or the hidden core—just from its $(x, y, z)$ coordinates?
+
+A simple and elegant way is to sum the absolute values of its coordinates, known as the **Manhattan distance** or **$L_1$ norm**:
 
 $$\|c\|_1 = |x| + |y| + |z|$$
 
-Because coordinates $x, y, z \in \lbrace -1, 0, 1 \rbrace$, each absolute value $|x|, |y|, |z| \in \lbrace 0, 1 \rbrace$ is a binary indicator: $1$ if the cubelet reaches the outer boundary along that axis, and $0$ if it is interior along that axis. Consequently, the Manhattan distance **literally counts the number of visible colored faces**:
+Because each coordinate is either $-1, 0,$ or $1$, the absolute value simply indicates whether the piece reaches an outer boundary:
+- $|x| = 1$ if the piece extends outward to a boundary face along that axis.
+- $|x| = 0$ if the piece stays flush in the center along that axis.
 
-| $\|c\|_1$ | Cubelet Type | Count | Description |
+Adding them together simply counts **how many colored faces the cubelet exposes to the outside world**:
+
+| Visible Faces ($\|c\|_1$) | Cubelet Type | Number of Pieces | Description |
 |:---:|:---|:---:|:---|
-| **0** | Interior | 1 | The hidden center mechanism; 0 visible faces; never moves. |
+| **0** | Interior | 1 | The hidden core mechanism; 0 visible faces; never moves. |
 | **1** | Center | 6 | Fixed centers; 1 visible face; rotate in place, define face colors. |
 | **2** | Edge | 12 | 2 visible colored faces. |
 | **3** | Corner | 8 | 3 visible colored faces. |
