@@ -23,36 +23,37 @@ draw = ImageDraw.Draw(img)
 FONTS_DIR = REPO_ROOT / "fonts"
 
 # Fonts
-font_panel_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 20 * SCALE)
-font_panel_sub = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 13 * SCALE)
-font_panel_stat = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 13 * SCALE)
+font_panel_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 21 * SCALE)
+font_panel_sub = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 14 * SCALE)
+font_panel_stat = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 14 * SCALE)
+font_panel_desc = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 14 * SCALE)
 
-# Color palette
-C_BG = (18, 19, 22)
-C_CARD_BG = (24, 26, 30)
-C_CARD_BORDER = (42, 45, 52)
-C_TEXT_TITLE = (240, 242, 246)
-C_TEXT_SUB = (150, 155, 166)
-C_TEXT_MUTED = (110, 115, 125)
+# High-contrast color palette
+C_BG = (15, 17, 23)
+C_CARD_BG = (24, 28, 38)
+C_CARD_BORDER = (65, 75, 96)
+C_TEXT_TITLE = (255, 255, 255)
+C_TEXT_SUB = (205, 215, 230)
+C_TEXT_MUTED = (165, 180, 202)
 
-# Cubelet base colors (muted dark for unhighlighted)
-C_DARK_TOP = (40, 43, 50)
-C_DARK_FRONT = (32, 34, 40)
-C_DARK_RIGHT = (26, 28, 33)
-C_DARK_EDGE = (55, 60, 70)
+# Cubelet base colors (clearly visible 3D geometry for unhighlighted)
+C_DARK_TOP = (58, 66, 82)
+C_DARK_FRONT = (46, 53, 67)
+C_DARK_RIGHT = (36, 42, 54)
+C_DARK_EDGE = (90, 102, 126)
 
-# Highlight colors
-C_WHITE = (245, 247, 250)
-C_WHITE_FRONT = (200, 205, 212)
-C_WHITE_RIGHT = (165, 170, 178)
+# Highlight colors (vibrant, saturated)
+C_WHITE = (255, 255, 255)
+C_WHITE_FRONT = (220, 226, 236)
+C_WHITE_RIGHT = (185, 192, 205)
 
-C_ACCENT = (56, 189, 248)  # Cyan
-C_ACCENT_FRONT = (34, 150, 205)
-C_ACCENT_RIGHT = (22, 115, 165)
+C_ACCENT = (65, 205, 255)  # Electric Cyan
+C_ACCENT_FRONT = (38, 165, 225)
+C_ACCENT_RIGHT = (25, 130, 185)
 
-C_GREEN = (46, 204, 113)
-C_RED = (231, 76, 60)
-C_GOLD = (241, 196, 15)
+C_GREEN = (52, 211, 153)
+C_RED = (248, 113, 113)
+C_GOLD = (250, 204, 21)
 
 # Isometric projection setup
 # Angles for X, Y, Z
@@ -247,8 +248,8 @@ for idx, p in enumerate(panels):
     render_cube(draw, cube_cx, cube_cy, cube_sz, p["mode"])
 
     # Bottom caption
-    cap_w = font_panel_sub.getbbox(p["desc"])[2]
-    draw.text((x0 + (card_w - cap_w) // 2, y1 - 28 * SCALE), p["desc"], fill=C_TEXT_MUTED, font=font_panel_sub)
+    cap_w = font_panel_desc.getbbox(p["desc"])[2]
+    draw.text((x0 + (card_w - cap_w) // 2, y1 - 28 * SCALE), p["desc"], fill=C_TEXT_MUTED, font=font_panel_desc)
 
 # Save output
 out_path = REPO_ROOT / "img" / "cube-anatomy.png"

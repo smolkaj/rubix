@@ -23,29 +23,29 @@ font_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 22 * SCALE)
 font_subtitle = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 14 * SCALE)
 font_axis = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 16 * SCALE)
 font_label = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 14 * SCALE)
-font_small = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 13 * SCALE)
+font_small = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 13 * SCALE)
 
-# Palette
-C_BG = (18, 19, 22)
-C_TEXT_TITLE = (240, 242, 246)
-C_TEXT_SUB = (150, 155, 166)
-C_MUTED = (110, 115, 125)
+# High-contrast color palette
+C_BG = (15, 17, 23)
+C_TEXT_TITLE = (255, 255, 255)
+C_TEXT_SUB = (205, 215, 230)
+C_MUTED = (165, 180, 202)
 
 # Axis colors
-C_X = (46, 204, 113)   # Front / +X (Green)
-C_Y = (231, 76, 60)    # Right / +Y (Red)
-C_Z = (245, 247, 250)  # Top / +Z (White)
+C_X = (52, 211, 153)   # Front / +X (Green)
+C_Y = (248, 113, 113)  # Right / +Y (Red)
+C_Z = (255, 255, 255)  # Top / +Z (White)
 
-# Wireframe / cubelet colors
-C_DARK_TOP = (32, 35, 42)
-C_DARK_FRONT = (26, 28, 34)
-C_DARK_RIGHT = (22, 24, 29)
-C_DARK_EDGE = (48, 52, 62)
+# Wireframe / cubelet colors (crisply visible)
+C_DARK_TOP = (58, 66, 82)
+C_DARK_FRONT = (46, 53, 67)
+C_DARK_RIGHT = (36, 42, 54)
+C_DARK_EDGE = (90, 102, 126)
 
 # Centers highlight
-C_CENTER_FRONT = (46, 204, 113)  # Green
-C_CENTER_RIGHT = (231, 76, 60)   # Red
-C_CENTER_TOP = (245, 247, 250)   # White
+C_CENTER_FRONT = (52, 211, 153)  # Green
+C_CENTER_RIGHT = (248, 113, 113)  # Red
+C_CENTER_TOP = (255, 255, 255)    # White
 
 # Isometric projection setup
 rad30 = math.radians(30)

@@ -22,30 +22,30 @@ draw = ImageDraw.Draw(img)
 
 # Fonts
 font_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 22 * SCALE)
-font_sub = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 14 * SCALE)
+font_sub = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 14 * SCALE)
 font_stat = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 14 * SCALE)
-font_callout_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 15 * SCALE)
-font_callout_body = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 13 * SCALE)
+font_callout_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 16 * SCALE)
+font_callout_body = ImageFont.truetype(str(FONTS_DIR / "Roboto-Medium.ttf"), 14 * SCALE)
 
-# Color palette
-C_BG = (18, 19, 22)
-C_CARD_BG = (24, 26, 30)
-C_CARD_BORDER = (42, 45, 52)
-C_TEXT_TITLE = (240, 242, 246)
-C_TEXT_SUB = (150, 155, 166)
-C_TEXT_MUTED = (110, 115, 125)
+# High-contrast color palette
+C_BG = (15, 17, 23)
+C_CARD_BG = (24, 28, 38)
+C_CARD_BORDER = (65, 75, 96)
+C_TEXT_TITLE = (255, 255, 255)
+C_TEXT_SUB = (205, 215, 230)
+C_TEXT_MUTED = (165, 180, 202)
 
-C_DARK_TOP = (40, 43, 50)
-C_DARK_FRONT = (32, 34, 40)
-C_DARK_RIGHT = (26, 28, 33)
-C_DARK_EDGE = (55, 60, 70)
+C_DARK_TOP = (58, 66, 82)
+C_DARK_FRONT = (46, 53, 67)
+C_DARK_RIGHT = (36, 42, 54)
+C_DARK_EDGE = (90, 102, 126)
 
-C_ACCENT = (56, 189, 248)       # Cyan
-C_ACCENT_FRONT = (34, 150, 205)
-C_ACCENT_RIGHT = (22, 115, 165)
-C_WHITE = (245, 247, 250)
-C_GREEN = (46, 204, 113)
-C_GOLD = (241, 196, 15)
+C_ACCENT = (65, 205, 255)       # Electric Cyan
+C_ACCENT_FRONT = (38, 165, 225)
+C_ACCENT_RIGHT = (25, 130, 185)
+C_WHITE = (255, 255, 255)
+C_GREEN = (52, 211, 153)
+C_GOLD = (250, 204, 21)
 
 # Isometric projection setup
 ang30 = math.radians(30)
@@ -211,7 +211,7 @@ for c in callouts:
     c_w = SW - pad - cx_right - 24 * SCALE
 
     # Card background
-    draw.rounded_rectangle([cx_right, card_y, cx_right + c_w, card_y + c_h], radius=10 * SCALE, fill=(30, 33, 40), outline=(48, 52, 64), width=1 * SCALE)
+    draw.rounded_rectangle([cx_right, card_y, cx_right + c_w, card_y + c_h], radius=10 * SCALE, fill=(30, 35, 48), outline=(65, 75, 96), width=1 * SCALE)
 
     # Number pill
     pill_r = 13 * SCALE
