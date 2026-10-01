@@ -34,7 +34,7 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
 - **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
 - **Move:** A 90° rotation of an outer slice around a coordinate axis.
 
-> **Key Idea 1 (Standard): Fixed Centers by Restricting to Outer-Slice Moves**  
+> **Key Idea 1 (Standard): Fix Centers by Restricting to Outer-Slice Moves**  
 > The 12 90° outer-slice rotations (6 faces $\times$ 2 directions) are sufficient to generate any Rubik's Cube configuration. By omitting whole-cube and inner-slice rotations, the center cubelets remain permanently fixed in space.
 
 ---
