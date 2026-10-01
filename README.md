@@ -169,7 +169,7 @@ Every cubelet starts at its canonical home position $c \in \lbrace -1, 0, 1 \rbr
    A cubelet is in its solved position and orientation if and only if all of its facelets point back toward their home center cubelets:
    $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
 
-![Geometric Intuition: Basis Vectors, Colors, and diag(c)](img/basis-colors-diag.png)
+<img src="img/basis-colors-diag.png" alt="The Geometric Trick: Facelet Normals as Matrix Columns" width="700">
 
 In [`rubix.py`](rubix.py), checking whether a cubelet is solved ([`is_cubelet_solved`](rubix.py#L204-L207)) or reading current facelet orientations ([`describe_config`](rubix.py#L75-L82)) takes just two lines:
 
