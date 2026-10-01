@@ -48,21 +48,23 @@ At first glance, representing a Rubik's cube might seem straightforward: track 5
 
 **What if we treat the Rubik's Cube as what it physically is: a rigid 3D object in space?**
 
-Instead of 54 independent stickers, the puzzle is composed of **27 cubelets** arranged in a $3 \times 3 \times 3$ grid. We anchor our coordinate frame at the geometric center of the cube: $(0, 0, 0)$.
+Instead of 54 independent stickers, the puzzle is composed of **27 cubelets** arranged in a $3 \times 3 \times 3$ grid. 
 
-Each cubelet has an integer coordinate $(x, y, z)$ with values in $\lbrace -1, 0, 1 \rbrace$:
+Look inside a physical Rubik's cube, and its defining structural backbone becomes immediately apparent: a rigid **3-dimensional cross** connecting the internal core to the six face centers along the coordinate axes. When you turn an outer slice, the layer rotates *around* an arm of this cross.
+
+By anchoring our origin at the core $(0, 0, 0)$, this 3D cross becomes our Cartesian coordinate frame:
 
 <p align="center">
-  <img src="img/coordinate-frame.png" alt="Discrete 3D Coordinate Space and Spindle Axes" width="600">
+  <img src="img/coordinate-frame.png" alt="Discrete 3D Coordinate Space: The 3D Cross and Fixed Points" width="600">
 </p>
 
-Each coordinate axis corresponds to an opposing pair of faces:
+Each axis corresponds to an opposing pair of faces, with cubelet coordinates $(x, y, z) \in \lbrace -1, 0, 1 \rbrace^3$:
 - **X-axis:** $+X$ points **Front** and $-X$ points **Back**.
 - **Y-axis:** $+Y$ points **Right** and $-Y$ points **Left**.
 - **Z-axis:** $+Z$ points **Top** and $-Z$ points **Bottom**.
 
-> **Key Idea 2 (Rubix): Axis Intersections as Invariant Fixed Points**  
-> All 7 cubelets intersecting a coordinate axis are fixed points in Euclidean space: the internal core at $(0,0,0)$ and the 6 face centers at unit distance $(\pm 1, 0, 0)$, $(0, \pm 1, 0)$, $(0, 0, \pm 1)$. Because slice rotations turn strictly *around* these coordinate axes, the spindle axes physically pierce and preserve these stationary anchors throughout every legal move.
+> **Key Idea 2 (Rubix): The 3D Cross as an Invariant Coordinate Frame**  
+> All 7 cubelets forming the 3D cross (the internal core at $(0,0,0)$ and the 6 face centers at unit distance) are invariant fixed points in Euclidean space. Because every outer-slice move rotates strictly *around* an arm of this cross, the entire cross remains permanently stationary—anchoring our 3D reference frame throughout every legal move.
 
 ---
 
@@ -119,7 +121,7 @@ Now comes the next puzzle: *how do we represent colors?*
 
 In traditional software, colors are arbitrary strings (`'WHITE'`, `'GREEN'`) or integer tags (`0`, `1`). But look at the physical mechanism of a Rubik's Cube:
 
-Because moves only rotate outer slices, the **6 center cubelets are physically locked to the core spindle**. They never move relative to each other:
+Because moves only rotate outer slices, the **6 center cubelets are the immovable arms of the 3D cross**. They never move relative to each other:
 - The Green center is permanently at $(+1, 0, 0)$ [Front].
 - The Blue center is permanently at $(-1, 0, 0)$ [Back].
 - The Red center is permanently at $(0, +1, 0)$ [Right].

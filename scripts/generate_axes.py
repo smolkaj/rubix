@@ -105,8 +105,8 @@ def draw_cubelet_face(i, j, k, face_type, fill, outline, width=1):
     draw.polygon([p1, p2, p3, p4], fill=fill, outline=outline, width=width)
 
 # Draw title and subtitle
-draw.text((36 * SCALE, 22 * SCALE), "Discrete 3D Coordinate Space: Spindle Axes & Fixed Points", fill=C_TEXT_TITLE, font=font_title)
-draw.text((36 * SCALE, 52 * SCALE), "The 3 coordinate axes pierce the core at (0,0,0) and the 6 centers, creating invariant Euclidean fixed points.", fill=C_TEXT_SUB, font=font_subtitle)
+draw.text((36 * SCALE, 22 * SCALE), "Discrete 3D Coordinate Space: The 3D Cross & Fixed Points", fill=C_TEXT_TITLE, font=font_title)
+draw.text((36 * SCALE, 52 * SCALE), "The rigid 3D cross joins the core at (0,0,0) to the 6 centers, creating invariant Euclidean fixed points.", fill=C_TEXT_SUB, font=font_subtitle)
 
 # Negative axis arrows (drawn behind the cube)
 # -Z axis (Bottom)
@@ -197,8 +197,8 @@ box_h = 48 * SCALE
 bx0 = (W - box_w) // 2
 by0 = H - box_h - 18 * SCALE
 draw.rounded_rectangle([bx0, by0, bx0 + box_w, by0 + box_h], radius=8*SCALE, fill=(24, 26, 31), outline=(45, 48, 58), width=1*SCALE)
-draw.text((bx0 + 20*SCALE, by0 + 8*SCALE), "Invariant: All 7 axis cubelets (Core + 6 Centers) are fixed points.", fill=C_TEXT_TITLE, font=font_label)
-draw.text((bx0 + 20*SCALE, by0 + 26*SCALE), "Rotating an outer slice leaves its axle and center permanently locked in space.", fill=C_TEXT_SUB, font=font_small)
+draw.text((bx0 + 20*SCALE, by0 + 8*SCALE), "Invariant: All 7 cubelets of the 3D cross (Core + 6 Centers) are fixed points.", fill=C_TEXT_TITLE, font=font_label)
+draw.text((bx0 + 20*SCALE, by0 + 26*SCALE), "Rotating an outer slice leaves the entire 3D cross permanently locked in space.", fill=C_TEXT_SUB, font=font_small)
 
 # Save
 out_path = REPO_ROOT / "img" / "coordinate-frame.png"
