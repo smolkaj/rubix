@@ -6,7 +6,7 @@
 
 Most Rubik's cube software relies on complex combinatorial representations: 54 color stickers mapped across 6 face arrays, lookup tables for permutations, or massive pattern databases.
 
-**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space, the entire physics and state of the Rubik's Cube reduces to **vectors, rotation matrices, and dot products**. The core solver ([`rubix.py`](rubix.py)) reliably solves full 100,000-move scrambles with zero external puzzle libraries, pattern databases, or precomputed tables (typically in ~15–30s, or a few minutes for tough scrambles using randomized restarts).
+**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space, the entire physics and state of the Rubik's Cube reduces to **vectors, rotation matrices, and dot products**. The core solver ([`rubix.py`](rubix.py)) reliably solves full 100,000-move scrambles in **seconds** with zero external puzzle libraries, pattern databases, or precomputed tables (typically ~10–25s).
 
 ---
 
@@ -135,8 +135,8 @@ A\* needs a sense of direction so it doesn't search aimlessly. Rather than stori
 - **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
 
 ### Search Performance & Randomized Restarts
-- **Throughput:** Simulates ~35,000 moves/sec via vector dot products and memoized transposition caching.
-- **Randomized Restarts:** To escape deep local plateaus in complex scrambles without storing massive precomputed pattern tables, A\* incorporates subtle priority randomization (`RANDOMIZE_SEARCH = True`) protected by exponential restart timeouts (`with_restarts`). Typical scrambles solve in 15–30 seconds; difficult configurations that trigger a restart resolve in 1–3 minutes.
+- **Throughput:** Simulates ~50,000 moves/sec via vector dot products and memoized transposition caching.
+- **Randomized Restarts:** To escape deep local plateaus in complex scrambles without storing massive precomputed pattern tables, A\* incorporates subtle priority randomization (`RANDOMIZE_SEARCH = True`) protected by exponential restart timeouts (`with_restarts`). Typical scrambles solve in 5–20 seconds; difficult configurations that trigger a restart typically resolve in under a minute.
 
 ---
 
