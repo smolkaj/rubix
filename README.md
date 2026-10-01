@@ -22,17 +22,17 @@ The payoff of this linear algebra formulation is radical simplicity: the entire 
 ### Key Terminology
 
 <p align="center">
-  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Face, Slice, Cubelet, and Facelet" width="700">
+  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Facelet, Face, Cubelet, and Slice" width="700">
 </p>
 
-- **Face:** One of the 6 sides of the cube (Front, Back, Right, Left, Top, Bottom). A face is a 2D exterior surface made of 9 outer facelets pointing in the same direction.
-- **Slice:** A 3D layer of 9 cubelets that rotate together as a rigid unit. An **outer slice** is the physical layer behind a **face**—turning a face physically rotates its corresponding slice.
-- **Cubelet:** One of the 27 constituent $1 \times 1 \times 1$ cubes that make up the puzzle. Mechanically, there are four types:
-  - **Core:** Hidden internal mechanism at the origin.
-  - **Center:** Center of each face, anchored to the central spindle.
-  - **Edge:** Border cubelet between two faces.
-  - **Corner:** Vertex cubelet joining three faces.
-- **Facelet:** One of the 54 individual colored square stickers ($1 \times 1$) on the exterior of a cubelet.
+- **Facelet:** One of the 54 colored square stickers ($1 \times 1$) on the exterior of the puzzle.
+- **Face:** One of the 6 exterior sides of the puzzle (Front, Back, Right, Left, Top, Bottom), each formed by a $3 \times 3$ grid of 9 facelets.
+- **Cubelet:** One of the 27 smaller $1 \times 1 \times 1$ cubes that compose the puzzle. Depending on how many facelets they expose, cubelets fall into four types:
+  - **Core:** Exposes 0 facelets (hidden internal mechanism at the origin).
+  - **Center:** Exposes 1 facelet (center of each face, anchored to the internal cross).
+  - **Edge:** Exposes 2 facelets (border between two adjacent faces).
+  - **Corner:** Exposes 3 facelets (vertex joining three faces).
+- **Slice:** A 3D layer of 9 cubelets that rotate together as a rigid unit. An **outer slice** is the physical layer directly behind an exterior **face**.
 - **Move:** A 90° rotation of an outer slice around a coordinate axis.
 
 > [!TIP]

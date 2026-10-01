@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate a clean 4-panel diagram illustrating Rubix terminology:
-Face, Slice, Cubelet, and Facelet.
+Facelet, Face, Cubelet, and Slice.
 """
 
 from math import cos, sin, radians
@@ -178,6 +178,14 @@ def render_cube(draw, cx, cy, sz, mode):
 # Define 4 panels
 panels = [
     {
+        "title": "Facelet",
+        "sub": "Surface sticker patch",
+        "stat": "1 of 54 stickers",
+        "stat_col": C_GOLD,
+        "mode": "facelet",
+        "desc": "1×1 colored sticker",
+    },
+    {
         "title": "Face",
         "sub": "2D exterior surface",
         "stat": "1 of 6 sides",
@@ -186,28 +194,20 @@ panels = [
         "desc": "9 outer stickers",
     },
     {
-        "title": "Slice",
-        "sub": "3D layer of cubelets",
-        "stat": "1 of 9 slices",
-        "stat_col": C_ACCENT,
-        "mode": "slice",
-        "desc": "9 rotating cubelets",
-    },
-    {
         "title": "Cubelet",
-        "sub": "Constituent 1×1×1 cube",
+        "sub": "Individual 1×1×1 cube",
         "stat": "1 of 27 cubelets",
         "stat_col": C_GREEN,
         "mode": "cubelet",
         "desc": "Rigid 1×1×1 body",
     },
     {
-        "title": "Facelet",
-        "sub": "Surface sticker patch",
-        "stat": "1 of 54 stickers",
-        "stat_col": C_GOLD,
-        "mode": "facelet",
-        "desc": "1×1 colored sticker",
+        "title": "Slice",
+        "sub": "3D layer of cubelets",
+        "stat": "1 of 9 slices",
+        "stat_col": C_ACCENT,
+        "mode": "slice",
+        "desc": "9 rotating cubelets",
     },
 ]
 
