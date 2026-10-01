@@ -27,6 +27,7 @@ _print = print
 def print(*args, **kw):
   _print("[%s]" % (datetime.now().strftime('%H:%M:%S')), *args, **kw)
 
+# Returns the 1-norm of a vector.
 def norm1(v): return abs(v[0]) + abs(v[1]) + abs(v[2])
 
 # Returns a 2-dimensional matrix as a tuple.
