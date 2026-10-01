@@ -396,7 +396,7 @@ class TestRubiksCubeScanner(unittest.TestCase):
         prior_conf = model.get_confidence("FRONT", 1, 1)
         prior_ent = model.get_facelet_entropy("FRONT", 1, 1)
 
-        # Apply uninformative shadow likelihood
+        # Apply uninformative shadow likelihood to single facelet
         model.update_facelet_belief("FRONT", 1, 1, lh_shadow)
         post_conf = model.get_confidence("FRONT", 1, 1)
         post_ent = model.get_facelet_entropy("FRONT", 1, 1)
@@ -404,6 +404,60 @@ class TestRubiksCubeScanner(unittest.TestCase):
         # Belief and entropy remain uncorrupted
         self.assertAlmostEqual(post_conf, prior_conf, places=3)
         self.assertAlmostEqual(post_ent, prior_ent, places=3)
+
+        # Full face shadow rejection: feeding uniform shadow across entire face
+        # must NOT confirm face, must NOT assign fake WHITE stickers, and must maintain maximal entropy
+        model_shadow = self.CubeModel()
+        shadow_grid = [[lh_shadow for _ in range(3)] for _ in range(3)]
+        model_shadow.update_face_bayesian("FRONT", shadow_grid, auto_orient=True)
+        self.assertFalse(model_shadow.confirmed_faces["FRONT"])
+        for r in range(3):
+            for c in range(3):
+                self.assertIsNone(model_shadow.faces["FRONT"][r][c])
+                self.assertAlmostEqual(model_shadow.get_confidence("FRONT", r, c), 1.0 / 6.0, places=4)
+        self.assertAlmostEqual(model_shadow.get_face_entropy("FRONT"), 9 * np.log2(6), places=3)
+
+    def test_bayesian_intermediate_belief_preservation(self):
+        """Verify that getters and UI queries preserve intermediate Bayesian beliefs without premature clobbering."""
+        model = self.CubeModel()
+        # Likelihood giving ~50% confidence for GREEN
+        lh = {"GREEN": 0.50, "WHITE": 0.10, "YELLOW": 0.10, "BLUE": 0.10, "RED": 0.10, "ORANGE": 0.10}
+        best_c, conf = model.update_facelet_belief("FRONT", 1, 1, lh)
+        self.assertEqual(best_c, "GREEN")
+        self.assertAlmostEqual(conf, 0.50, places=3)
+
+        # Querying confidence, MAP color, entropy, or progress must NOT mutate internal belief
+        q_conf = model.get_confidence("FRONT", 1, 1)
+        self.assertAlmostEqual(q_conf, 0.50, places=3)
+        self.assertAlmostEqual(model.beliefs["FRONT"][1][1]["GREEN"], 0.50, places=3)
+
+        q_face_conf = model.get_face_confidence("FRONT")
+        self.assertAlmostEqual(model.beliefs["FRONT"][1][1]["GREEN"], 0.50, places=3)
+
+        q_ent = model.get_facelet_entropy("FRONT", 1, 1)
+        self.assertAlmostEqual(model.beliefs["FRONT"][1][1]["GREEN"], 0.50, places=3)
+
+        # Manual facelet modification from outside still synchronizes properly
+        model.faces["FRONT"][0][0] = "YELLOW"
+        self.assertEqual(model.get_map_color("FRONT", 0, 0), "YELLOW")
+        self.assertGreater(model.get_confidence("FRONT", 0, 0), 0.90)
+
+    def test_incomplete_face_not_confirmed(self):
+        """Verify that a face with missing/unidentified stickers is not marked confirmed even if average confidence is high."""
+        model = self.CubeModel()
+        lh_green = {c: (0.95 if c == "GREEN" else 0.01) for c in self.CANONICAL_COLORS}
+        lh_shadow = {c: 1.0 / 6.0 for c in self.CANONICAL_COLORS}
+        grid_lh = [[lh_green for _ in range(3)] for _ in range(3)]
+        grid_lh[0][0] = lh_shadow  # one unobserved sticker
+
+        model.update_face_bayesian("FRONT", grid_lh, auto_orient=False)
+        self.assertFalse(model.confirmed_faces["FRONT"])
+        self.assertIsNone(model.faces["FRONT"][0][0])
+        # After observing the missing sticker, face confirms
+        grid_lh[0][0] = lh_green
+        model.update_face_bayesian("FRONT", grid_lh, auto_orient=False)
+        self.assertTrue(model.confirmed_faces["FRONT"])
+        self.assertEqual(model.faces["FRONT"][0][0], "GREEN")
 
     def test_shannon_entropy_rotation_guidance(self):
         """Verify that Shannon entropy accurately guides rotation toward faces with highest uncertainty."""

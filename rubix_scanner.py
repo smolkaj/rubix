@@ -466,6 +466,9 @@ class CubeModel:
         self.faces: Dict[str, List[List[Optional[str]]]] = {
             name: [[None] * 3 for _ in range(3)] for name in FACE_NORMALS
         }
+        self._synced_faces: Dict[str, List[List[Optional[str]]]] = {
+            name: [[None] * 3 for _ in range(3)] for name in FACE_NORMALS
+        }
         self.confirmed_faces: Dict[str, bool] = {name: False for name in FACE_NORMALS}
         self.face_scan_counts: Dict[str, int] = {name: 0 for name in FACE_NORMALS}
         self.confirmation_threshold: float = 0.82
@@ -477,21 +480,26 @@ class CubeModel:
                 [{c: 1.0 / 6.0 for c in CANONICAL_COLORS} for _ in range(3)] for _ in range(3)
             ]
             self.faces[name] = [[None] * 3 for _ in range(3)]
+            self._synced_faces[name] = [[None] * 3 for _ in range(3)]
             self.confirmed_faces[name] = False
             self.face_scan_counts[name] = 0
 
     def sync_beliefs_from_faces(self):
-        """Synchronizes beliefs if faces grid was modified directly."""
+        """Synchronizes beliefs if faces grid was modified directly from outside."""
         for face_name in FACE_NORMALS:
             for r in range(3):
                 for c in range(3):
-                    col = self.faces[face_name][r][c]
-                    if col and col in CANONICAL_COLORS:
-                        b = self.beliefs[face_name][r][c]
-                        map_c = max(b, key=b.get)
-                        if map_c != col or b[map_c] < 0.90:
+                    cur_col = self.faces[face_name][r][c]
+                    last_col = self._synced_faces[face_name][r][c]
+                    if cur_col != last_col:
+                        self._synced_faces[face_name][r][c] = cur_col
+                        if cur_col and cur_col in CANONICAL_COLORS:
                             self.beliefs[face_name][r][c] = {
-                                cn: (0.995 if cn == col else 0.001) for cn in CANONICAL_COLORS
+                                cn: (0.995 if cn == cur_col else 0.001) for cn in CANONICAL_COLORS
+                            }
+                        elif cur_col is None:
+                            self.beliefs[face_name][r][c] = {
+                                cn: 1.0 / 6.0 for cn in CANONICAL_COLORS
                             }
 
     def set_facelet(self, face_name: str, r: int, c: int, color: str):
@@ -499,6 +507,7 @@ class CubeModel:
         if face_name not in self.faces or color not in CANONICAL_COLORS:
             return
         self.faces[face_name][r][c] = color
+        self._synced_faces[face_name][r][c] = color
         self.beliefs[face_name][r][c] = {
             cn: (0.995 if cn == color else 0.001) for cn in CANONICAL_COLORS
         }
@@ -532,6 +541,10 @@ class CubeModel:
         # Update MAP facelet if confidence has risen above uniform
         if confidence > 0.25:
             self.faces[face_name][r][c] = best_color
+            self._synced_faces[face_name][r][c] = best_color
+        else:
+            self.faces[face_name][r][c] = None
+            self._synced_faces[face_name][r][c] = None
 
         return best_color, confidence
 
@@ -549,15 +562,20 @@ class CubeModel:
         if auto_orient:
             best_errors_count = float("inf")
             prev_grid = [row[:] for row in self.faces[face_name]]
+            prev_synced = [row[:] for row in self._synced_faces[face_name]]
             prev_confirmed = self.confirmed_faces[face_name]
 
             for k in [0, 1, 2, 3]:
                 cand_lh = rotate_grid_cw(grid_likelihoods, k)
                 cand_colors = [
-                    [max(cand_lh[r][c], key=cand_lh[r][c].get) for c in range(3)]
+                    [
+                        (max(cand_lh[r][c], key=cand_lh[r][c].get) if max(cand_lh[r][c].values()) > 0.25 else None)
+                        for c in range(3)
+                    ]
                     for r in range(3)
                 ]
                 self.faces[face_name] = cand_colors
+                self._synced_faces[face_name] = cand_colors
                 self.confirmed_faces[face_name] = True
                 is_valid, errors, _ = self.validate()
                 total_errors = len(errors)
@@ -569,6 +587,7 @@ class CubeModel:
                     best_likelihoods = cand_lh
 
             self.faces[face_name] = prev_grid
+            self._synced_faces[face_name] = prev_synced
             self.confirmed_faces[face_name] = prev_confirmed
 
         # Apply Bayesian updates with best oriented likelihoods
@@ -576,9 +595,10 @@ class CubeModel:
             for c in range(3):
                 self.update_facelet_belief(face_name, r, c, best_likelihoods[r][c])
 
-        # Auto-confirm face if average confidence exceeds threshold
+        # Auto-confirm face if all stickers identified and average confidence exceeds threshold
+        all_identified = all(self.faces[face_name][r][c] is not None for r in range(3) for c in range(3))
         avg_conf = self.get_face_confidence(face_name)
-        if avg_conf >= self.confirmation_threshold:
+        if all_identified and avg_conf >= self.confirmation_threshold:
             self.confirmed_faces[face_name] = True
 
         return True
@@ -598,11 +618,13 @@ class CubeModel:
         if auto_orient:
             best_errors_count = float("inf")
             prev_grid = [row[:] for row in self.faces[face_name]]
+            prev_synced = [row[:] for row in self._synced_faces[face_name]]
             prev_confirmed = self.confirmed_faces[face_name]
 
             for k in [0, 1, 2, 3]:
                 cand = rotate_grid_cw(grid_colors, k)
                 self.faces[face_name] = cand
+                self._synced_faces[face_name] = cand
                 self.confirmed_faces[face_name] = True
                 is_valid, errors, _ = self.validate()
                 total_errors = len(errors)
@@ -614,9 +636,11 @@ class CubeModel:
                     best_grid = cand
 
             self.faces[face_name] = prev_grid
+            self._synced_faces[face_name] = prev_synced
             self.confirmed_faces[face_name] = prev_confirmed
 
         self.faces[face_name] = [row[:] for row in best_grid]
+        self._synced_faces[face_name] = [row[:] for row in best_grid]
         self.confirmed_faces[face_name] = True
         self.face_scan_counts[face_name] += 1
 
@@ -674,7 +698,6 @@ class CubeModel:
 
     def get_progress(self) -> Tuple[int, int, Dict[str, int]]:
         """Returns (confirmed_faces_count, confirmed_stickers_count, color_counts)."""
-        self.sync_beliefs_from_faces()
         faces_count = sum(1 for conf in self.confirmed_faces.values() if conf)
         stickers_count = 0
         color_counts = {c: 0 for c in CANONICAL_COLORS}
@@ -690,7 +713,6 @@ class CubeModel:
 
     def get_conflicts(self) -> set:
         """Returns the set of (face_name, r, c) coordinates of stickers involved in conflicts."""
-        self.sync_beliefs_from_faces()
         conflicts = set()
         _, _, color_counts = self.get_progress()
 
@@ -809,9 +831,9 @@ class CubeModel:
 
         face_entropies = {f: self.get_face_entropy(f) for f in FACE_NORMALS}
 
-        # Candidate unconfirmed or high uncertainty faces (H > 1.5 bits)
+        # Candidate unconfirmed faces
         unconfirmed = [f for f, conf in self.confirmed_faces.items() if not conf]
-        if not unconfirmed and all(h <= 1.5 for h in face_entropies.values()):
+        if not unconfirmed:
             return "Analyzing cube state..."
 
         # Priority target: highest entropy among unconfirmed faces (or all faces if none unconfirmed)
@@ -829,8 +851,8 @@ class CubeModel:
             cur = current_visible_face
             cur_entropy = face_entropies[cur]
 
-            # If current face still has high entropy, hold it steady
-            if cur in unconfirmed and cur_entropy > 2.5:
+            # If current face is still unconfirmed, hold it steady
+            if cur in unconfirmed:
                 return f"Hold the {cur} face steady to capture (Uncertainty: {cur_entropy:.1f}b)..."
 
             if cur == target_face:
