@@ -26,7 +26,7 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 </p>
 
 <p align="center">
-  <img src="img/cubelet-types.png" alt="Cubelet Types: Core, Center, Edge, and Corner" width="1000">
+  <img src="img/cubelet-types.png" alt="Cubelet Types: Corner, Edge, Center, and Core" width="1000">
 </p>
 
 <p align="center">

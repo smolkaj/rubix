@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate a clean 4-panel diagram illustrating the four Cubelet types:
-Core (0 facelets), Center (1 facelet), Edge (2 facelets), and Corner (3 facelets).
+Corner (3 facelets), Edge (2 facelets), Center (1 facelet), and Core (0 facelets).
 """
 
 import math
@@ -219,23 +219,15 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
                 draw_cubelet_face(draw, i, j, k, "right", cx, cy, sz, fill_right, edge_right, w_right)
 
 
-# Define 4 panels
+# Define 4 panels in descending order: 3 -> 2 -> 1 -> 0 faces
 panels = [
     {
-        "title": "Core",
-        "sub": "Internal mechanism",
-        "stat": "0 facelets",
-        "stat_col": C_PURPLE,
-        "mode": "core",
-        "desc": "Hidden at origin (0, 0, 0)",
-    },
-    {
-        "title": "Center",
-        "sub": "Face-center cubelet",
-        "stat": "1 facelet",
-        "stat_col": C_WHITE,
-        "mode": "center",
-        "desc": "Anchored to internal cross",
+        "title": "Corner",
+        "sub": "Vertex cubelet",
+        "stat": "3 facelets",
+        "stat_col": C_GOLD,
+        "mode": "corner",
+        "desc": "Part of 3 faces",
     },
     {
         "title": "Edge",
@@ -243,15 +235,23 @@ panels = [
         "stat": "2 facelets",
         "stat_col": C_ACCENT,
         "mode": "edge",
-        "desc": "Borders 2 adjacent faces",
+        "desc": "Part of 2 faces",
     },
     {
-        "title": "Corner",
-        "sub": "Vertex cubelet",
-        "stat": "3 facelets",
-        "stat_col": C_GOLD,
-        "mode": "corner",
-        "desc": "Joins 3 adjacent faces",
+        "title": "Center",
+        "sub": "Face-center cubelet",
+        "stat": "1 facelet",
+        "stat_col": C_WHITE,
+        "mode": "center",
+        "desc": "Part of 1 face",
+    },
+    {
+        "title": "Core",
+        "sub": "Interior cubelet",
+        "stat": "0 facelets",
+        "stat_col": C_PURPLE,
+        "mode": "core",
+        "desc": "Part of 0 faces",
     },
 ]
 
