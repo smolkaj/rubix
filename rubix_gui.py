@@ -269,7 +269,16 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left mouse button
                     if scan_button[1].collidepoint(event.pos):
-                        print("Scan my cube button clicked (no-op for now)")
+                        from rubix_scanner import run_scanner
+                        scanned = run_scanner(screen)
+                        if scanned is not None:
+                            cube = scanned
+                            original_cube = cube
+                            solution = None
+                            move_index = 0
+                            current_move = None
+                            next_cube = None
+                            animation_progress = 0
                     elif shuffle_button[1].collidepoint(event.pos):
                         cube = shuffle(solved_cube, iterations=999, seed=None)
                         original_cube = cube
@@ -285,6 +294,18 @@ def main():
                         next_cube = None
                         animation_progress = 0
                         original_cube = cube
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_s:
+                    from rubix_scanner import run_scanner
+                    scanned = run_scanner(screen)
+                    if scanned is not None:
+                        cube = scanned
+                        original_cube = cube
+                        solution = None
+                        move_index = 0
+                        current_move = None
+                        next_cube = None
+                        animation_progress = 0
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_RIGHT] or keys[pygame.K_LEFT]:

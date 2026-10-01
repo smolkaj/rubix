@@ -173,13 +173,33 @@ Launch the 2D cube net visualizer:
 python rubix_gui.py
 ```
 
+- **Scan my cube:** Launch the real-time webcam scanner (or press `S`) to scan a physical cube by naturally rotating it in front of the camera.
 - **Shuffle:** Click the **Shuffle** button to apply a 999-move scramble.
 - **Solve:** Click the **Solve** button to run the A\* solver with a real-time progress bar.
 - **Playback:**
   - `Right Arrow`: Step forward through the solution moves (hold to fast-forward at 15×).
   - `Left Arrow`: Step backward through the solution moves (rewind).
 
-### 2. Command-Line Solver
+### 2. Real-Time Webcam Scanner
+
+Scan a physical Rubik's cube without rigid grid constraints (similar to Apple card scanning):
+
+```bash
+# Launch scanner directly
+python rubix_scanner.py
+```
+
+![Scanner Preview](img/scanner-in-progress.png)
+
+- **Continuous AR Detection:** Hold and rotate the cube naturally in front of your camera. Real-time contour and perspective tracking locks onto the cube face and overlays an augmented reality (AR) 3x3 grid.
+- **Live Hypothesis Model:** An unfolded 2D net view shows the app's evolving guess of all 54 facelets with color counters.
+- **Dynamic Rotation Guidance:** Provides clear, real-time feedback on how to rotate the cube next (*"👉 Front captured! Rotate 90° RIGHT to show RED"*).
+- **Physical Invariant Verification:** Detects color imbalances, impossible edges, or corner chirality errors live, guiding the user to re-show conflicting faces.
+- **Interactive Correction:** Click any sticker on the live guess net to cycle colors if harsh ambient lighting causes a misread.
+- **Synthetic Demo Feed:** Press `D` to toggle a simulated 3D rotating cube feed for testing on headless machines or without a webcam.
+- **Instant Solve:** Press `SPACE` or click **Solve Cube** once verified to import the scanned cube directly into the step-by-step solver.
+
+### 3. Command-Line Solver
 
 Solve a scrambled cube directly from the terminal:
 
