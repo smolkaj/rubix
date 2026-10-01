@@ -20,30 +20,12 @@ SH = HEIGHT * SCALE
 img = Image.new("RGBA", (SW, SH), (18, 19, 22, 255))
 draw = ImageDraw.Draw(img)
 
+FONTS_DIR = REPO_ROOT / "fonts"
+
 # Fonts
-font_dir = Path("/usr/share/fonts")
-bold_font_path = None
-regular_font_path = None
-
-for path in [
-    font_dir / "truetype" / "roboto" / "unhinted" / "Roboto-Bold.ttf",
-    font_dir / "truetype" / "dejavu" / "DejaVuSans-Bold.ttf",
-]:
-    if path.exists():
-        bold_font_path = str(path)
-        break
-
-for path in [
-    font_dir / "truetype" / "roboto" / "unhinted" / "Roboto-Regular.ttf",
-    font_dir / "truetype" / "dejavu" / "DejaVuSans.ttf",
-]:
-    if path.exists():
-        regular_font_path = str(path)
-        break
-
-font_panel_title = ImageFont.truetype(bold_font_path or "sans-serif", 20 * SCALE)
-font_panel_sub = ImageFont.truetype(regular_font_path or "sans-serif", 13 * SCALE)
-font_panel_stat = ImageFont.truetype(bold_font_path or "sans-serif", 13 * SCALE)
+font_panel_title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 20 * SCALE)
+font_panel_sub = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 13 * SCALE)
+font_panel_stat = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 13 * SCALE)
 
 # Color palette
 C_BG = (18, 19, 22)
@@ -131,9 +113,6 @@ def render_cube(draw, cx, cy, sz, mode):
     cubelets.sort(key=lambda c: (c[0] + c[1] + c[2], c[2], c[0], c[1]))
 
     for i, j, k in cubelets:
-        # Determine coloring based on mode
-        is_highlight_cubelet = False
-        is_highlight_slice = (k == 1)
         is_corner = (i == 1 and j == 1 and k == 1)
 
         # Base muted fills

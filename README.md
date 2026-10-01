@@ -89,7 +89,9 @@ $$\|c\|_1 = |x| + |y| + |z|$$
 
 Total: $1 + 6 + 12 + 8 = 27$ cubelets.
 
-![Types of Cubelets](img/cubelet-types.png)
+<p align="center">
+  <img src="img/cubelet-types.png" alt="Types of Cubelets" width="600">
+</p>
 
 No lookup tables, no hardcoded classifications. The physical nature of the cubelet falls directly out of its coordinate norm.
 
