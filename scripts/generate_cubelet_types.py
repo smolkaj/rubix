@@ -41,6 +41,12 @@ C_DARK_FRONT = (46, 53, 67)
 C_DARK_RIGHT = (36, 42, 54)
 C_DARK_EDGE = (90, 102, 126)
 
+# Lightly highlighted face wash colors (shows which faces the cubelet belongs to)
+C_WASH_TOP = (76, 88, 112)
+C_WASH_FRONT = (62, 72, 94)
+C_WASH_RIGHT = (50, 58, 76)
+C_WASH_EDGE = (112, 128, 158)
+
 # Colors for facelets
 C_WHITE = (255, 255, 255)
 C_GREEN = (52, 211, 153)
@@ -157,16 +163,17 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
             draw.line([project_pt(u, 1.5, -1.5, cx, cy, sz), project_pt(u, 1.5, 1.5, cx, cy, sz)], fill=col_grid, width=w_grid)
 
     elif mode == "center":
-        # Highlight top-center (0, 0, 1): exposes exactly 1 facelet (+Z)
+        # Highlight top-center (0, 0, 1): part of 1 face (Top face lightly washed)
         for i, j, k in cubelets:
             is_center = (i == 0 and j == 0 and k == 1)
-            fill_top = C_WHITE if is_center else C_DARK_TOP
+            fill_top = C_WHITE if is_center else C_WASH_TOP
+            edge_top = (255, 255, 255) if is_center else C_WASH_EDGE
+            w_top = 2 * SCALE if is_center else 1 * SCALE
+
             fill_front = C_DARK_FRONT
             fill_right = C_DARK_RIGHT
-            edge_top = (255, 255, 255) if is_center else C_DARK_EDGE
             edge_front = C_DARK_EDGE
             edge_right = C_DARK_EDGE
-            w_top = 2 * SCALE if is_center else 1 * SCALE
             w_front = 1 * SCALE
             w_right = 1 * SCALE
 
@@ -178,17 +185,19 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
                 draw_cubelet_face(draw, i, j, k, "right", cx, cy, sz, fill_right, edge_right, w_right)
 
     elif mode == "edge":
-        # Highlight front-top edge (1, 0, 1): exposes exactly 2 facelets (+Z, +X)
+        # Highlight front-top edge (1, 0, 1): part of 2 faces (Top & Front faces lightly washed)
         for i, j, k in cubelets:
             is_edge = (i == 1 and j == 0 and k == 1)
-            fill_top = C_WHITE if is_edge else C_DARK_TOP
-            fill_front = C_GREEN if is_edge else C_DARK_FRONT
-            fill_right = C_DARK_RIGHT
-            edge_top = (255, 255, 255) if is_edge else C_DARK_EDGE
-            edge_front = (120, 255, 180) if is_edge else C_DARK_EDGE
-            edge_right = C_DARK_EDGE
+            fill_top = C_WHITE if is_edge else C_WASH_TOP
+            edge_top = (255, 255, 255) if is_edge else C_WASH_EDGE
             w_top = 2 * SCALE if is_edge else 1 * SCALE
+
+            fill_front = C_GREEN if is_edge else C_WASH_FRONT
+            edge_front = (140, 255, 195) if is_edge else C_WASH_EDGE
             w_front = 2 * SCALE if is_edge else 1 * SCALE
+
+            fill_right = C_DARK_RIGHT
+            edge_right = C_DARK_EDGE
             w_right = 1 * SCALE
 
             if k == 1:
@@ -199,17 +208,19 @@ def render_cubelet_type(draw, cx, cy, sz, mode):
                 draw_cubelet_face(draw, i, j, k, "right", cx, cy, sz, fill_right, edge_right, w_right)
 
     elif mode == "corner":
-        # Highlight front-top-right corner (1, 1, 1): exposes exactly 3 facelets (+Z, +X, +Y)
+        # Highlight front-top-right corner (1, 1, 1): part of 3 faces (Top, Front, Right faces lightly washed)
         for i, j, k in cubelets:
             is_corner = (i == 1 and j == 1 and k == 1)
-            fill_top = C_WHITE if is_corner else C_DARK_TOP
-            fill_front = C_GREEN if is_corner else C_DARK_FRONT
-            fill_right = C_RED if is_corner else C_DARK_RIGHT
-            edge_top = (255, 255, 255) if is_corner else C_DARK_EDGE
-            edge_front = (120, 255, 180) if is_corner else C_DARK_EDGE
-            edge_right = (255, 140, 130) if is_corner else C_DARK_EDGE
+            fill_top = C_WHITE if is_corner else C_WASH_TOP
+            edge_top = (255, 255, 255) if is_corner else C_WASH_EDGE
             w_top = 2 * SCALE if is_corner else 1 * SCALE
+
+            fill_front = C_GREEN if is_corner else C_WASH_FRONT
+            edge_front = (140, 255, 195) if is_corner else C_WASH_EDGE
             w_front = 2 * SCALE if is_corner else 1 * SCALE
+
+            fill_right = C_RED if is_corner else C_WASH_RIGHT
+            edge_right = (255, 160, 160) if is_corner else C_WASH_EDGE
             w_right = 2 * SCALE if is_corner else 1 * SCALE
 
             if k == 1:
