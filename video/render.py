@@ -448,10 +448,10 @@ def render_beat(beat, local, caption=""):
         matrix(draw, TOP_MATRIX, caption="M · the top quarter-turn matrix")
     elif visual in {"normals", "rotate_normals"}:
         cube(draw, move=TOP, fraction=turn, isolate=EDGE, normals=True)
-        if turn in (0., 1.):
+        if visual == "rotate_normals" and turn in (0., 1.):
             matrix(draw, TOP_MATRIX @ np.diag(EDGE) if turn == 1. else np.diag(EDGE),
                    caption="R D · current sticker directions")
-        else:
+        elif visual == "rotate_normals":
             draw.text((760, 315), "The arrows turn together", font=font(26), fill=MUTED)
     elif visual in {"decompose", "diag", "sum"}:
         rotation = partial_rotation(TOP, turn) if visual == "sum" else IDENTITY
