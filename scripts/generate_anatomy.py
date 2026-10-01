@@ -184,7 +184,7 @@ panels = [
         "stat": "1 of 54 stickers",
         "stat_col": C_GOLD,
         "mode": "facelet",
-        "desc": "1×1 colored sticker",
+        "desc": "Single 1×1 colored sticker",
     },
     {
         "title": "Face",
