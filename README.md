@@ -22,18 +22,14 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 ### Key Terminology
 
 <p align="center">
-  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Facelet, Face, Cubelet, and Slice" width="700">
+  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Facelet, Face, Cubelet, and Slice" width="800">
 </p>
 
-- **Facelet:** One of the 54 colored square stickers ($1 \times 1$) on the exterior of the puzzle.
-- **Face:** One of the 6 exterior sides of the puzzle (Front, Back, Right, Left, Top, Bottom), each formed by a $3 \times 3$ grid of 9 facelets.
-- **Cubelet:** One of the 27 smaller $1 \times 1 \times 1$ cubes that compose the puzzle. Depending on how many facelets they expose, cubelets fall into four types:
-  - **Core:** Exposes 0 facelets (hidden internal mechanism at the origin).
-  - **Center:** Exposes 1 facelet (center of each face, anchored to the internal cross).
-  - **Edge:** Exposes 2 facelets (border between two adjacent faces).
-  - **Corner:** Exposes 3 facelets (vertex joining three faces).
-- **Slice:** A 3D layer of 9 cubelets that rotate together as a rigid unit. An **outer slice** is the physical layer directly behind an exterior **face**.
-- **Move:** A 90° rotation of an outer slice around a coordinate axis.
+<p align="center">
+  <img src="img/cubelet-types.png" alt="Cubelet Types: Core, Center, Edge, and Corner" width="800">
+</p>
+
+A **Move** is a 90° rotation of an outer slice around a coordinate axis.
 
 > [!TIP]
 > **Key Idea 1 (Standard): Fix Centers by Restricting to Outer-Slice Moves**  

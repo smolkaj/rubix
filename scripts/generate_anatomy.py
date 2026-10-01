@@ -199,7 +199,7 @@ panels = [
         "stat": "1 of 27 cubelets",
         "stat_col": C_GREEN,
         "mode": "cubelet",
-        "desc": "Rigid 1×1×1 body",
+        "desc": "Single 1×1×1 cube",
     },
     {
         "title": "Slice",
