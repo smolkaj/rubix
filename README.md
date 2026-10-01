@@ -123,13 +123,14 @@ A single matrix multiplication transforms all of the cubelet's face normals into
 A cubelet is in its solved position and orientation if and only if all face normals point in their home directions:
 
 $$R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$$
-
-In [`describe_config`](rubix.py), checking where stickers point is just:
+ 
+In [`is_cubelet_solved`](rubix.py), verifying that all faces of a piece point home is literally:
 ```python
 colors = np.diag(cubelet)
 color_positions = rotation @ colors
+return np.array_equal(colors, color_positions)
 ```
-No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
+And in [`describe_config`](rubix.py), reading current sticker orientations uses the exact same matrix product `rotation @ colors`. No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
 
 ### 4. Slice Moves as Hyperplane Rotations
 
