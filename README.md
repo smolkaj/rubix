@@ -1,19 +1,19 @@
-# Rubix
+# Eigencube
 
 > A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
 <p align="center">
-  <img src="img/gui-preview.png" alt="Rubix GUI Preview" width="500">
+  <img src="img/gui-preview.png" alt="Eigencube GUI Preview" width="500">
 </p>
 
 Most Rubik's cube solvers rely on complex combinatorial bookkeeping: tracking 54 color stickers mapped across flat arrays, maintaining lookup tables for permutations, or precomputing massive 100MB pattern databases.
 
-**Rubix takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space using linear algebra, the entire physics, state, and solution of the Rubik's Cube reduce to **vectors, rotation matrices, and dot products**.
+**Eigencube takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space using linear algebra, the entire physics, state, and solution of the Rubik's Cube reduce to **vectors, rotation matrices, and dot products**.
 
-The payoff of this linear algebra formulation is **radical simplicity**: the entire puzzle model, transformations, and multi-phase solver in [`rubix.py`](rubix.py) fit in **under 400 lines of readable Python**—with zero external puzzle libraries, zero lookup tables, and zero precomputed pattern databases.
+The payoff of this linear algebra formulation is **radical simplicity**: the entire puzzle model, transformations, and multi-phase solver in [`eigencube.py`](eigencube.py) fit in **under 400 lines of readable Python**—with zero external puzzle libraries, zero lookup tables, and zero precomputed pattern databases.
 
 > [!NOTE]
-> **Shoutout:** The core insight for Rubix was directly sparked by Grant Sanderson’s ([3Blue1Brown](https://www.3blue1brown.com)) masterclass YouTube series, [**Essence of Linear Algebra**](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab). The series’ emphasis on geometric intuition—treating matrices as transformations of coordinate space and tracking where standard basis vectors land—inspired ditching messy combinatorial sticker permutations in favor of discrete 3D rotation matrices, vectors, and inner products. Massive praise and props to Grant for making linear algebra so intuitive, visual, and delightful!
+> **Shoutout:** The core insight for Eigencube was directly sparked by Grant Sanderson’s ([3Blue1Brown](https://www.3blue1brown.com)) masterclass YouTube series, [**Essence of Linear Algebra**](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab). The series’ emphasis on geometric intuition—treating matrices as transformations of coordinate space and tracking where standard basis vectors land—inspired ditching messy combinatorial sticker permutations in favor of discrete 3D rotation matrices, vectors, and inner products. Massive praise and props to Grant for making linear algebra so intuitive, visual, and delightful!
 
 ---
 
@@ -22,7 +22,7 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 ### Key Terminology
 
 <p align="center">
-  <img src="img/cube-anatomy.png" alt="Rubix Anatomy: Facelet, Face, Cubelet, and Slice" width="1000">
+  <img src="img/cube-anatomy.png" alt="Eigencube Anatomy: Facelet, Face, Cubelet, and Slice" width="1000">
 </p>
 
 <p align="center">
@@ -64,8 +64,10 @@ Each axis corresponds to an opposing pair of faces, with cubelet coordinates $(x
 - **Z-axis:** $+Z$ points **Top** and $-Z$ points **Bottom**.
 
 > [!TIP]
-> **Key Idea 2 (Rubix): The 3D Cross as an Invariant Coordinate Frame**  
+> **Key Idea 2 (Eigencube): The 3D Cross as an Invariant Coordinate Frame**  
 > All 7 cubelets forming the 3D cross (the internal core at $(0,0,0)$ and the 6 face centers at unit distance) are invariant fixed points in Euclidean space. Because every outer-slice move rotates strictly *around* an arm of this cross, the entire cross remains permanently stationary—anchoring our 3D reference frame throughout every legal move.
+>
+> In linear algebra terms: each arm of the cross is the **eigenvector** (with eigenvalue 1) of the rotation matrices that turn around it—hence the name *Eigencube*.
 
 ---
 
@@ -112,7 +114,7 @@ $$\|c\|_1 = |x| + |y| + |z|$$
 Total: $1 + 6 + 12 + 8 = 27$ cubelets.
 
 > [!TIP]
-> **Key Idea 3 (Rubix): The Manhattan Norm Classifies Cubelets for Free**  
+> **Key Idea 3 (Eigencube): The Manhattan Norm Classifies Cubelets for Free**  
 > Centering coordinates at $(0, 0, 0) \in \lbrace -1, 0, 1 \rbrace^3$ turns coordinate magnitudes into boundary indicators. The Manhattan distance $\|c\|_1 = |x| + |y| + |z|$ literally counts the number of visible colored facelets ($0 \to \text{Core}$, $1 \to \text{Center}$, $2 \to \text{Edge}$, $3 \to \text{Corner}$) with zero lookup tables or conditional branches.
 
 ---
@@ -149,7 +151,7 @@ Why invent separate color constants when the centers are already 3D vectors? We 
 With this identification, a facelet's intrinsic color is simply the center cubelet it points toward in the solved state (its outward normal vector at rest). When rotated by $R$, its color remains constant while its physical pointing direction becomes $R \cdot c_{\text{center}}$.
 
 > [!TIP]
-> **Key Idea 4 (Rubix): Colors *Are* Basis Vectors**  
+> **Key Idea 4 (Eigencube): Colors *Are* Basis Vectors**  
 > Because the 6 center cubelets never move, they define the 3D coordinate axes. A color's identity is the constant unit position vector of its center cubelet ($c_{\text{center}}$), replacing arbitrary strings or integer enums with pure vector geometry.
 
 ---
@@ -184,7 +186,7 @@ And notice the payoff connecting back to Step 2: **the matrix rank of $\mathrm{d
 $$\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1 = \text{number of visible facelets}$$
 
 > [!TIP]
-> **Key Idea 5 (Rubix): Facelet Normals as Matrix Columns via $\mathrm{diag}(c)$**  
+> **Key Idea 5 (Eigencube): Facelet Normals as Matrix Columns via $\mathrm{diag}(c)$**  
 > Expanding coordinate vector $c$ into the diagonal matrix $\mathrm{diag}(c) = [\mathbf{n}_x \;\; \mathbf{n}_y \;\; \mathbf{n}_z]$ packs all outward facelet normal vectors directly into matrix columns. Hidden internal faces automatically vanish as zero columns, and matrix rank equals the Manhattan norm ($\mathrm{rank}(\mathrm{diag}(c)) = \|c\|_1$).
 
 ---
@@ -210,7 +212,7 @@ Every cubelet starts at its canonical home position $c \in \lbrace -1, 0, 1 \rbr
   <img src="img/basis-colors-diag.png" alt="The Geometric Trick: Facelet Normals as Matrix Columns" width="700">
 </p>
 
-In [`rubix.py`](rubix.py), checking whether a cubelet is solved ([`is_cubelet_solved`](rubix.py#L204-L207)) or reading current facelet orientations ([`describe_config`](rubix.py#L75-L82)) takes just two lines:
+In [`eigencube.py`](eigencube.py), checking whether a cubelet is solved ([`is_cubelet_solved`](eigencube.py#L204-L207)) or reading current facelet orientations ([`describe_config`](eigencube.py#L75-L82)) takes just two lines:
 
 ```python
 colors = np.diag(cubelet)
@@ -221,7 +223,7 @@ return np.array_equal(colors, color_positions)
 No sticker permutation tables, no orientation state machines—just discrete 3D linear transformations.
 
 > [!TIP]
-> **Key Idea 6 (Rubix): One-Shot Simultaneous Rotation via $R \cdot \mathrm{diag}(c)$**  
+> **Key Idea 6 (Eigencube): One-Shot Simultaneous Rotation via $R \cdot \mathrm{diag}(c)$**  
 > Matrix multiplication distributes across columns simultaneously: $R \cdot \mathrm{diag}(c) = [R\mathbf{n}_x \;\; R\mathbf{n}_y \;\; R\mathbf{n}_z]$. A single matrix multiply rotates all facelets at once, reducing the solved test to $R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$ with zero permutation tracking.
 
 ---
@@ -243,7 +245,7 @@ $$R_{\text{new}} = M \cdot R$$
 Because every turn is a 90° rotation along a coordinate axis, all matrix entries in $R$ remain integers in $\lbrace -1, 0, 1 \rbrace$.
 
 > [!TIP]
-> **Key Idea 7 (Rubix): Slices as Coordinate Half-Spaces**  
+> **Key Idea 7 (Eigencube): Slices as Coordinate Half-Spaces**  
 > Instead of storing index sets for each face, determining which cubelets belong to an active slice is evaluated via a single inner product: $v \cdot (R \cdot c) > 0$.
 
 ---
@@ -252,7 +254,7 @@ Because every turn is a 90° rotation along a coordinate axis, all matrix entrie
 
 Finding the optimal solution to an arbitrary Rubik's cube is NP-hard, and God's Number (20 moves) requires massive precomputed pattern databases.
 
-[`rubix.py`](rubix.py) implements a **hierarchical multi-phase A\* search** that mimics human layer-by-layer reduction, staying strictly under 400 lines without precomputed databases:
+[`eigencube.py`](eigencube.py) implements a **hierarchical multi-phase A\* search** that mimics human layer-by-layer reduction, staying strictly under 400 lines without precomputed databases:
 
 ```
 [Scrambled Cube]
@@ -277,7 +279,7 @@ Phase 5: Endgame Permutation Alignment
 ```
 
 ### Guiding the Search: Distance Estimation
-A\* needs a sense of direction so it doesn't search aimlessly. Rather than storing gigabytes of precomputed lookup tables, Rubix calculates a quick distance estimate on the fly:
+A\* needs a sense of direction so it doesn't search aimlessly. Rather than storing gigabytes of precomputed lookup tables, Eigencube calculates a quick distance estimate on the fly:
 - **Individual cubelet distance (`min_moves_to_solved`):** Calculates how many 90° turns an isolated cubelet needs to reach its solved coordinate and orientation if no other cubelets were in the way.
 - **Layer distance:** Combines the individual estimates of the active layer's target cubelets into a single distance score, pulling the search toward states where more cubelets are closer to home.
 - **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
@@ -298,12 +300,12 @@ A\* needs a sense of direction so it doesn't search aimlessly. Rather than stori
 
 ```bash
 # Clone the repository
-git clone https://github.com/smolkaj/rubix.git
-cd rubix
+git clone https://github.com/smolkaj/eigencube.git
+cd eigencube
 
 # Create and activate a virtual environment
-python3 -m venv rubix_env
-source rubix_env/bin/activate
+python3 -m venv eigencube_env
+source eigencube_env/bin/activate
 
 # Install dependencies (numpy, pygame, opencv-python, Pillow)
 pip install -r requirements.txt
@@ -318,7 +320,7 @@ pip install -r requirements.txt
 Launch the 2D cube net visualizer:
 
 ```bash
-python rubix_gui.py
+python eigencube_gui.py
 ```
 
 - **Shuffle:** Click the **Shuffle** button to apply a 999-move scramble.
@@ -333,21 +335,21 @@ Solve a scrambled cube directly from the terminal:
 
 ```bash
 # Solve a 100,000-move scramble with default seed (42)
-python rubix.py
+python eigencube.py
 
 # Solve with a specific random seed
-python rubix.py 123
+python eigencube.py 123
 
 # Run benchmark across 100 random scrambles
-python rubix.py --benchmark
+python eigencube.py --benchmark
 ```
 
 ### 3. Programmatic Python API
 
-Use `rubix` as a lightweight puzzle simulation and solving library:
+Use `eigencube` as a lightweight puzzle simulation and solving library:
 
 ```python
-from rubix import solved_cube, shuffle, solve, describe_move, is_cube_solved, apply_move_to_cube
+from eigencube import solved_cube, shuffle, solve, describe_move, is_cube_solved, apply_move_to_cube
 
 # Create a scrambled cube
 scrambled = shuffle(solved_cube, iterations=1000, seed=42)
@@ -388,15 +390,15 @@ The test suite covers:
 ## Codebase Structure
 
 ```
-rubix/
-├── rubix.py            # Core solver & linear algebra model (< 400 lines)
-├── rubix_gui.py        # Pygame GUI with animated moves & step playback
-├── rubix_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
+eigencube/
+├── eigencube.py            # Core solver & linear algebra model (< 400 lines)
+├── eigencube_gui.py        # Pygame GUI with animated moves & step playback
+├── eigencube_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
 ├── scripts/
 │   ├── generate_anatomy.py # Cube anatomy diagram generator
 │   └── generate_diagram.py # Geometric intuition diagram generator
 ├── tests/
-│   └── test_rubix.py   # Unit test suite
+│   └── test_eigencube.py   # Unit test suite
 ├── img/                # Architectural diagrams & preview snapshots
 │   ├── basis-colors-diag.png
 │   ├── cube.png
@@ -412,8 +414,8 @@ rubix/
 
 ## Invariants & Design Principles
 
-- **A Functional Pearl (Maximally elegant, simple, and educational):** Rubix is designed in the tradition of a *functional pearl*—an elegant, instructive gem where the code is an executable mathematical specification. Code clarity, linear algebra transparency, and pedagogical beauty always trump micro-optimizations or clever programming tricks.
+- **A Functional Pearl (Maximally elegant, simple, and educational):** Eigencube is designed in the tradition of a *functional pearl*—an elegant, instructive gem where the code is an executable mathematical specification. Code clarity, linear algebra transparency, and pedagogical beauty always trump micro-optimizations or clever programming tricks.
 - **Self-documenting, transparent code:** Code should read as self-explanatory prose. Reject cryptic abbreviations, single-letter domain shorthand, or dense tuple indexing. Prefer clear, descriptive names (`left`, `top`, `bottom` rather than `L`, `U`, `D`) so anyone can understand the logic without an external decoder ring.
 - **Zero ambient magic:** No obscure puzzle encodings or heavyweight dependencies. Pure NumPy vector and matrix arithmetic.
-- **Strict code compactness:** The complete solver and domain model in `rubix.py` strictly stays below 400 lines of clean, readable Python.
-- **Headless-friendly:** GUI components decouple display initializers so importing `rubix_gui` works seamlessly in headless CI/CD environments.
+- **Strict code compactness:** The complete solver and domain model in `eigencube.py` strictly stays below 400 lines of clean, readable Python.
+- **Headless-friendly:** GUI components decouple display initializers so importing `eigencube_gui` works seamlessly in headless CI/CD environments.

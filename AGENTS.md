@@ -4,13 +4,13 @@ The repository root is a clean checkout. Keep it eagerly fast-forwarded with mai
 
 ```sh
 # Create a clean worktree branched from latest origin/main:
-git worktree add ../rubix-<task> -b <agent>/<task>
+git worktree add ../eigencube-<task> -b <agent>/<task>
 
 # Inspect active worktrees:
 git worktree list
 
 # Safely clean up worktree after PR merges:
-git worktree remove ../rubix-<task>
+git worktree remove ../eigencube-<task>
 ```
 
 - `<agent>` is your short ID (e.g. `agy`, `codex`, `claude`); `<task>` is short yet descriptive.
@@ -26,7 +26,7 @@ git worktree remove ../rubix-<task>
 
 - The user connects remotely over `ghostty` + `mosh` + `zellij`.
 - `mosh` synchronizes character cells and drops terminal graphics protocols (Kitty / Sixel). Do not expect native interactive windows to display over remote terminals, and do not expect the user to view local file artifacts or `file://` links directly.
-- Rubix is a native desktop application: `rubix_gui.py` uses Pygame and `rubix_scanner.py` uses OpenCV.
+- Eigencube is a native desktop application: `eigencube_gui.py` uses Pygame and `eigencube_scanner.py` uses OpenCV.
 - For UI inspections and visual verification:
   - Run Pygame in headless mode (`SDL_VIDEODRIVER=dummy`) or run off-screen surface rendering.
   - Export rendered frames or scanner detections to image files (e.g., `pygame.image.save()` or `cv2.imwrite()`).
@@ -37,13 +37,13 @@ git worktree remove ../rubix-<task>
 - Development environment:
   ```sh
   # Activate or create virtual environment
-  python3 -m venv rubix_env && source rubix_env/bin/activate
+  python3 -m venv eigencube_env && source eigencube_env/bin/activate
   pip install -r requirements.txt
   ```
 - Fast syntax and gate checks prior to review:
   ```sh
   # Compile check
-  python3 -m py_compile rubix.py rubix_gui.py rubix_scanner.py
+  python3 -m py_compile eigencube.py eigencube_gui.py eigencube_scanner.py
   # Run test suite
   python3 -m unittest discover tests
   ```
@@ -75,5 +75,5 @@ Whenever investigating or fixing a bug observed by a user or in production:
 All agent work must strictly preserve the repository's canonical [Invariants & Design Principles](README.md#invariants--design-principles) as well as the core development tenets:
 
 - **Single source of truth:** Code, specifications, and design principles must each have exactly one canonical representation. Reject duplicated definitions or copy-pasted guidelines across files.
-- **Simplicity above all:** Rubix is a minimalistic Rubik's cube solver (~300 lines of Python code) and visualizer. Reject accidental complexity, heavy external frameworks, or speculative abstractions.
+- **Simplicity above all:** Eigencube is a minimalistic Rubik's cube solver (~300 lines of Python code) and visualizer. Reject accidental complexity, heavy external frameworks, or speculative abstractions.
 - **Churn is free:** When a coherent simplification calls for a refactor, follow it through every affected file and call site. Diff size is not a reason to leave debt behind. The standard is a materially simpler, more understandable system.

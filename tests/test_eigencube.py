@@ -3,7 +3,7 @@ import os
 import tempfile
 import numpy as np
 
-from rubix import (
+from eigencube import (
     solved_cube,
     moves,
     unit_vectors,
@@ -19,7 +19,7 @@ from rubix import (
 )
 
 
-class TestRubixCube(unittest.TestCase):
+class TestEigencube(unittest.TestCase):
     def test_solved_cube_invariants(self):
         """Verify structural properties and L1 norm classifications of the solved cube."""
         self.assertEqual(len(solved_cube), NUM_CUBELETS)
@@ -122,7 +122,7 @@ class TestRubixCube(unittest.TestCase):
 
     def test_shuffle_reproducibility(self):
         """Shuffle with the same seed must produce identical cube states."""
-        from rubix import shuffle
+        from eigencube import shuffle
         cube_a = shuffle(solved_cube, iterations=20, seed=42)
         cube_b = shuffle(solved_cube, iterations=20, seed=42)
         cube_c = shuffle(solved_cube, iterations=20, seed=99)
@@ -132,7 +132,7 @@ class TestRubixCube(unittest.TestCase):
 
     def test_descriptions(self):
         """Verify describe_position, describe_move, and describe_cubelet_type."""
-        from rubix import describe_position, describe_move, describe_cubelet_type
+        from eigencube import describe_position, describe_move, describe_cubelet_type
         self.assertEqual(describe_position((1, 0, 0)), "front")
         self.assertEqual(describe_position((0, 1, 1)), "top-right")
         self.assertEqual(describe_position((-1, -1, -1)), "bottom-left-back")
@@ -208,20 +208,20 @@ class TestRubixCube(unittest.TestCase):
         self.assertIsNone(res_cyclic)
 
     def test_headless_gui_render(self):
-        """Verify that rubix_gui renders a frame headlessly without error."""
-        import rubix_gui
+        """Verify that eigencube_gui renders a frame headlessly without error."""
+        import eigencube_gui
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         with tempfile.TemporaryDirectory() as tmp_dir:
             out_path = os.path.join(tmp_dir, "preview.png")
-            result = rubix_gui.render_frame_to_image(solved_cube, out_path)
+            result = eigencube_gui.render_frame_to_image(solved_cube, out_path)
             self.assertEqual(result, out_path)
             self.assertTrue(os.path.exists(out_path))
             self.assertGreater(os.path.getsize(out_path), 0)
 
             # Test solving progress frame rendering
             solving_path = os.path.join(tmp_dir, "solving.png")
-            result_solving = rubix_gui.render_frame_to_image(solved_cube, solving_path, solving_cube=solved_cube)
+            result_solving = eigencube_gui.render_frame_to_image(solved_cube, solving_path, solving_cube=solved_cube)
             self.assertEqual(result_solving, solving_path)
             self.assertTrue(os.path.exists(solving_path))
             self.assertGreater(os.path.getsize(solving_path), 0)
@@ -273,7 +273,7 @@ class TestRubixCube(unittest.TestCase):
 
     def test_min_moves_to_position(self):
         """Verify min_moves_to_position ignores cubelet orientation."""
-        from rubix import min_moves_to_position, min_moves_to_solved, position
+        from eigencube import min_moves_to_position, min_moves_to_solved, position
         corner = (1, 1, -1)
         # Identity rotation: 0 moves to solved and position
         identity = ((1, 0, 0), (0, 1, 0), (0, 0, 1))
@@ -281,7 +281,7 @@ class TestRubixCube(unittest.TestCase):
         self.assertEqual(min_moves_to_solved(corner, identity), 0)
 
         # Find a rotation where corner is in home place but twisted
-        from rubix import shuffle
+        from eigencube import shuffle
         for seed in range(50):
             cube = shuffle(solved_cube, iterations=20, seed=seed)
             for c, r in cube:
@@ -292,14 +292,14 @@ class TestRubixCube(unittest.TestCase):
                     return
 
     def test_headless_gui_render_with_solution(self):
-        """Verify that rubix_gui renders frames with active solution and progress info."""
-        import rubix_gui
+        """Verify that eigencube_gui renders frames with active solution and progress info."""
+        import eigencube_gui
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         mock_solution = [((1, 0, 0), 1), ((0, 1, 0), -1)]
         with tempfile.TemporaryDirectory() as tmp_dir:
             out_path = os.path.join(tmp_dir, "preview_solution.png")
-            result = rubix_gui.render_frame_to_image(
+            result = eigencube_gui.render_frame_to_image(
                 solved_cube,
                 out_path,
                 solution=mock_solution,
@@ -312,20 +312,20 @@ class TestRubixCube(unittest.TestCase):
 
     def test_gui_text_bubble_and_buttons(self):
         """Verify GUI button and text bubble components render without error across edge cases."""
-        import rubix_gui
+        import eigencube_gui
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
-        rubix_gui.init_display()
+        eigencube_gui.init_display()
 
         # Button creation
-        surf, rect = rubix_gui.create_button("Test Button", 10, 20, 120, 35, (0, 0, 0), (255, 255, 255))
+        surf, rect = eigencube_gui.create_button("Test Button", 10, 20, 120, 35, (0, 0, 0), (255, 255, 255))
         self.assertEqual(surf.get_size(), (120, 35))
         self.assertEqual(rect.topleft, (10, 20))
 
         # Text bubble edge cases: empty text, bold prefix, progress bar
-        h_plain = rubix_gui.draw_text_bubble("Plain text", 10, 10, 200)
-        h_bold = rubix_gui.draw_text_bubble("Prefix: remaining text", 10, 10, 200, progress=0.5, bold_part="Prefix:")
-        h_empty = rubix_gui.draw_text_bubble("", 10, 10, 200, progress=1.0)
+        h_plain = eigencube_gui.draw_text_bubble("Plain text", 10, 10, 200)
+        h_bold = eigencube_gui.draw_text_bubble("Prefix: remaining text", 10, 10, 200, progress=0.5, bold_part="Prefix:")
+        h_empty = eigencube_gui.draw_text_bubble("", 10, 10, 200, progress=1.0)
         self.assertGreater(h_plain, 0)
         self.assertGreater(h_bold, 0)
         self.assertGreater(h_empty, 0)
@@ -333,61 +333,61 @@ class TestRubixCube(unittest.TestCase):
     def test_gui_font_fallback(self):
         """Verify font loading falls back safely to system fonts if font files cannot be loaded."""
         from unittest.mock import patch
-        import rubix_gui
+        import eigencube_gui
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
-        orig_regular, orig_bold = rubix_gui.font_regular, rubix_gui.font_bold
-        orig_max_h = rubix_gui.MAX_TEXT_HEIGHT
+        orig_regular, orig_bold = eigencube_gui.font_regular, eigencube_gui.font_bold
+        orig_max_h = eigencube_gui.MAX_TEXT_HEIGHT
         try:
-            rubix_gui.font_regular = None
-            rubix_gui.font_bold = None
+            eigencube_gui.font_regular = None
+            eigencube_gui.font_bold = None
             with patch("pygame.font.Font", side_effect=Exception("Simulated missing font")):
-                rubix_gui.init_display()
-                self.assertIsNotNone(rubix_gui.font_regular)
-                self.assertIsNotNone(rubix_gui.font_bold)
-                surf, _ = rubix_gui.create_button("Fallback", 0, 0, 100, 30, (0, 0, 0), (255, 255, 255))
+                eigencube_gui.init_display()
+                self.assertIsNotNone(eigencube_gui.font_regular)
+                self.assertIsNotNone(eigencube_gui.font_bold)
+                surf, _ = eigencube_gui.create_button("Fallback", 0, 0, 100, 30, (0, 0, 0), (255, 255, 255))
                 self.assertEqual(surf.get_size(), (100, 30))
         finally:
-            rubix_gui.font_regular, rubix_gui.font_bold = orig_regular, orig_bold
-            rubix_gui.MAX_TEXT_HEIGHT = orig_max_h
+            eigencube_gui.font_regular, eigencube_gui.font_bold = orig_regular, orig_bold
+            eigencube_gui.MAX_TEXT_HEIGHT = orig_max_h
 
     def test_gui_main_lifecycle(self):
         """Verify GUI main loop initializes, creates all UI components, and exits cleanly on QUIT."""
         import pygame
-        import rubix_gui
+        import eigencube_gui
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         pygame.init()
         pygame.event.post(pygame.event.Event(pygame.QUIT))
-        rubix_gui.main()
+        eigencube_gui.main()
 
     def test_gui_lifecycle_reinit_after_quit(self):
         """Verify re-initialization after pygame.quit() does not retain stale font handles or crash."""
         import pygame
-        import rubix_gui
+        import eigencube_gui
 
         os.environ["SDL_VIDEODRIVER"] = "dummy"
-        rubix_gui.init_display()
+        eigencube_gui.init_display()
         pygame.quit()
         # Second session: re-init and ensure font rendering and button creation succeed without segfault
-        rubix_gui.init_display()
-        surf, rect = rubix_gui.create_button("Reinit Test", 0, 0, 100, 30, (0, 0, 0), (255, 255, 255))
+        eigencube_gui.init_display()
+        surf, rect = eigencube_gui.create_button("Reinit Test", 0, 0, 100, 30, (0, 0, 0), (255, 255, 255))
         self.assertEqual(surf.get_size(), (100, 30))
-        h = rubix_gui.draw_text_bubble("Reinit Bubble", 0, 0, 200)
+        h = eigencube_gui.draw_text_bubble("Reinit Bubble", 0, 0, 200)
         self.assertGreater(h, 0)
 
     def test_gui_offscreen_surface_preservation(self):
         """Verify passing a custom surface to init_display is preserved across subsequent draw calls."""
         import pygame
-        import rubix_gui
+        import eigencube_gui
 
-        custom_surf = pygame.Surface((rubix_gui.WIDTH, rubix_gui.HEIGHT))
-        rubix_gui.init_display(surface=custom_surf)
-        self.assertIs(rubix_gui.screen, custom_surf)
-        rubix_gui.draw_cube_static(solved_cube)
-        self.assertIs(rubix_gui.screen, custom_surf)
-        rubix_gui.draw_text_bubble("Test Offscreen", 10, 10, 200)
-        self.assertIs(rubix_gui.screen, custom_surf)
+        custom_surf = pygame.Surface((eigencube_gui.WIDTH, eigencube_gui.HEIGHT))
+        eigencube_gui.init_display(surface=custom_surf)
+        self.assertIs(eigencube_gui.screen, custom_surf)
+        eigencube_gui.draw_cube_static(solved_cube)
+        self.assertIs(eigencube_gui.screen, custom_surf)
+        eigencube_gui.draw_text_bubble("Test Offscreen", 10, 10, 200)
+        self.assertIs(eigencube_gui.screen, custom_surf)
 
 
 if __name__ == "__main__":

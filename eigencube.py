@@ -1,6 +1,6 @@
 """ A minimalstic Rubik's cube solver.
 
-We model a rubix cube as a discrete object in 3-dimensional Euclidean space,
+We model a Rubik's cube as a discrete object in 3-dimensional Euclidean space,
 centered at the origin (0, 0, 0).
 Each *cubelet* has coordinates (x, y, z) in {-1, 0, 1}^3.
 Each *move* is a 90 degree hyperplane rotation, with the hyperplane given
@@ -374,7 +374,7 @@ if __name__ == "__main__":
   run_tests()
   arg = sys.argv[1] if len(sys.argv) > 1 else "42"
   if arg in ("-h", "--help"):
-    print("Usage: python rubix.py [seed | --benchmark]")
+    print("Usage: python eigencube.py [seed | --benchmark]")
   elif arg == "--benchmark":
     for seed in range(100):
       print("== SEED:", seed, "==========================================")
