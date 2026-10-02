@@ -6,10 +6,6 @@
 
 > A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
-<p align="center">
-  <img src="img/gui-preview.png" alt="Eigencube GUI Preview" width="500">
-</p>
-
 Most Rubik's cube solvers rely on complex combinatorial bookkeeping: tracking 54 color stickers mapped across flat arrays, maintaining lookup tables for permutations, or precomputing massive 100MB pattern databases.
 
 **Eigencube takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space using linear algebra, the entire physics, state, and solution of the Rubik's Cube reduce to **vectors, rotation matrices, and dot products**.
@@ -30,7 +26,7 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 </p>
 
 <p align="center">
-  <b>▶ <a href="https://github.com/smolkaj/eigencube/releases/download/explainer/eigencube-explainer.mp4"><i>Eigencube, explained</i></a></b> (16 minutes, captioned; <a href="https://github.com/smolkaj/eigencube/releases/download/explainer/eigencube-explainer.srt">transcript</a>)
+  <b>▶ <a href="https://github.com/smolkaj/eigencube/releases/download/explainer/eigencube-explainer.mp4"><i>Eigencube, explained</i></a></b> (16 minutes, captioned)
 </p>
 
 <!-- This table mirrors the film's closing recap (Outro in explainer/scenes.py); keep the two in step. -->

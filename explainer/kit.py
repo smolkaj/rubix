@@ -392,12 +392,40 @@ def arrow(start, end, color, thickness=0.03, segments=12, tip=1.0):
                    resolution=(segments, 6))
 
 
+class OutlinedArrow(VGroup):
+    """A black outline arrow, and the arrow it outlines (drawn on top, with the same pieces)."""
+
+
 def overlay_arrow(start, end, color, thickness=0.03):
     """An arrow drawn over everything in the 3D world, with a thin black outline so that it stays
     visible wherever it crosses the cube or other arrows."""
     outline = arrow(start, end, BLACK, thickness=2.4 * thickness, segments=6, tip=1.35)
-    return VGroup(outline, arrow(start, end, color, thickness=thickness, segments=6)
-                  ).set_shade_in_3d(False)
+    return OutlinedArrow(outline, arrow(start, end, color, thickness=thickness, segments=6)
+                         ).set_shade_in_3d(False)
+
+
+class Draw(Create):
+    """Create, except that an outlined arrow's outline grows along with the arrow it outlines.
+
+    Create draws pieces one after another, so it would draw the whole black outline first, and
+    every arrow would enter as a black silhouette. Here each outline piece shares its time slot
+    with the matching piece of the arrow."""
+
+    def begin(self):
+        members = self.mobject.family_members_with_points()
+        twin = {id(piece): match
+                for outlined in self.mobject.get_family() if isinstance(outlined, OutlinedArrow)
+                for piece, match in zip(outlined[0].family_members_with_points(),
+                                        outlined[1].family_members_with_points())}
+        own_slots = [i for i, m in enumerate(members) if id(m) not in twin]
+        slot_of = {id(members[i]): slot for slot, i in enumerate(own_slots)}
+        self.slots = [slot_of[id(twin.get(id(m), m))] for m in members]
+        self.slot_count = len(own_slots)
+        super().begin()
+
+    def interpolate_mobject(self, alpha):
+        for slot, pieces in zip(self.slots, self.get_all_families_zipped()):
+            self.interpolate_submobject(*pieces, self.get_sub_alpha(alpha, slot, self.slot_count))
 
 
 def piercing_arrow(start, surface, end, color, thickness=0.03):

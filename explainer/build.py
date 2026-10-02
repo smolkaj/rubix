@@ -186,6 +186,8 @@ def main():
     flags = ["-ql"] if args.draft else ["--resolution", "1920,1080", "--frame_rate", "30"]
     media = BUILD / ("draft" if args.draft else "final")
     media.mkdir(parents=True, exist_ok=True)
+    source_mtime = max(path.stat().st_mtime
+                       for path in [*HERE.glob("*.py"), HERE.parent / "eigencube.py"])
 
     def video(scene):
         if not args.scenes or scene in args.scenes:
@@ -193,6 +195,10 @@ def main():
         existing = list(media.glob(f"videos/scenes/*/{scene}.mp4"))
         if not existing:
             sys.exit(f"{scene} has not been rendered at this quality yet; render it too.")
+        # A final cut is what gets published, so it must not stitch in chapters (or the gates
+        # they passed) from older code. Drafts may, to keep iteration fast.
+        if not args.draft and existing[0].stat().st_mtime < source_mtime:
+            sys.exit(f"{scene} was rendered before the film's code last changed; render it too.")
         print(f"reusing the earlier render of {scene}", file=sys.stderr)
         return existing[0]
 
