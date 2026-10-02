@@ -56,11 +56,11 @@ def rounded_square(half, radius, steps=5):
 def logo_shapes(weight=1.0):
     """Polygons (points, fill, stroke, stroke_width) in model units, in drawing order.
 
-    `weight` thickens the silhouette rim and the arrow, which would otherwise vanish at favicon sizes.
+    `weight` makes the silhouette rim and the arrow bolder, which would otherwise vanish at icon sizes.
     """
     # The cube's silhouette: all corners but the nearest and farthest from the camera.
-    corners = sorted((np.array(c, float) for c in np.ndindex(2, 2, 2)), key=lambda c: np.dot(c, VIEW))[1:-1]
-    rim = [project(3 * c - 1.5) for c in corners]
+    silhouette = sorted((np.array(c, float) for c in np.ndindex(2, 2, 2)), key=lambda c: np.dot(c, VIEW))[1:-1]
+    rim = [project(3 * c - 1.5) for c in silhouette]
     center = np.mean(rim, axis=0)
     rim.sort(key=lambda p: math.atan2(p[1] - center[1], p[0] - center[0]))
     shapes = [(rim, BODY, OUTLINE, 0.09 * weight)]
@@ -163,7 +163,8 @@ def render_icon(shapes, size, background=None, margin=0.0, scale=4):
 
 
 def write_window_icon(path):
-    render_icon(logo_shapes(), 256).save(path, optimize=True)
+    # Window managers shrink this to ~24 px in title bars, so it is drawn bolder than the logo.
+    render_icon(logo_shapes(weight=1.8), 256).save(path, optimize=True)
 
 
 def write_favicon(path):
