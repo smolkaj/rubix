@@ -27,8 +27,8 @@ The rendered film (1080p, ~30 MB, English captions embedded) is a build artifact
   narration line written right next to the animation it accompanies.
 - [`kit.py`](kit.py) draws the cube straight from [`eigencube.py`](../eigencube.py): every cubelet is
   drawn at its home address and transformed by its rotation matrix R, the cubelets a move turns are
-  the ones Eigencube's own move turns, and code listings are its live source. The video cannot drift
-  from the model it explains.
+  the ones Eigencube's own move turns, and code listings are its live source. Each build renders
+  the model as it is at that moment.
 - Narration is synthesized with [edge-tts](https://github.com/rany2/edge-tts) and cached by content.
   Each scene's timeline is paced by its spoken lines, and captions are timed by the words the voice
   actually speaks. `kit.PRONUNCIATION` holds the few spellings the voice needs to say what the

@@ -367,8 +367,7 @@ class FixedFrame(Narrated):
                 self.when_said(words)
                 self.play(cube.pieces[c].animate.set_opacity(0.45), Create(a), FadeIn(label))
             self.play(Write(domain))
-        self.wait(1)
-        self.wait(1)
+        self.wait(2)
 
 
 # --- 4. Counting stickers with the 1-norm ---------------------------------------
@@ -689,10 +688,10 @@ class Configuration(Narrated):
             arrows = sticker_arrows(CORNER)
             self.play(Create(arrows))
             corner.add(arrows)
-            self.when_said("one solid")
-            for move in [TURN_TOP, TURN_FRONT]:
-                self.play(cube.turn(move), run_time=1.5)
-            self.undo(cube, [TURN_TOP, TURN_FRONT], run_time=0.8)
+            self.when_said("moves pile up")
+            scramble = [TURN_TOP, ((0, 1, 0), 1), TURN_FRONT]
+            for move in scramble:
+                self.play(cube.turn(move), run_time=1.3)
 
         rule = self.hud(VGroup(
             MathTex(r"\text{rotation about the origin} = \text{matrix } R", font_size=32),
@@ -706,6 +705,8 @@ class Configuration(Narrated):
                         "rotation matrix, which we call R."):
             self.when_said("a rotation about")
             self.play(Create(rule_box), Write(rule), run_time=2)
+        with self.voice("Let's put our corner back where it started, and look at it more closely."):
+            self.undo(cube, scramble, run_time=0.8)
 
         identity = np.identity(3, dtype=int)
         config_title = self.hud(MathTex(r"\text{configuration: }(c,\, R)", font_size=40,
@@ -742,7 +743,7 @@ class Configuration(Narrated):
                         .arrange(RIGHT).to_corner(DR))  # Clear of the x axis, lower left.
         above_captions(p_eq)
         with self.voice("So where is our cubelet, c, now? Take its home address, and rotate it: "
-                        "multiply c by R.", pause=0.8):
+                        "apply the matrix R to c.", pause=0.8):
             self.play(corner.animate.set_opacity(0.45))  # See-through, so the arrow to it shows.
             self.play(Create(home))
             self.when_said("rotate it")
@@ -754,11 +755,11 @@ class Configuration(Narrated):
         s_eq = self.hud(VGroup(MathTex(r"R\,\mathrm{diag}(c) =", font_size=36),
                                matrix_tex(turned_stickers, BASIS_COLORS).scale(0.7))
                         .arrange(RIGHT).move_to(p_eq, aligned_edge=LEFT))
-        with self.voice("And where do its stickers point? Same idea: multiply diag of c by R. "
+        with self.voice("And where do its stickers point? Same idea: apply the matrix R to diag of c. "
                         "Matrix multiplication works column by column, so this rotates every "
                         "sticker at once. Green now points left, and red points to the front."):
             self.play(FadeOut(home), FadeOut(moved), FadeOut(p_eq), corner.animate.set_opacity(1))
-            self.when_said("multiply diag")
+            self.when_said("apply the matrix R to diag")
             self.play(Write(s_eq), run_time=2)
             self.when_said("Green now")
             self.play(Indicate(s_eq[1].get_columns()[0], color=X_COLOR))
@@ -803,7 +804,8 @@ class Moves(Narrated):
                         "take the face's axis, v. For the top face, v is e z, pointing up."):
             self.play(cube.animate.ghosted(cube.slice_cubelets(TURN_TOP), 0.15), run_time=1.5)
             self.when_said("the face's axis")
-            self.play(Create(v_arrow), FadeIn(v_label))
+            # The z axis steps aside, so that v, which runs along it, stands out.
+            self.play(FadeOut(axes[0][2]), FadeOut(axes[1][2]), Create(v_arrow), FadeIn(v_label))
 
         dot = self.hud(VGroup(
             MathTex(r"\mathbf{v} \cdot p", r"= \text{how far } p \text{ reaches along } \mathbf{v}",
@@ -888,7 +890,8 @@ class Moves(Narrated):
                                        .to_corner(DL)))
         with self.voice("Here it is in the actual code. That really is the entire move logic."):
             # The cube fades back, so that the wide listing can overlap it and stay legible.
-            self.play(FadeIn(code, shift=0.2 * UP), cube.animate.ghosted(opacity=0.25))
+            self.play(FadeIn(code, shift=0.2 * UP), cube.animate.ghosted(opacity=0.25),
+                      FadeOut(axes[0]), FadeOut(*axes[1]))
         self.wait(1)
 
 
@@ -897,7 +900,7 @@ class Moves(Narrated):
 class Solved(Narrated):
     def construct(self):
         self.set_camera_orientation(phi=64 * DEGREES, theta=22 * DEGREES, zoom=1.05)
-        self.show_axes()
+        axes = self.show_axes()
         state = eigencube.apply_move_to_cube(TURN_FRONT, eigencube.apply_move_to_cube(
             TURN_TOP, eigencube.solved_cube))
         cube = CubeMobject(state)
@@ -911,9 +914,9 @@ class Solved(Narrated):
             self.play(Create(arrows))
         criterion = self.hud(MathTex(r"R\,\mathrm{diag}(c)", r"=", r"\mathrm{diag}(c)",
                                      font_size=52).to_corner(UL))
-        with self.voice("In symbols: multiply diag of c by R, and you should get diag of c right "
-                        "back."):
-            self.when_said("multiply")
+        with self.voice("In symbols: apply the matrix R to diag of c, and you should get diag of "
+                        "c right back."):
+            self.when_said("apply")
             self.play(Write(criterion), run_time=2)
 
         twisted = VGroup(MathTex(r"R\,c = c", r"\;\checkmark", font_size=36),
@@ -943,9 +946,11 @@ class Solved(Narrated):
                         "passes. We drew a little mark on this one so you can watch it turn. On a "
                         "plain cube, that spin is invisible, and the encoding, rightly, doesn't "
                         "care either. It's exactly as picky as the colors are."):
-            self.play(cube.animate.ghosted([CENTER], 0.12))
+            # Clear view of the mark: no axes on top of it, and a camera looking down on it.
+            self.play(cube.animate.ghosted([CENTER], 0.12), FadeOut(axes[0]), FadeOut(*axes[1]))
+            self.move_camera(phi=30 * DEGREES, theta=22 * DEGREES, zoom=1.05, run_time=1.5)
             self.when_said("Spin it")
-            self.play(cube.turn(TURN_TOP), run_time=2)
+            self.play(cube.turn(TURN_TOP), run_time=2.5)
             r_center = labeled_matrix("R =", dict(cube.state)[CENTER], BASIS_COLORS).scale(0.85)
             ok = MathTex(r"R \neq I, \;\text{ yet }\; R\,\mathrm{diag}(c) = \mathrm{diag}(c)",
                          r"\;\checkmark", font_size=30)

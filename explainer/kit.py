@@ -273,16 +273,16 @@ class Narrated(ThreeDScene):
         arrows = coordinate_axes()
         labels = VGroup(*(MathTex(name, color=color, font_size=40)
                           .add_background_rectangle(color=BODY, opacity=0.8)
-                          .move_to((AXIS_LENGTH + 0.3) * np.array(unit(i)))
+                          .move_to((AXIS_LENGTHS[i] + 0.3) * np.array(unit(i)))
                           for i, (name, color) in enumerate(zip("xyz", BASIS_COLORS))))
         for label in labels:
             self.facing_camera(label)
         return arrows, labels
 
-    def show_axes(self, labels=True):
+    def show_axes(self):
         """Puts the coordinate frame on screen at once (after it has been introduced)."""
         arrows, names = self.axes()
-        self.add(arrows, *(names if labels else []))
+        self.add(arrows, *names)
         return arrows, names
 
     def tear_down(self):
@@ -319,7 +319,8 @@ def code_listing(name):
 # --- The 3D world ---------------------------------------------------------------
 
 SPACING = 0.9  # Distance between neighboring cubelet centers.
-AXIS_LENGTH = 3.0 * SPACING
+# The x axis points almost at the camera; extra length carries its tip and label past the cube.
+AXIS_LENGTHS = (4.2 * SPACING, 3.0 * SPACING, 3.0 * SPACING)
 
 
 def unit(i):
@@ -350,9 +351,10 @@ def coordinate_axes():
     axes = VGroup()
     for i, color in enumerate(BASIS_COLORS):
         e = np.array(unit(i), dtype=float)
-        inside = Line3D(-AXIS_LENGTH * e, edge * e, color=color, thickness=0.016, resolution=(20, 6))
-        outline = arrow(edge * e, AXIS_LENGTH * e, BODY, thickness=0.04, segments=6, tip=1.5)
-        outside = arrow(edge * e, AXIS_LENGTH * e, color, thickness=0.016, segments=6)
+        length = AXIS_LENGTHS[i]
+        inside = Line3D(-length * e, edge * e, color=color, thickness=0.016, resolution=(20, 6))
+        outline = arrow(edge * e, length * e, BODY, thickness=0.04, segments=6, tip=1.5)
+        outside = arrow(edge * e, length * e, color, thickness=0.016, segments=6)
         axes.add(VGroup(inside, VGroup(outline, outside).set_shade_in_3d(False)))
     return axes
 
@@ -390,7 +392,7 @@ def cubelet_mobject(cubelet):
     if cubelet == (0, 0, 1):
         # Like the logo on a real cube's white center: it makes the center's spin visible.
         logo = Logo(fill_color=GREY_C, fill_opacity=1, stroke_width=0, shade_in_3d=True)
-        logo.scale(size * 0.22).rotate(-PI / 2)
+        logo.scale(size * 0.3).rotate(-PI / 2)
         logo.shift(SPACING * c + OUT * (size / 2 + 0.012) - logo.get_z_index_reference_point())
         stickers.add(logo)
     group = VGroup(body, stickers)
