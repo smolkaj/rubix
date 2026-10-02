@@ -154,6 +154,14 @@ def write_social_preview(path, scale=3):
     img.resize((1280, 640), Image.Resampling.LANCZOS).save(path, optimize=True)
 
 
+FULL_DETAIL_SIZE = 40  # px: from this size up, the logo's rim and arrow need no extra weight
+
+
+def icon_weight(size):
+    """Stroke weight that keeps the rim and arrow at least about a pixel wide at `size` px."""
+    return max(1.0, FULL_DETAIL_SIZE / size)
+
+
 def render_icon(shapes, size, background=None, margin=0.0, scale=4):
     """The logo as a square raster image, supersampled for smooth edges."""
     img = Image.new("RGBA", (size * scale, size * scale), background or (0, 0, 0, 0))
@@ -163,15 +171,14 @@ def render_icon(shapes, size, background=None, margin=0.0, scale=4):
 
 
 def write_window_icon(path):
-    # Window managers shrink this to ~24 px in title bars, so it is drawn bolder than the logo.
-    render_icon(logo_shapes(weight=1.8), 256).save(path, optimize=True)
+    # Shown anywhere from ~24 px title bars to ~128 px app switchers; weighted for the common 32 px.
+    render_icon(logo_shapes(weight=icon_weight(32)), 256).save(path, optimize=True)
 
 
 def write_favicon(path):
     # Rendered per size rather than downscaled from one image, so small sizes stay crisp.
-    # Below 48 px the rim and arrow get proportionally heavier, or they would shrink below a pixel.
     sizes = [16, 32, 48]
-    icons = [render_icon(logo_shapes(weight=max(1.0, 40 / size)), size) for size in sizes]
+    icons = [render_icon(logo_shapes(weight=icon_weight(size)), size) for size in sizes]
     icons[-1].save(path, sizes=[(size, size) for size in sizes], append_images=icons[:-1])
 
 
