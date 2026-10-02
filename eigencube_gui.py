@@ -17,7 +17,7 @@ def init_display(surface=None):
         screen = surface
     elif screen is None or not pygame.display.get_init():
         pygame.init()
-        pygame.display.set_caption("Rubik's Cube Solver")
+        pygame.display.set_caption("Eigencube — Rubik's Cube Solver")
         pygame.key.set_repeat(300, 50)  # delay, interval
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
         font_regular = None
