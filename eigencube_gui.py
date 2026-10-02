@@ -1,10 +1,12 @@
 import threading
+from pathlib import Path
 import pygame
 import pygame.font
 import numpy as np
 from eigencube import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move, is_cubelet_solved, NUM_CUBELETS
 
 
+REPO_DIR = Path(__file__).resolve().parent  # assets resolve from here, whatever the working directory
 WIDTH, HEIGHT, TEXT_SIZE = 875, 750, 19
 screen = None
 font_regular = None
@@ -18,7 +20,7 @@ def init_display(surface=None):
     elif screen is None or not pygame.display.get_init():
         pygame.init()
         pygame.display.set_caption("Eigencube — Rubik's Cube Solver")
-        pygame.display.set_icon(pygame.image.load("img/icon.png"))  # before set_mode, per SDL
+        pygame.display.set_icon(pygame.image.load(REPO_DIR / "img" / "icon.png"))  # before set_mode, per SDL
         pygame.key.set_repeat(300, 50)  # delay, interval
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
         font_regular = None
@@ -27,8 +29,8 @@ def init_display(surface=None):
     if font_regular is None or font_bold is None or not pygame.font.get_init():
         pygame.font.init()
         try:
-            font_regular = pygame.font.Font("fonts/Roboto-Light.ttf", TEXT_SIZE)
-            font_bold = pygame.font.Font("fonts/Roboto-Medium.ttf", TEXT_SIZE)
+            font_regular = pygame.font.Font(REPO_DIR / "fonts" / "Roboto-Light.ttf", TEXT_SIZE)
+            font_bold = pygame.font.Font(REPO_DIR / "fonts" / "Roboto-Medium.ttf", TEXT_SIZE)
         except Exception:
             font_regular = pygame.font.SysFont("Arial", TEXT_SIZE)
             font_bold = pygame.font.SysFont("Arial", TEXT_SIZE, bold=True)
@@ -194,7 +196,7 @@ def create_header_buttons(solving=False):
     solve_btn = create_button(solve_text, 3 * button_spacing + 2 * button_width, button_y, button_width, button_height, solve_color, WHITE)
     return scan_btn, shuffle_btn, solve_btn
 
-def render_frame_to_image(cube, output_path="img/gui-preview.png", solution=None, move_index=0, current_move=None, solving_cube=None):
+def render_frame_to_image(cube, output_path=REPO_DIR / "img" / "gui-preview.png", solution=None, move_index=0, current_move=None, solving_cube=None):
     scr = init_display()
     scr.fill(BACKGROUND)
     draw_cube_static(solving_cube if solving_cube else cube)

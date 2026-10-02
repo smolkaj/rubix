@@ -105,7 +105,7 @@ def hexcolor(rgb):
 
 def write_svg(shapes, path):
     x0, y0, side = bounds(shapes, pad=0.15)
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.3f} {y0:.3f} {side:.3f} {side:.3f}">']
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.3f} {y0:.3f} {side:.3f} {side:.3f}" width="256" height="256">']
     for points, fill, stroke, stroke_width in shapes:
         coords = " ".join(f"{x:.3f},{y:.3f}" for x, y in points)
         stroke_attrs = f' stroke="{hexcolor(stroke)}" stroke-width="{stroke_width:g}" stroke-linejoin="round"' if stroke else ""
