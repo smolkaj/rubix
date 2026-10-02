@@ -409,6 +409,69 @@ class TestEigencube(unittest.TestCase):
         self.assertIs(eigencube_gui.screen, custom_surf)
 
 
+
+
+class TestLearnedMacros(unittest.TestCase):
+    """Macros are learned at runtime, so their invariants must hold for any sequence."""
+
+    # A commutator of two adjacent faces: disturbs few cubelets.
+    commutator = (((-1, 0, 0), -1), ((0, -1, 0), -1), ((-1, 0, 0), 1), ((0, -1, 0), 1))
+
+    def setUp(self):
+        import eigencube
+        self.eigencube = eigencube
+        self.saved_macros = dict(eigencube.macros)
+        eigencube.macros.clear()
+
+    def tearDown(self):
+        self.eigencube.macros.clear()
+        self.eigencube.macros.update(self.saved_macros)
+
+    def test_symmetric_sequences_act_as_conjugates(self):
+        """Under every cube symmetry Q, the image of a sequence acts as Q * sequence * Q^T."""
+        from eigencube import symmetries, symmetric_move, apply_moves_to_cube
+        import random
+        random.seed(0)
+        sequence = tuple(random.choice(moves) for _ in range(8))
+        original = dict(apply_moves_to_cube(sequence, solved_cube))
+        for Q in symmetries:
+            image = dict(apply_moves_to_cube(tuple(symmetric_move(Q, m) for m in sequence), solved_cube))
+            for cubelet, rotation in original.items():
+                image_cubelet = tuple(int(x) for x in Q @ cubelet)
+                np.testing.assert_array_equal(image[image_cubelet], Q @ np.array(rotation) @ Q.T)
+
+    def test_learned_macros_match_their_effects(self):
+        """Every learned macro is keyed by its true effect and respects the disturbance cap."""
+        from eigencube import learn_macro, apply_moves_to_cube, num_disturbed, MAX_MACRO_DISTURBANCE
+        learn_macro(self.commutator)
+        macros = self.eigencube.macros
+        # 48 symmetries x {sequence, inverse}, minus coinciding effects.
+        self.assertGreater(len(macros), 1)
+        self.assertLessEqual(len(macros), 96)
+        self.assertIn(apply_moves_to_cube(self.commutator, solved_cube), macros)
+        for effect, macro in macros.items():
+            self.assertEqual(apply_moves_to_cube(macro, solved_cube), effect)
+            self.assertTrue(0 < num_disturbed(effect) <= MAX_MACRO_DISTURBANCE)
+            # Each macro's inverse is learned too, so applying both is the identity.
+            inverse = macros[apply_moves_to_cube(tuple(inverse_move(m) for m in reversed(macro)), solved_cube)]
+            self.assertTrue(is_cube_solved(apply_moves_to_cube(macro + inverse, solved_cube)))
+
+    def test_macro_step_matches_move_by_move_application(self):
+        """Applying a macro as one search step equals applying its moves one by one, from any state."""
+        from eigencube import learn_macro, apply_moves_to_cube, apply_step_to_cube, shuffle
+        learn_macro(self.commutator)
+        cube = shuffle(solved_cube, iterations=50, seed=7)
+        for macro in self.eigencube.macros.values():
+            self.assertEqual(apply_step_to_cube(macro, cube), apply_moves_to_cube(macro, cube))
+
+    def test_learn_macro_rejects_trivial_and_disruptive_sequences(self):
+        """Sequences that disturb nothing, or too much, are not worth learning."""
+        from eigencube import learn_macro
+        learn_macro(())
+        learn_macro((moves[0], inverse_move(moves[0])))  # Disturbs nothing.
+        learn_macro(tuple(m for m in moves if m[1] == 1))  # Disturbs 20 of 26 cubelets.
+        self.assertEqual(self.eigencube.macros, {})
+
+
 if __name__ == "__main__":
     unittest.main()
-
