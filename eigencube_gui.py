@@ -18,6 +18,7 @@ def init_display(surface=None):
     elif screen is None or not pygame.display.get_init():
         pygame.init()
         pygame.display.set_caption("Eigencube — Rubik's Cube Solver")
+        pygame.display.set_icon(pygame.image.load("img/icon.png"))  # before set_mode, per SDL
         pygame.key.set_repeat(300, 50)  # delay, interval
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
         font_regular = None
