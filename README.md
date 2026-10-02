@@ -67,7 +67,7 @@ Each axis corresponds to an opposing pair of faces, with cubelet coordinates $(x
 > **Key Idea 2 (Eigencube): The 3D Cross as an Invariant Coordinate Frame**  
 > All 7 cubelets forming the 3D cross (the internal core at $(0,0,0)$ and the 6 face centers at unit distance) are invariant fixed points in Euclidean space. Because every outer-slice move rotates strictly *around* an arm of this cross, the entire cross remains permanently stationary—anchoring our 3D reference frame throughout every legal move.
 >
-> In linear algebra terms: each arm of the cross is the **eigenvector** (with eigenvalue 1) of the rotation matrices that turn around it—hence the name *Eigencube*.
+> In linear algebra terms: each arm of the cross is an **eigenvector** (with eigenvalue 1) of the rotation matrices that turn around it—hence the name *Eigencube*.
 
 ---
 
