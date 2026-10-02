@@ -376,6 +376,25 @@ class TestEigencube(unittest.TestCase):
         h = eigencube_gui.draw_text_bubble("Reinit Bubble", 0, 0, 200)
         self.assertGreater(h, 0)
 
+    def test_gui_assets_independent_of_working_directory(self):
+        """Verify the GUI starts from any directory and loads its bundled assets, not system fallbacks."""
+        import pygame
+        import eigencube_gui
+        from unittest import mock
+
+        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        pygame.quit()
+        original_cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as elsewhere:
+            try:
+                os.chdir(elsewhere)
+                with mock.patch("pygame.font.SysFont", side_effect=AssertionError("bundled font not found")):
+                    eigencube_gui.init_display()
+                out_path = eigencube_gui.render_frame_to_image(solved_cube, os.path.join(elsewhere, "frame.png"))
+                self.assertTrue(os.path.exists(out_path))
+            finally:
+                os.chdir(original_cwd)
+
     def test_gui_offscreen_surface_preservation(self):
         """Verify passing a custom surface to init_display is preserved across subsequent draw calls."""
         import pygame

@@ -1,4 +1,8 @@
-# Eigencube
+<p align="center">
+  <img src="img/logo.svg" alt="Eigencube logo: a cube whose fixed centers keep their colors, with the rotation axis rising from the top center" width="160">
+</p>
+
+<h1 align="center">Eigencube</h1>
 
 > A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**, accompanied by an interactive visualizer.
 
@@ -396,7 +400,8 @@ eigencube/
 ├── eigencube_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
 ├── scripts/
 │   ├── generate_anatomy.py # Cube anatomy diagram generator
-│   └── generate_diagram.py # Geometric intuition diagram generator
+│   ├── generate_diagram.py # Geometric intuition diagram generator
+│   └── generate_logo.py    # Logo, icons & GitHub social preview generator
 ├── tests/
 │   └── test_eigencube.py   # Unit test suite
 ├── img/                # Architectural diagrams & preview snapshots
@@ -405,7 +410,12 @@ eigencube/
 │   ├── cubelet-types.png
 │   ├── cube-anatomy.png
 │   ├── cube-in-plane.jpg
-│   └── gui-preview.png
+│   ├── gui-preview.png
+│   ├── logo.svg            # Logo; generate_logo.py also writes the icons below
+│   ├── apple-touch-icon.png
+│   ├── favicon.ico
+│   ├── icon.png            # GUI window icon
+│   └── social-preview.png
 ├── requirements.txt    # numpy, pygame, opencv-python, Pillow
 └── README.md
 ```
