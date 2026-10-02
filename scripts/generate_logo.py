@@ -23,7 +23,9 @@ from eigencube_gui import COLORS  # noqa: E402
 BODY = (35, 42, 54)
 EDGE = (58, 68, 88)
 BLANK = (59, 70, 89)  # stickers that are not fixed centers
-ARROW = COLORS[color_names[(0, 0, 1)]]  # the top center's color: the axis is part of it
+OUTLINE = (112, 126, 152)  # silhouette rim: lifts the dark cube off dark backgrounds
+ARROW = COLORS[color_names[(0, 0, 1)]]  # the axis is drawn in the top center's own color
+BACKGROUND = (15, 17, 23)  # dark ground for the opaque images, as in the README diagrams
 
 # Camera: looking at the (+X, +Y, +Z) corner, with screen x horizontal so the Z axis stays upright.
 VIEW = np.array([1.0, 0.8, 0.78]) / np.linalg.norm([1.0, 0.8, 0.78])
@@ -51,9 +53,17 @@ def rounded_square(half, radius, steps=5):
     return points
 
 
-def logo_shapes():
-    """Polygons (points, fill, stroke, stroke_width) in model units, in drawing order."""
-    shapes = []
+def logo_shapes(weight=1.0):
+    """Polygons (points, fill, stroke, stroke_width) in model units, in drawing order.
+
+    `weight` makes the silhouette rim and the arrow bolder, which would otherwise vanish at icon sizes.
+    """
+    # The cube's silhouette: all corners but the nearest and farthest from the camera.
+    silhouette = sorted((np.array(c, float) for c in np.ndindex(2, 2, 2)), key=lambda c: np.dot(c, VIEW))[1:-1]
+    rim = [project(3 * c - 1.5) for c in silhouette]
+    center = np.mean(rim, axis=0)
+    rim.sort(key=lambda p: math.atan2(p[1] - center[1], p[0] - center[0]))
+    shapes = [(rim, BODY, OUTLINE, 0.09 * weight)]
     cubelets = [np.array(index) - 1 for index in np.ndindex(3, 3, 3)]
     for cubelet in cubelets:
         for normal in np.vstack([np.eye(3), -np.eye(3)]):
@@ -72,14 +82,15 @@ def logo_shapes():
     # Eigenvector of every top-face rotation: rises from the top center sticker.
     # The same arrow drawn first with a wider dark stroke gives it a keyline,
     # which keeps the white arrow legible on light backgrounds.
-    arrow = arrow_polygons(project((0, 0, 1.5)), project((0, 0, 3.0)))
-    for color, stroke_width in [(BODY, 0.133), (ARROW, 0.05)]:
+    arrow = arrow_polygons(project((0, 0, 1.5)), project((0, 0, 3.0)), weight)
+    for color, stroke_width in [(BODY, 0.133 * weight), (ARROW, 0.05 * weight)]:
         shapes += [(polygon, color, color, stroke_width) for polygon in arrow]
     return shapes
 
 
-def arrow_polygons(tail, apex, shaft_width=0.05, head_length=0.33, head_half_width=0.18):
+def arrow_polygons(tail, apex, weight=1.0):
     """Shaft and head outlines; the round-join stroke they are drawn with adds the rest of their width."""
+    shaft_width, head_length, head_half_width = 0.05 * weight, 0.33 * weight, 0.18 * weight
     tail, apex = np.array(tail), np.array(apex)
     along = (apex - tail) / np.linalg.norm(apex - tail)
     across = np.array([-along[1], along[0]])
@@ -103,7 +114,8 @@ def hexcolor(rgb):
     return "#%02x%02x%02x" % rgb
 
 
-def write_svg(shapes, path):
+def write_svg(path):
+    shapes = logo_shapes()
     x0, y0, side = bounds(shapes, pad=0.15)
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.3f} {y0:.3f} {side:.3f} {side:.3f}" width="256" height="256">']
     for points, fill, stroke, stroke_width in shapes:
@@ -129,17 +141,25 @@ def draw_logo(draw, shapes, x, y, size):
                 draw.ellipse([p[0] - radius, p[1] - radius, p[0] + radius, p[1] + radius], fill=stroke)
 
 
-def write_social_preview(shapes, path, scale=3):
+def write_social_preview(path, scale=3):
     # GitHub's recommended social preview size.
-    img = Image.new("RGB", (1280 * scale, 640 * scale), (15, 17, 23))
+    img = Image.new("RGB", (1280 * scale, 640 * scale), BACKGROUND)
     draw = ImageDraw.Draw(img)
-    draw_logo(draw, shapes, 90 * scale, 110 * scale, 420 * scale)
+    draw_logo(draw, logo_shapes(), 90 * scale, 110 * scale, 420 * scale)
     title = ImageFont.truetype(str(FONTS_DIR / "Roboto-Bold.ttf"), 112 * scale)
     tagline = ImageFont.truetype(str(FONTS_DIR / "Roboto-Regular.ttf"), 34 * scale)
     draw.text((560 * scale, 210 * scale), "Eigencube", fill=(236, 240, 241), font=title)
     draw.text((566 * scale, 360 * scale), "A Rubik's Cube solver in linear algebra.", fill=(165, 180, 202), font=tagline)
     draw.text((566 * scale, 408 * scale), "Vectors, rotation matrices, and dot products.", fill=(165, 180, 202), font=tagline)
     img.resize((1280, 640), Image.Resampling.LANCZOS).save(path, optimize=True)
+
+
+FULL_DETAIL_SIZE = 40  # px: from this size up, the logo's rim and arrow need no extra weight
+
+
+def icon_weight(size):
+    """Stroke weight that keeps the rim and arrow at least about a pixel wide at `size` px."""
+    return max(1.0, FULL_DETAIL_SIZE / size)
 
 
 def render_icon(shapes, size, background=None, margin=0.0, scale=4):
@@ -150,27 +170,27 @@ def render_icon(shapes, size, background=None, margin=0.0, scale=4):
     return img.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def write_window_icon(shapes, path):
-    render_icon(shapes, 256).save(path, optimize=True)
+def write_window_icon(path):
+    # Shown anywhere from ~24 px title bars to ~128 px app switchers; weighted for the common 32 px.
+    render_icon(logo_shapes(weight=icon_weight(32)), 256).save(path, optimize=True)
 
 
-def write_favicon(shapes, path):
+def write_favicon(path):
     # Rendered per size rather than downscaled from one image, so small sizes stay crisp.
     sizes = [16, 32, 48]
-    icons = [render_icon(shapes, size) for size in sizes]
+    icons = [render_icon(logo_shapes(weight=icon_weight(size)), size) for size in sizes]
     icons[-1].save(path, sizes=[(size, size) for size in sizes], append_images=icons[:-1])
 
 
-def write_apple_touch_icon(shapes, path):
+def write_apple_touch_icon(path):
     # iOS fills transparency with black and rounds the corners itself, so supply an opaque, padded square.
-    render_icon(shapes, 180, background=(15, 17, 23, 255), margin=0.12).convert("RGB").save(path, optimize=True)
+    render_icon(logo_shapes(), 180, background=BACKGROUND + (255,), margin=0.12).convert("RGB").save(path, optimize=True)
 
 
 if __name__ == "__main__":
-    shapes = logo_shapes()
     for name, write in [("logo.svg", write_svg), ("social-preview.png", write_social_preview),
                         ("icon.png", write_window_icon), ("favicon.ico", write_favicon),
                         ("apple-touch-icon.png", write_apple_touch_icon)]:
         out_path = REPO_ROOT / "img" / name
-        write(shapes, out_path)
+        write(out_path)
         print(f"Generated {out_path}")
