@@ -2,7 +2,7 @@ import threading
 import pygame
 import pygame.font
 import numpy as np
-from rubix import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move, is_cubelet_solved, NUM_CUBELETS
+from eigencube import solved_cube, apply_move_to_cube, shuffle, solve, moves, color_names, describe_move, is_cubelet_solved, NUM_CUBELETS
 
 
 WIDTH, HEIGHT, TEXT_SIZE = 875, 750, 19

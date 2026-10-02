@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a clean 4-panel diagram illustrating Rubix terminology:
+"""Generate a clean 4-panel diagram illustrating Eigencube terminology:
 Facelet, Face, Cubelet, and Slice.
 """
 
