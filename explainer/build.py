@@ -93,8 +93,15 @@ def caption_chunks(text):
             chunks[-1] = joined
         else:
             chunks.append(piece)
-    if len(chunks) > 1 and len(chunks[-1]) < MIN_CAPTION:  # Fold a short tail into its predecessor.
-        chunks[-2:] = [f"{chunks[-2]} {chunks[-1]}"]
+    # A short tail joins its predecessor; if the two don't fit on one line, they share it evenly.
+    if len(chunks) > 1 and len(chunks[-1]) < MIN_CAPTION:
+        joined = f"{chunks[-2]} {chunks[-1]}"
+        if len(joined) <= CAPTION_WIDTH:
+            chunks[-2:] = [joined]
+        else:
+            middle = min((i for i, ch in enumerate(joined) if ch == " "),
+                         key=lambda i: abs(i - len(joined) / 2))
+            chunks[-2:] = [joined[:middle], joined[middle + 1:]]
     return chunks
 
 
@@ -111,7 +118,9 @@ def timed_chunks(cue):
         position += len(speakable(chunk))
     starts, position = [None] * len(chunks), 0
     for word_start, _, word in cue["words"]:
-        position = spoken.index(word, position)
+        position = spoken.find(word, position)
+        if position < 0:
+            sys.exit(f"the voice reported {word!r}, which is not in the line: {cue['text']!r}")
         chunk = max(i for i, bound in enumerate(bounds) if bound <= position)
         if starts[chunk] is None:
             starts[chunk] = word_start
@@ -123,10 +132,12 @@ def timed_chunks(cue):
 
 
 def check_captions(entries):
-    """Fails the build on captions that are out of order or too brief to read."""
+    """Fails the build on captions that are out of order, too brief to read, or too long for one
+    line."""
     for (a, b, text), (next_a, _, _) in zip(entries, entries[1:] + [(float("inf"), 0, "")]):
-        if b - a < MIN_CAPTION_SECONDS or next_a < a:
-            sys.exit(f"caption at {a:.2f}s lasts {b - a:.2f}s or is out of order: {text!r}")
+        if b - a < MIN_CAPTION_SECONDS or next_a < a or len(text) > CAPTION_WIDTH:
+            sys.exit(f"caption at {a:.2f}s lasts {b - a:.2f}s, is out of order or is longer than "
+                     f"{CAPTION_WIDTH} characters: {text!r}")
 
 
 def captions(videos, media):

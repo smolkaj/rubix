@@ -149,7 +149,7 @@ class LinearAlgebraReview(Narrated):
     def construct(self):
         name = Text("Essence of Linear Algebra", font_size=54, weight=BOLD)
         by = Text("3Blue1Brown  ·  Grant Sanderson", font_size=30, color=ACCENT)
-        card = VGroup(name, by).arrange(DOWN, buff=0.3)
+        card = self.label(VGroup(name, by).arrange(DOWN, buff=0.3))
         with self.voice("Before we dive in, a shoutout. This whole project grew out of a video "
                         "series by 3Blue1Brown: Essence of Linear Algebra, by Grant Sanderson. "
                         "We'll lean on a few of its ideas, so let's take a minute to review them."):
@@ -163,6 +163,7 @@ class LinearAlgebraReview(Narrated):
         v = Vector([2, 1], color=POSITION)
         v_label = MathTex(r"\begin{bmatrix} 2 \\ 1 \end{bmatrix}", color=POSITION).next_to(
             v.get_end(), RIGHT, 0.15)
+        self.label(v_label)
         with self.voice("Here's a flat plane with a grid. A vector is an arrow that starts at the "
                         "origin, and we describe it by its coordinates. This one is two, one: two "
                         "steps to the right, and one step up."):
@@ -173,6 +174,7 @@ class LinearAlgebraReview(Narrated):
         e_x, e_y = Vector(RIGHT, color=X_COLOR), Vector(UP, color=Y_COLOR)
         x_label = MathTex(r"\mathbf{e}_x", color=X_COLOR).next_to(e_x, DOWN, 0.15)
         y_label = MathTex(r"\mathbf{e}_y", color=Y_COLOR).next_to(e_y, LEFT, 0.15)
+        self.label(x_label, y_label)
         with self.voice("Those steps are measured with two special vectors. e x is one step to "
                         "the right, drawn here in green. e y is one step up, drawn in red. "
                         "Together, they're called the basis. Essence of Linear Algebra calls them "
@@ -188,6 +190,7 @@ class LinearAlgebraReview(Narrated):
                               font_size=48).to_corner(UR).add_background_rectangle()
         combination[3].set_color(X_COLOR)  # Indices count the background rectangle first.
         combination[5].set_color(Y_COLOR)
+        self.label(combination)
         with self.voice("Every vector is a combination of them. Ours is two steps of e x, plus one "
                         "step of e y."):
             self.when_said("two steps")
@@ -214,6 +217,7 @@ class LinearAlgebraReview(Narrated):
         m.get_columns()[1].set_color(Y_COLOR)
         m_group = VGroup(MathTex("R =", font_size=48), m).arrange(RIGHT).next_to(
             combination, DOWN, 0.5, aligned_edge=RIGHT)
+        self.label(x_lands, y_lands, m_group)
         with self.voice("Here's the beautiful part. e x has landed on zero, one. e y has landed on "
                         "minus one, zero. Write those landing spots side by side, as columns, and "
                         "that is the matrix of this rotation."):
@@ -223,8 +227,9 @@ class LinearAlgebraReview(Narrated):
             self.play(Write(y_lands))
             self.when_said("side by side")
             self.play(Write(m_group[0]), FadeIn(m.get_brackets()), FadeIn(m.background_rectangle))
-            self.play(TransformFromCopy(x_lands[1], m.get_columns()[0]))
-            self.play(TransformFromCopy(y_lands[1], m.get_columns()[1]))
+            # Plain fades: a transform from a copy would leave the copy, not the matrix, on screen.
+            self.play(Indicate(x_lands, color=X_COLOR), FadeIn(m.get_columns()[0], shift=0.4 * RIGHT))
+            self.play(Indicate(y_lands, color=Y_COLOR), FadeIn(m.get_columns()[1], shift=0.4 * RIGHT))
 
         product = MathTex(r"R \begin{bmatrix} 2 \\ 1 \end{bmatrix}", "=",
                           r"2 \begin{bmatrix} 0 \\ 1 \end{bmatrix}", "+",
@@ -234,6 +239,7 @@ class LinearAlgebraReview(Narrated):
         product[4].set_color(Y_COLOR)
         product[6].set_color(POSITION)
         product.add_background_rectangle().to_edge(DOWN, buff=1.3)
+        self.label(product)
         with self.voice("And our vector? It's still two steps of e x plus one of e y, just using the "
                         "moved ones. That's exactly what multiplying the matrix by the vector "
                         "computes: the rotated vector, minus one, two."):
@@ -247,18 +253,19 @@ class LinearAlgebraReview(Narrated):
             MathTex(r"R\,\vec{v} \;=\; \text{the rotated vector } \vec{v}", font_size=40),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.3)
         box = SurroundingRectangle(rule, color=ACCENT, buff=0.3).set_fill(BLACK, opacity=0.9)
-        rule_card = VGroup(box, rule).move_to(0.6 * DOWN)
+        rule_card = self.label(VGroup(box, rule).move_to(0.6 * DOWN))
         with self.voice("So here's our rule for the rest of the video, now in three dimensions. A "
                         "rotation about the origin is a matrix, and multiplying a vector by that "
                         "matrix gives you the rotated vector. If you want to see why that works, "
                         "Essence of Linear Algebra is the place to go."):
-            self.play(FadeOut(product))
+            self.play(FadeOut(product), FadeOut(x_lands), FadeOut(y_lands))
             self.when_said("A rotation")
             self.play(FadeIn(box), Write(rule), run_time=2)  # Shown as rule_card.
 
-        eigen = MathTex(r"\text{eigenvector:}\;\; \text{a vector the transformation leaves in place}",
+        eigen = MathTex(r"\text{eigenvector, eigenvalue 1:}\;\; \text{a vector the transformation "
+                        r"leaves in place}",
                         font_size=36, color=ACCENT)
-        eigen.add_background_rectangle().next_to(rule_card, DOWN, 0.5)
+        self.label(eigen.add_background_rectangle().next_to(rule_card, DOWN, 0.5))
         with self.voice("One last word we'll need. If a transformation leaves a vector exactly where "
                         "it was, that vector is called an eigenvector, with eigenvalue one. A "
                         "quarter turn of the plane leaves no arrow in place. But in three "
@@ -266,7 +273,7 @@ class LinearAlgebraReview(Narrated):
             self.when_said("eigenvector")
             self.play(Write(eigen), run_time=2)
             self.when_said("A quarter turn")  # Every arrow moves.
-            self.play(FadeOut(rule_card), FadeOut(x_lands), FadeOut(y_lands), run_time=0.6)
+            self.play(FadeOut(rule_card), run_time=0.6)
             self.play(Rotate(VGroup(plane, e_x, e_y, v), angle=PI / 2, about_point=ORIGIN),
                       run_time=2.5)
         self.wait(0.5)
@@ -375,7 +382,7 @@ class FixedFrame(Narrated):
 class CountingStickers(Narrated):
     def construct(self):
         self.set_camera_orientation(**CAMERA)
-        self.show_axes()
+        axes = self.show_axes()
         cube = CubeMobject()
         core = cubelet_mobject((0, 0, 0))
         self.add(cube, core)
@@ -426,8 +433,10 @@ class CountingStickers(Narrated):
 
         pieces = [core] + list(cube.pieces.values())
         homes = [(0, 0, 0)] + list(cube.pieces)
+        # The axes step aside while the cube is taken apart; they would run through the pieces.
         self.play(*(p.animate.shift(at(c, 0.45)) for p, c in zip(pieces, homes)),
-                  self.camera.zoom_tracker.animate.set_value(0.68), run_time=2)
+                  self.camera.zoom_tracker.animate.set_value(0.68), FadeOut(axes[0]),
+                  FadeOut(*axes[1]), run_time=2)
 
         examples = [(0, 0, 0), (0, 0, 1), (1, 0, 1), (1, 1, 1)]
         names = ["core", "centers", "edges", "corners"]
@@ -466,7 +475,8 @@ class CountingStickers(Narrated):
                       Write(total))
         self.play(FadeOut(rows), FadeOut(total), FadeOut(norm))
         self.play(*(p.animate.shift(-at(c, 0.45)) for p, c in zip(pieces, homes)),
-                  self.camera.zoom_tracker.animate.set_value(CAMERA["zoom"]), run_time=2)
+                  self.camera.zoom_tracker.animate.set_value(CAMERA["zoom"]), FadeIn(axes[0]),
+                  FadeIn(*axes[1]), run_time=2)
         self.wait(0.5)
 
 
@@ -486,16 +496,17 @@ class ColorsAreVectors(Narrated):
         self.undo(cube, made)
 
         # Long arrows, so that even the ones pointing away from the camera stand out.
-        color_arrows = {c: arrow(ORIGIN, at(c, 2.4 if c[2] < 0 else 3.0), STICKER[c], thickness=0.045)
-                        for c in centers}
-        # A positive center is labeled where it sits; the others, which face away, at their tips.
-        label_spots = {FRONT: at(FRONT) + 0.75 * SPACING * OUT, RIGHT_FACE: at(RIGHT_FACE) +
-                       0.75 * SPACING * OUT, TOP: at((0, -1.5, 1.35)),
-                       (-1, 0, 0): at((-1, 0, 0), 3.4), (0, -1, 0): at((0, -1, 0), 3.4),
-                       (0, 0, -1): at((0, 0, -1), 2.4) + 0.9 * RIGHT}
-        tips = {c: self.facing_camera(vector_tex(c, color=STICKER[c], font_size=36)
-                                      .add_background_rectangle(opacity=0.75)
-                                      .move_to(label_spots[c])) for c in centers}
+        # The orange and yellow ones a little shorter, clear of the addresses and the captions.
+        color_arrows = {c: arrow(ORIGIN, at(c, 2.4 if c in [(0, -1, 0), (0, 0, -1)] else 3.0),
+                                 STICKER[c], thickness=0.045) for c in centers}
+        # Each center's address, listed on screen as it is named: in the picture, the labels
+        # would have to sit on the arrows and stickers they describe.
+        order = [FRONT, RIGHT_FACE, TOP, (-1, 0, 0), (0, -1, 0), (0, 0, -1)]
+        addresses = self.hud(VGroup(*(MathTex(r"\text{%s center: }" % color_name(c),
+                                              vector_tex(c).get_tex_string(), font_size=36)
+                                      .set_color(STICKER[c]) for c in order))
+                             .arrange(DOWN, aligned_edge=LEFT).to_corner(UL))
+        tips = dict(zip(order, addresses))
         self.play(cube.animate.ghosted(centers, 0.12), run_time=1.2)
         for c, words in [(FRONT, "The green center always sits at one, zero, zero: one step "
                                  "along x."),
@@ -533,13 +544,12 @@ class ColorsAreVectors(Narrated):
                       *(FadeIn(tips[c]) for c in negatives),
                       LaggedStart(*(Write(p) for p in palette[3:]), lag_ratio=0.4), run_time=2.5)
         # The opposites point away from the camera; look at them from the other side.
-        # The legend and the front labels would crowd the back view, so they step aside meanwhile.
-        front_labels = [tips[c] for c in centers if c not in negatives]
-        self.play(FadeOut(palette), *(FadeOut(t) for t in front_labels))
+        # From behind, the arrows reach toward the address list, which steps aside meanwhile.
+        self.play(FadeOut(addresses))
         self.move_camera(phi=70 * DEGREES, theta=CAMERA["theta"] + PI, run_time=2.5)
         self.wait(2)
         self.move_camera(**CAMERA, run_time=2.5)
-        self.play(FadeIn(palette), *(FadeIn(t) for t in front_labels))
+        self.play(FadeIn(addresses))
         self.wait(1)
 
 
@@ -813,7 +823,7 @@ class Moves(Narrated):
             MathTex(r"\mathbf{v} = \mathbf{e}_z:\;\; \mathbf{v} \cdot p = z", font_size=36),
         ).arrange(DOWN, aligned_edge=LEFT).to_corner(UL))
         layer_labels = [self.facing_camera(MathTex(text, color=ACCENT, font_size=40)
-                                           .move_to(at((0, 2.2, z))))
+                                           .move_to(at((-1.6, 1.7, z))))  # Clear of the y axis.
                         for z, text in [(1, "+1"), (0, "0"), (-1, "-1")]]
         with self.voice("Now take the dot product of v with each cubelet's current position, p. "
                         "Dotting with a unit axis measures how far p reaches along it. For v "
@@ -982,6 +992,7 @@ class Outro(Narrated):
             ("move", ":", r"\mathbf{v}\cdot(R\,c) > 0 \;\Rightarrow\; R \leftarrow M R"),
             ("solved", r"\iff", r"R\,\mathrm{diag}(c) = \mathrm{diag}(c)"),
         ])).arrange(DOWN, aligned_edge=LEFT, buff=0.3).move_to(0.3 * UP)
+        self.label(recap)
         for row in recap:
             row[0].set_color(ACCENT)
         self.say("Let's step back, and look at what we built.")

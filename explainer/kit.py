@@ -230,18 +230,53 @@ class Narrated(ThreeDScene):
                      (m.get_fill_opacity() > 0 or m.get_stroke_opacity() > 0)]
             if not parts:
                 continue
-            shift = 0
+            points = np.vstack([p.points for p in parts])
             if label in camera.fixed_orientation_mobjects:
                 # Such a label is drawn where its center projects to, without perspective.
                 center = camera.fixed_orientation_mobjects[label]()
-                shift = camera.project_point(center) - center
-            low = np.min([p.get_corner(DL) for p in parts], axis=0) + shift
-            high = np.max([p.get_corner(UR) for p in parts], axis=0) + shift
-            yield getattr(label, "tex_string", type(label).__name__), low, high
+                points = points + (camera.project_point(center) - center)
+            elif label not in camera.fixed_in_frame_mobjects:
+                points = camera.project_points(points)  # A label placed in the world.
+            yield (getattr(label, "tex_string", type(label).__name__),
+                   points.min(axis=0), points.max(axis=0))
+
+    def obstacles(self, samples=24):
+        """What text must not cover, on screen: points along visible arrows, and the outlines of
+        opaque stickers."""
+        camera, points, boxes = self.renderer.camera, [], []
+        for m in self.get_mobject_family_members():
+            if isinstance(m, Line3D) and m.get_fill_opacity() > 0.3:
+                start, end = m.get_start(), m.get_end()
+                line = start + np.linspace(0, 1, samples)[:, None] * (end - start)
+                pinned = m in camera.fixed_in_frame_mobjects
+                points.append(line if pinned else camera.project_points(line))
+            elif getattr(m, "is_sticker", False) and m.get_fill_opacity() > 0.9:
+                corners = camera.project_points(m.points)
+                boxes.append((corners.min(axis=0), corners.max(axis=0)))
+        return (np.vstack(points) if points else np.zeros((0, 3))), boxes
 
     def check_labels(self, slack=0.03):
-        """Records text that overlaps other text or the caption band; the build fails on any."""
+        """Records text that overlaps other text, the caption band, an arrow or an opaque
+        sticker; the build fails on any."""
         boxes = list(self.label_boxes())
+        arrow_points, stickers = self.obstacles()
+        for name, low, high in boxes:
+            inside = ((arrow_points[:, :2] > low[:2] + slack) &
+                      (arrow_points[:, :2] < high[:2] - slack)).all(axis=1)
+            if inside.any():
+                self.collisions.append((self.renderer.time, name, "an arrow"))
+            for low2, high2 in stickers:
+                if (min(high[0], high2[0]) - max(low[0], low2[0]) > slack and
+                        min(high[1], high2[1]) - max(low[1], low2[1]) > slack):
+                    self.collisions.append((self.renderer.time, name, "a sticker"))
+                    break
+        # Text that was never registered as a label would escape this check; it may not exist.
+        registered = {m for label in self.labels for m in label.get_family()}
+        for m in self.get_mobject_family_members():
+            if isinstance(m, (SingleStringMathTex, Text, MarkupText)) and m not in registered:
+                owner = next(top for top in self.mobjects if m in top.get_family())
+                self.collisions.append((self.renderer.time, getattr(owner, "tex_string",
+                                        type(owner).__name__), "no label"))
         for i, (name, low, high) in enumerate(boxes):
             if low[1] < CAPTION_TOP - slack:
                 self.collisions.append((self.renderer.time, name, "the captions"))
@@ -259,6 +294,11 @@ class Narrated(ThreeDScene):
         self.remove(*mobjects)
         if not overlay:
             self.labels += mobjects
+        return mobjects[0] if len(mobjects) == 1 else mobjects
+
+    def label(self, *mobjects):
+        """Registers text placed in the world of a flat scene, so that its layout is checked."""
+        self.labels += mobjects
         return mobjects[0] if len(mobjects) == 1 else mobjects
 
     def facing_camera(self, mobject):
@@ -352,7 +392,9 @@ def coordinate_axes():
     for i, color in enumerate(BASIS_COLORS):
         e = np.array(unit(i), dtype=float)
         length = AXIS_LENGTHS[i]
-        inside = Line3D(-length * e, edge * e, color=color, thickness=0.016, resolution=(20, 6))
+        # Only the front half is longer; the back half stays short and behind the cube.
+        inside = Line3D(-AXIS_LENGTHS[1] * e, edge * e, color=color, thickness=0.016,
+                        resolution=(20, 6))
         outline = arrow(edge * e, length * e, BODY, thickness=0.04, segments=6, tip=1.5)
         outside = arrow(edge * e, length * e, color, thickness=0.016, segments=6)
         axes.add(VGroup(inside, VGroup(outline, outside).set_shade_in_3d(False)))
@@ -388,6 +430,7 @@ def cubelet_mobject(cubelet):
         if normal[2] == 0:
             sticker.rotate(PI / 2, axis=RIGHT if normal[1] else UP)
         sticker.move_to(SPACING * c + normal * (size / 2 + 0.006))
+        sticker.is_sticker = True
         stickers.add(sticker)
     if cubelet == (0, 0, 1):
         # Like the logo on a real cube's white center: it makes the center's spin visible.
