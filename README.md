@@ -45,6 +45,7 @@ The model at a glance:
 | **Colors** | $\pm\mathbf{e}_x, \pm\mathbf{e}_y, \pm\mathbf{e}_z$: the never-moving centers, each an eigenvector of the turns around it |
 | **Sticker colors** | the non-zero columns of $\mathrm{diag}(c)$ |
 | **State** | one configuration $(c, R)$ per cubelet, with $R$ a rotation matrix |
+| **Position** | $p = R\,c$: where the cubelet is now |
 | **Move** | the cubelets with $\mathbf{v} \cdot (R\,c) > 0$ turn ( $\mathbf{v}$: the face's axis): $R \leftarrow M R$ ( $M$: the quarter-turn matrix) |
 | **Solved** | $R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$ for every cubelet |
 

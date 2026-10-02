@@ -78,36 +78,45 @@ async def synthesize(spoken, path, words_path):
 
 
 def music(seconds, rate=44100):
-    """A soft piece to close the film: slow chords and a gentle arpeggio, synthesized here so that
-    nothing needs licensing. It fades in and out over exactly `seconds`."""
+    """A gentle piano piece to close the film, synthesized here so that nothing needs licensing.
+
+    Broken chords over C - G/B - Am - F, two and a half seconds each, ending on a held C major
+    chord; it fades in, and slowly out, over exactly `seconds`."""
     # Keyed by this function's own source as well, so that editing the music invalidates the cache.
     version = hashlib.sha1(inspect.getsource(music).encode()).hexdigest()[:8]
     path = SPEECH_CACHE / f"music-{version}-{seconds:.2f}.wav"
     if path.exists():
         return path
-    t = np.arange(int(seconds * rate)) / rate
+    signal = np.zeros(int(seconds * rate))
     hz = lambda semitones: 261.63 * 2 ** (semitones / 12)  # Semitones above middle C.
-    chords = [[-12, -8, -5, -1, 2], [-15, -12, -8, -5, 0], [-19, -15, -12, -8, -3],
-              [-17, -12, -10, -5, 2]]  # Cmaj9, Am7, Fmaj7, Gsus: four seconds each.
-    signal = np.zeros_like(t)
-    for start in np.arange(0, seconds, 4.0):
-        chord = chords[int(start / 4) % len(chords)]
-        local = t - start
-        swell = np.clip(local / 1.2, 0, 1) * np.clip((5.5 - local) / 1.5, 0, 1)  # Overlaps the next.
-        for note in chord:
-            for detune in (-0.4, 0.4):
-                signal += 0.05 * swell * np.sin(2 * np.pi * (hz(note) + detune) * t)
-        for k, note in enumerate(chord[1:] + chord[1:3]):  # An arpeggio, one note per half second.
-            onset = local - 0.5 * k
-            pluck = np.where(onset >= 0, np.exp(-np.maximum(onset, 0) * 3.5), 0)
-            pitch = hz(note + 12)
-            signal += 0.07 * pluck * (np.sin(2 * np.pi * pitch * t) +
-                                      0.3 * np.sin(4 * np.pi * pitch * t))
-    for delay, gain in [(0.375, 0.35), (0.75, 0.15)]:  # A little echo, for space.
-        shift = int(delay * rate)
-        signal[shift:] += gain * signal[:-shift]
-    signal *= np.clip(t / 2.5, 0, 1) * np.clip((seconds - t) / 5.0, 0, 1)
-    signal *= 0.45 / np.abs(signal).max()
+
+    def strike(semitones, start, length, loudness):
+        """A piano-like note: harmonics that decay, the higher ones faster."""
+        begin, end = int(start * rate), min(len(signal), int((start + length + 1.0) * rate))
+        if begin >= end:
+            return
+        t = np.arange(end - begin) / rate
+        tone = sum(np.sin(2 * np.pi * hz(semitones) * k * t) * np.exp(-t * (0.9 + 0.6 * k)) / k ** 1.4
+                   for k in range(1, 7))
+        release = np.clip((start + length + 1.0 - (start + t)) / 1.0, 0, 1)  # Damper.
+        signal[begin:end] += loudness * tone * np.minimum(t / 0.004, 1) * release
+
+    bar = 2.5
+    chords = [(-24, [0, 4, 7, 12, 16]), (-25, [-1, 2, 7, 11, 14]), (-27, [-3, 0, 4, 9, 12]),
+              (-31, [-7, -3, 0, 5, 9])]  # (bass, broken chord), in semitones from middle C.
+    bars = max(0, int((seconds - 4.0) // bar))
+    for b in range(bars):
+        bass, notes = chords[b % len(chords)]
+        start = b * bar
+        strike(bass, start, bar, 0.5)
+        strike(bass + 7, start, bar, 0.3)
+        for k, note in enumerate(notes + notes[-2:0:-1][:3]):  # Up and back down, in eighths.
+            strike(note, start + k * bar / 8, bar / 4, 0.32 - 0.02 * k)
+    for note in (-24, -12, 4, 7, 12, 16):  # The home chord, left to ring.
+        strike(note, bars * bar, seconds, 0.3)
+    t = np.arange(len(signal)) / rate
+    signal *= np.clip(t / 1.5, 0, 1) * np.clip((seconds - t) / 6.0, 0, 1)
+    signal *= 0.5 / max(np.abs(signal).max(), 1e-9)
     SPEECH_CACHE.mkdir(parents=True, exist_ok=True)
     with wave.open(str(path), "wb") as out:
         out.setnchannels(1)
@@ -247,7 +256,11 @@ class Narrated(ThreeDScene):
         for m in self.get_mobject_family_members():
             if isinstance(m, Line3D) and m.get_fill_opacity() > 0.3:
                 start, end = m.get_start(), m.get_end()
-                line = start + np.linspace(0, 1, samples)[:, None] * (end - start)
+                # Out to the farthest point along the arrow, so that an arrowhead counts too.
+                direction = (end - start) / np.linalg.norm(end - start)
+                reach = max((np.vstack([p.points for p in m.get_family() if p.has_points()])
+                             - start) @ direction)
+                line = start + np.linspace(0, reach, samples)[:, None] * direction
                 pinned = m in camera.fixed_in_frame_mobjects
                 points.append(line if pinned else camera.project_points(line))
             elif getattr(m, "is_sticker", False) and m.get_fill_opacity() > 0.9:
@@ -379,26 +392,33 @@ def arrow(start, end, color, thickness=0.03, segments=12, tip=1.0):
                    resolution=(segments, 6))
 
 
-def coordinate_axes():
-    """The x, y and z axes through the core, in both directions, pointing to the positive side.
+def overlay_arrow(start, end, color, thickness=0.03):
+    """An arrow drawn over everything in the 3D world, with a thin black outline so that it stays
+    visible wherever it crosses the cube or other arrows."""
+    outline = arrow(start, end, BLACK, thickness=2.4 * thickness, segments=6, tip=1.35)
+    return VGroup(outline, arrow(start, end, color, thickness=thickness, segments=6)
+                  ).set_shade_in_3d(False)
+
+
+def piercing_arrow(start, surface, end, color, thickness=0.03):
+    """An arrow from inside the cube, out through its surface, to `end`.
 
     Cairo sorts each face of the cube by its center, so a big front face counts as nearer than the
-    stretch of axis sticking out in front of it, and would cover it. That stretch therefore draws
-    over the cube; the rest of each axis is depth-sorted as usual. (The camera views the cube
-    from the positive side of every axis.) A dark outline keeps it visible over the face of its
-    own color: the x axis over green, y over red, z over white."""
+    stretch of arrow sticking out in front of it, and would cover it. That stretch therefore draws
+    over the cube, outlined (the camera always sees the arrow's way out); the stretch inside is
+    depth-sorted as usual."""
+    inside = Line3D(np.array(start, dtype=float), np.array(surface, dtype=float), color=color,
+                    thickness=thickness, resolution=(20, 6))
+    return VGroup(inside, overlay_arrow(surface, end, color, thickness))
+
+
+def coordinate_axes():
+    """The x, y and z axes through the core, in both directions, pointing to the positive side."""
     edge = 1.55 * SPACING  # Just outside the stickers.
-    axes = VGroup()
-    for i, color in enumerate(BASIS_COLORS):
-        e = np.array(unit(i), dtype=float)
-        length = AXIS_LENGTHS[i]
-        # Only the front half is longer; the back half stays short and behind the cube.
-        inside = Line3D(-AXIS_LENGTHS[1] * e, edge * e, color=color, thickness=0.016,
-                        resolution=(20, 6))
-        outline = arrow(edge * e, length * e, BODY, thickness=0.04, segments=6, tip=1.5)
-        outside = arrow(edge * e, length * e, color, thickness=0.016, segments=6)
-        axes.add(VGroup(inside, VGroup(outline, outside).set_shade_in_3d(False)))
-    return axes
+    # Only the front half of the x axis is longer; the back halves stay short, behind the cube.
+    return VGroup(*(piercing_arrow(-AXIS_LENGTHS[1] * np.array(unit(i)), edge * np.array(unit(i)),
+                                   AXIS_LENGTHS[i] * np.array(unit(i)), color, thickness=0.016)
+                    for i, color in enumerate(BASIS_COLORS)))
 
 
 class Logo(Triangle):
