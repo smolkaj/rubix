@@ -25,17 +25,18 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 
 <p align="center">
   <a href="https://github.com/smolkaj/eigencube/releases/download/explainer/eigencube-explainer.mp4">
-    <img src="explainer/poster.jpg" alt="Eigencube, explained: a 14-minute animated tour of the encoding" width="720">
+    <img src="explainer/poster.jpg" alt="Eigencube, explained: a 15-minute animated tour of the encoding" width="720">
   </a>
 </p>
 
 <p align="center">
-  <b>▶ <a href="https://github.com/smolkaj/eigencube/releases/download/explainer/eigencube-explainer.mp4"><i>Eigencube, explained</i></a></b> (14 minutes, captioned)
+  <b>▶ <a href="https://github.com/smolkaj/eigencube/releases/download/explainer/eigencube-explainer.mp4"><i>Eigencube, explained</i></a></b> (15 minutes, captioned)
 </p>
 
 The whole encoding, in motion and from first principles: a quick review of the linear algebra it uses, then the cube itself, built up one idea at a time. It is rendered with Manim straight from [`eigencube.py`](eigencube.py) (see [`explainer/`](explainer/)), in the spirit of Essence of Linear Algebra.
 
-The model at a glance (the film's closing recap; keep the two in step):
+<!-- This table mirrors the film's closing recap (Outro in explainer/scenes.py); keep the two in step. -->
+The model at a glance:
 
 | | |
 |:--|:--|

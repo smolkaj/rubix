@@ -20,7 +20,7 @@ from kit import duration, speakable  # noqa: E402
 from scenes import SCENES  # noqa: E402
 
 CHAPTERS = [scene.__name__ for scene in SCENES]
-CAPTION_WIDTH = 84  # Characters; longer sentences are split at clause boundaries.
+CAPTION_WIDTH = 50  # Characters, so that a caption fits on one line in common players.
 # The moment the README shows as the film's thumbnail: a chapter and the start of a spoken line.
 POSTER = ("DiagTrick", "Each column is one sticker")
 MIN_CAPTION_SECONDS = 0.8
@@ -79,7 +79,12 @@ def caption_chunks(text):
     so that each caption is comfortable to read."""
     pieces = []
     for sentence in re.findall(r"[^.!?]+[.!?]*", text):
-        pieces += re.split(r"(?<=[,:;])\s+", sentence.strip())
+        for clause in re.split(r"(?<=[,:;])\s+", sentence.strip()):
+            while len(clause) > CAPTION_WIDTH:  # Still too long: break between words.
+                cut = clause.rfind(" ", 0, CAPTION_WIDTH)
+                pieces.append(clause[:cut])
+                clause = clause[cut + 1:]
+            pieces.append(clause)
     chunks = [""]
     for piece in pieces:
         joined = f"{chunks[-1]} {piece}".strip()
@@ -177,6 +182,7 @@ def main():
         existing = list(media.glob(f"videos/scenes/*/{scene}.mp4"))
         if not existing:
             sys.exit(f"{scene} has not been rendered at this quality yet; render it too.")
+        print(f"reusing the earlier render of {scene}", file=sys.stderr)
         return existing[0]
 
     with ThreadPoolExecutor(min(len(CHAPTERS), os.cpu_count() or 1)) as pool:

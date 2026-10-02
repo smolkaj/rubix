@@ -80,7 +80,9 @@ async def synthesize(spoken, path, words_path):
 def music(seconds, rate=44100):
     """A soft piece to close the film: slow chords and a gentle arpeggio, synthesized here so that
     nothing needs licensing. It fades in and out over exactly `seconds`."""
-    path = SPEECH_CACHE / f"music-{seconds:.2f}.wav"
+    # Keyed by this function's own source as well, so that editing the music invalidates the cache.
+    version = hashlib.sha1(inspect.getsource(music).encode()).hexdigest()[:8]
+    path = SPEECH_CACHE / f"music-{version}-{seconds:.2f}.wav"
     if path.exists():
         return path
     t = np.arange(int(seconds * rate)) / rate
@@ -270,6 +272,7 @@ class Narrated(ThreeDScene):
         """The coordinate frame (x, y, z through the core), with labels turned to the camera."""
         arrows = coordinate_axes()
         labels = VGroup(*(MathTex(name, color=color, font_size=40)
+                          .add_background_rectangle(color=BODY, opacity=0.8)
                           .move_to((AXIS_LENGTH + 0.3) * np.array(unit(i)))
                           for i, (name, color) in enumerate(zip("xyz", BASIS_COLORS))))
         for label in labels:
@@ -283,6 +286,9 @@ class Narrated(ThreeDScene):
         return arrows, names
 
     def tear_down(self):
+        # Chapters end on a short fade rather than a hard cut.
+        if self.mobjects:
+            self.play(*(FadeOut(m) for m in self.mobjects), run_time=0.6)
         cues_dir = Path(config.media_dir) / "cues"
         cues_dir.mkdir(parents=True, exist_ok=True)
         (cues_dir / f"{type(self).__name__}.json").write_text(json.dumps(self.cues, indent=1))
@@ -325,17 +331,30 @@ def at(cubelet, scale=1.0):
     return SPACING * scale * np.array(cubelet, dtype=float)
 
 
-def arrow(start, end, color, thickness=0.03, segments=12):
+def arrow(start, end, color, thickness=0.03, segments=12, tip=1.0):
     # Short segments along the shaft, so that each depth-sorts where it actually is.
     return Arrow3D(np.array(start, dtype=float), np.array(end, dtype=float), color=color,
-                   thickness=thickness, height=0.22, base_radius=0.07, resolution=(segments, 6))
+                   thickness=thickness, height=0.22 * tip, base_radius=0.07 * tip,
+                   resolution=(segments, 6))
 
 
 def coordinate_axes():
-    """The x, y and z axes through the core, in both directions, pointing to the positive side."""
-    return VGroup(*(arrow(-AXIS_LENGTH * np.array(unit(i)), AXIS_LENGTH * np.array(unit(i)),
-                          color, thickness=0.016, segments=20)
-                    for i, color in enumerate(BASIS_COLORS)))
+    """The x, y and z axes through the core, in both directions, pointing to the positive side.
+
+    Cairo sorts each face of the cube by its center, so a big front face counts as nearer than the
+    stretch of axis sticking out in front of it, and would cover it. That stretch therefore draws
+    over the cube; the rest of each axis is depth-sorted as usual. (The camera views the cube
+    from the positive side of every axis.) A dark outline keeps it visible over the face of its
+    own color: the x axis over green, y over red, z over white."""
+    edge = 1.55 * SPACING  # Just outside the stickers.
+    axes = VGroup()
+    for i, color in enumerate(BASIS_COLORS):
+        e = np.array(unit(i), dtype=float)
+        inside = Line3D(-AXIS_LENGTH * e, edge * e, color=color, thickness=0.016, resolution=(20, 6))
+        outline = arrow(edge * e, AXIS_LENGTH * e, BODY, thickness=0.04, segments=6, tip=1.5)
+        outside = arrow(edge * e, AXIS_LENGTH * e, color, thickness=0.016, segments=6)
+        axes.add(VGroup(inside, VGroup(outline, outside).set_shade_in_3d(False)))
+    return axes
 
 
 class Logo(Triangle):

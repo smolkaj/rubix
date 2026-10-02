@@ -1,6 +1,6 @@
 # Eigencube, explained
 
-A 14-minute animated explainer of the Eigencube encoding, in the style of 3Blue1Brown's
+A 15-minute animated explainer of the Eigencube encoding, in the style of 3Blue1Brown's
 [Essence of Linear Algebra](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab)
 (the series that sparked Eigencube in the first place).
 

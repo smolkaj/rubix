@@ -5,7 +5,7 @@ lines where it heard something else, e.g. "diagram" for "diag". Fix those throug
 kit.PRONUNCIATION or by rephrasing, and confirm doubtful ones by ear.
 
 With --sync, it instead transcribes the finished film and lists captions that appear more than
-half a second before or after their first words are heard.
+0.6 seconds before or after their first words are heard, or whose words are not heard at all.
 
     pip install faster-whisper
     python check_speech.py [--draft] [--sync]
@@ -75,25 +75,31 @@ def mismatches(expected, heard):
             yield " ".join(a[i1:i2]) or "∅", " ".join(b[j1:j2]) or "∅"
 
 
-def check_sync(model, film, tolerance=0.5):
-    """Captions whose start is off from when their first words are heard."""
+def check_sync(model, film, tolerance=0.6, window=30):  # The recognizer's word times jitter ~0.3s.
+    """Captions whose start is off from when their first words are heard, and captions whose
+    first words were not heard at all within `window` seconds (both count as failures)."""
     segments, _ = model.transcribe(audio(film), beam_size=5, word_timestamps=True)
-    heard = [(w.start, words(w.word)) for s in segments for w in s.words]
-    heard = [(start, token) for start, tokens in heard for token in tokens]
+    heard = [(w.start, token) for s in segments for w in s.words for token in words(w.word)]
     captions = re.findall(r"(\d+:\d+:\d+,\d+) --> .*\n(.*)\n", film.with_suffix(".srt").read_text())
-    late = 0
+    off, unheard = 0, 0
     for stamp, text in captions:
         h, m, sec = stamp.replace(",", ".").split(":")
         start = int(h) * 3600 + int(m) * 60 + float(sec)
-        first = words(text)[:2]
-        matches = [t for i, (t, _) in enumerate(heard)
-                   if [tok for _, tok in heard[i:i + len(first)]] == first and abs(t - start) < 4]
-        if matches and min(abs(t - start) for t in matches) > tolerance:
-            late += 1
+        # Compare the opening letters loosely: "e x" may be heard as "ex", "it's" as "is".
+        target = "".join(words(text))[:12]
+        matches = [t for i, (t, _) in enumerate(heard) if abs(t - start) < window and
+                   difflib.SequenceMatcher(None, target, "".join(
+                       tok for _, tok in heard[i:i + 8])[:len(target)]).ratio() >= 0.75]
+        if not matches:
+            unheard += 1
+            print(f"{start:7.2f}s  not heard nearby: {text!r}")
+        elif min(abs(t - start) for t in matches) > tolerance:
+            off += 1
             offset = min(matches, key=lambda t: abs(t - start)) - start
             print(f"{start:7.2f}s  heard {offset:+.2f}s later: {text!r}")
-    print(f"{late} of {len(captions)} caption(s) off by more than {tolerance}s.")
-    return late
+    print(f"{off} of {len(captions)} caption(s) off by more than {tolerance}s; "
+          f"{unheard} not heard within {window}s.")
+    return off + unheard
 
 
 def main():

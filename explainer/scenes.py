@@ -254,7 +254,7 @@ class LinearAlgebraReview(Narrated):
                         "Essence of Linear Algebra is the place to go."):
             self.play(FadeOut(product))
             self.when_said("A rotation")
-            self.play(FadeIn(box), Write(rule), run_time=2)
+            self.play(FadeIn(box), Write(rule), run_time=2)  # Shown as rule_card.
 
         eigen = MathTex(r"\text{eigenvector:}\;\; \text{a vector the transformation leaves in place}",
                         font_size=36, color=ACCENT)
@@ -266,6 +266,7 @@ class LinearAlgebraReview(Narrated):
             self.when_said("eigenvector")
             self.play(Write(eigen), run_time=2)
             self.when_said("A quarter turn")  # Every arrow moves.
+            self.play(FadeOut(rule_card), FadeOut(x_lands), FadeOut(y_lands), run_time=0.6)
             self.play(Rotate(VGroup(plane, e_x, e_y, v), angle=PI / 2, about_point=ORIGIN),
                       run_time=2.5)
         self.wait(0.5)
@@ -356,6 +357,8 @@ class FixedFrame(Narrated):
         other_labels = [self.facing_camera(vector_tex(c, color=POSITION, font_size=36)
                                            .add_background_rectangle(opacity=0.75)
                                            .move_to(at(spot))) for c, spot in others]
+        domain = self.hud(MathTex(r"c \in \{-1, 0, 1\}^3", font_size=44)
+                          .next_to(c_label, DOWN, 0.4, aligned_edge=LEFT))
         with self.voice("The coordinates of every cubelet are minus one, zero, or one. A center, "
                         "like this one, sits at zero, one, zero. And an edge, like this one, at "
                         "zero, one, one."):
@@ -363,9 +366,8 @@ class FixedFrame(Narrated):
                                               ["A center", "And an edge"]):
                 self.when_said(words)
                 self.play(cube.pieces[c].animate.set_opacity(0.45), Create(a), FadeIn(label))
-        domain = self.hud(MathTex(r"c \in \{-1, 0, 1\}^3", font_size=44)
-                          .next_to(c_label, DOWN, 0.4, aligned_edge=LEFT))
-        self.play(Write(domain))
+            self.play(Write(domain))
+        self.wait(1)
         self.wait(1)
 
 
@@ -407,7 +409,8 @@ class CountingStickers(Narrated):
         ).arrange(DOWN, aligned_edge=LEFT).to_corner(UL))
         with self.voice("So the absolute value of x is a little on-off switch: does this cubelet "
                         "show a sticker along the x axis? And the same goes for y, and for z."):
-            self.play(FadeOut(shown), Write(switch), run_time=2)
+            self.play(FadeOut(shown))
+            self.play(Write(switch), run_time=2)
             self.when_said("the same goes")
             self.play(cube.animate.ghosted(cube.pieces))
 
@@ -424,8 +427,8 @@ class CountingStickers(Narrated):
 
         pieces = [core] + list(cube.pieces.values())
         homes = [(0, 0, 0)] + list(cube.pieces)
-        self.play(*(p.animate.shift(at(c, 0.55)) for p, c in zip(pieces, homes)),
-                  self.camera.zoom_tracker.animate.set_value(0.72), run_time=2)
+        self.play(*(p.animate.shift(at(c, 0.45)) for p, c in zip(pieces, homes)),
+                  self.camera.zoom_tracker.animate.set_value(0.68), run_time=2)
 
         examples = [(0, 0, 0), (0, 0, 1), (1, 0, 1), (1, 1, 1)]
         names = ["core", "centers", "edges", "corners"]
@@ -444,7 +447,7 @@ class CountingStickers(Narrated):
         example_arrow = None
         for stickers, (c, row, line) in enumerate(zip(examples, rows, lines)):
             highlight = [p for c2, p in cube.pieces.items() if eigencube.norm1(c2) == stickers]
-            new_arrow = position_arrow(c, 1.55) if any(c) else None
+            new_arrow = position_arrow(c, 1.45) if any(c) else None
             with self.voice(line, pause=0.3):
                 # The core is a plain dark block with no stickers; tint it while it is the one named.
                 core_look = core.animate.set_fill(ACCENT if stickers == 0 else BODY,
@@ -463,7 +466,7 @@ class CountingStickers(Narrated):
             self.play(*(p.animate.set_opacity(1) for p in pieces), FadeOut(example_arrow),
                       Write(total))
         self.play(FadeOut(rows), FadeOut(total), FadeOut(norm))
-        self.play(*(p.animate.shift(-at(c, 0.55)) for p, c in zip(pieces, homes)),
+        self.play(*(p.animate.shift(-at(c, 0.45)) for p, c in zip(pieces, homes)),
                   self.camera.zoom_tracker.animate.set_value(CAMERA["zoom"]), run_time=2)
         self.wait(0.5)
 
@@ -568,7 +571,8 @@ class DiagTrick(Narrated):
                         "e z. Now draw those three pieces as arrows, starting from the cubelet "
                         "itself."):
             self.when_said("c is one")
-            self.play(FadeOut(c_label), Write(decomposition), run_time=2)
+            self.play(FadeOut(c_label))
+            self.play(Write(decomposition), run_time=2)
             self.when_said("draw those")
             self.play(FadeOut(c_arrow))
             for a in arrows:
@@ -853,7 +857,7 @@ class Moves(Narrated):
             self.play(Rotate(basis, **move_angle_axis(TURN_TOP), about_point=ORIGIN), run_time=4)
         landings = [self.facing_camera(vector_tex(turn[:, i], color=color, font_size=34)
                                        .add_background_rectangle(opacity=0.75)
-                                       .move_to(at(turn[:, i], 2.6) + 0.45 * OUT))
+                                       .move_to(at(turn[:, i], 2.6) + 0.75 * OUT))
                     for i, color in enumerate(BASIS_COLORS)]
         for column, a, landing, words in zip(
                 m_group[1].get_columns(), basis, landings,
