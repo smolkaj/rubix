@@ -85,22 +85,26 @@ def check_sync(model, film, tolerance=0.75, window=30):  # Word times jitter up 
     segments, _ = model.transcribe(audio(film), beam_size=5, word_timestamps=True)
     heard = [(w.start, token) for s in segments for w in s.words for token in words(w.word)]
     captions = re.findall(r"(\d+:\d+:\d+,\d+) --> .*\n(.*)\n", film.with_suffix(".srt").read_text())
-    off, unheard = 0, 0
+    off, unheard, cursor = 0, 0, 0
     for stamp, text in captions:
         h, m, sec = stamp.replace(",", ".").split(":")
         start = int(h) * 3600 + int(m) * 60 + float(sec)
         # Compare the opening letters loosely: "e x" may be heard as "ex", "it's" as "is".
         target = "".join(words(text))[:12]
-        matches = [t for i, (t, _) in enumerate(heard) if abs(t - start) < window and
-                   difflib.SequenceMatcher(None, target, "".join(
+        # Only past the previous caption's match: a short caption could otherwise match an
+        # earlier occurrence of its words, and hide drift.
+        matches = [(i, t) for i, (t, _) in enumerate(heard) if i >= cursor and
+                   abs(t - start) < window and difflib.SequenceMatcher(None, target, "".join(
                        tok for _, tok in heard[i:i + 8])[:len(target)]).ratio() >= 0.75]
         if not matches:
             unheard += 1
             print(f"{start:7.2f}s  not heard nearby: {text!r}")
-        elif min(abs(t - start) for t in matches) > tolerance:
+            continue
+        cursor, heard_at = min(matches, key=lambda match: abs(match[1] - start))
+        cursor += 1
+        if abs(heard_at - start) > tolerance:
             off += 1
-            offset = min(matches, key=lambda t: abs(t - start)) - start
-            print(f"{start:7.2f}s  heard {offset:+.2f}s later: {text!r}")
+            print(f"{start:7.2f}s  heard {heard_at - start:+.2f}s later: {text!r}")
     print(f"{off} of {len(captions)} caption(s) off by more than {tolerance}s; "
           f"{unheard} not heard within {window}s.")
     return off + unheard

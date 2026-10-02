@@ -23,6 +23,7 @@ CHAPTERS = [scene.__name__ for scene in SCENES]
 CAPTION_WIDTH = 50  # Characters, so that a caption fits on one line in common players.
 # The moment the README shows as the film's thumbnail: a chapter and the start of a spoken line.
 POSTER = ("DiagTrick", "Each column is one sticker")
+FINAL_FPS = 30
 MIN_CAPTION_SECONDS = 0.8
 MIN_CAPTION = 24  # Characters; shorter sentences are joined to a neighbor, so they don't flash by.
 
@@ -32,9 +33,11 @@ def render(scene, flags, media):
     # Caching stays off: after replaying a cached animation, Manim silently drops any sound added
     # before the next one, which cost three narration lines their audio.
     with log.open("w") as out:
-        subprocess.run([sys.executable, "-m", "manim", "render", *flags, "--disable_caching",
-                        "--media_dir", str(media), str(HERE / "scenes.py"), scene],
-                       stdout=out, stderr=out, check=True)
+        rendered = subprocess.run([sys.executable, "-m", "manim", "render", *flags,
+                                   "--disable_caching", "--media_dir", str(media),
+                                   str(HERE / "scenes.py"), scene], stdout=out, stderr=out)
+    if rendered.returncode:
+        sys.exit(f"{scene} failed to render; see {log}")
     (video,) = media.glob(f"videos/scenes/*/{scene}.mp4")
     check_narration_audible(scene, video, media)
     check_layout(scene, media)
@@ -160,6 +163,20 @@ def check_av_lengths(film):
         sys.exit(f"audio ({lengths['audio']}s) and video ({lengths['video']}s) differ in length")
 
 
+def contact_sheet(film, videos, media, tiles=36):
+    """A grid of frames across the film, each taken as a spoken line ends: by then, the
+    animations it narrates have settled, rather than being caught half-drawn."""
+    ends, offset = [], 0.0
+    for scene, video in zip(CHAPTERS, videos):
+        ends += [offset + cue["end"] - 0.1 for cue in cues(media, scene)]
+        offset += duration(video)
+    frames = {round(ends[round(i * (len(ends) - 1) / (tiles - 1))] * FINAL_FPS) for i in range(tiles)}
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(film), "-vf",
+                    "select='%s',scale=384:216,tile=6x6" % "+".join(f"eq(n,{n})" for n in frames),
+                    "-fps_mode", "passthrough", "-frames:v", "1", "-q:v", "4",
+                    str(HERE / "contact-sheet.jpg")], check=True)
+
+
 def poster(film, videos, media):
     """The README's thumbnail: one frame of the film with a play button on it."""
     from PIL import Image, ImageDraw
@@ -183,7 +200,7 @@ def main():
     parser.add_argument("scenes", nargs="*", choices=CHAPTERS, metavar="CHAPTER",
                         help=f"render only these chapters (default: all): {', '.join(CHAPTERS)}")
     args = parser.parse_args()
-    flags = ["-ql"] if args.draft else ["--resolution", "1920,1080", "--frame_rate", "30"]
+    flags = ["-ql"] if args.draft else ["--resolution", "1920,1080", "--frame_rate", str(FINAL_FPS)]
     media = BUILD / ("draft" if args.draft else "final")
     media.mkdir(parents=True, exist_ok=True)
     source_mtime = max(path.stat().st_mtime
@@ -224,9 +241,7 @@ def main():
                     "-movflags", "+faststart", str(film)], check=True)
     check_av_lengths(film)
     if not args.draft:  # The committed contact sheet and poster track the latest final cut.
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(film), "-vf",
-                        f"fps={36 / duration(film)},scale=384:216,tile=6x6", "-frames:v", "1", "-q:v", "4",
-                        str(HERE / "contact-sheet.jpg")], check=True)
+        contact_sheet(film, videos, media)
         poster(film, videos, media)
     print(f"{film}  ({duration(film) / 60:.1f} min)")
 

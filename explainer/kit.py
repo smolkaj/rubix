@@ -1,9 +1,11 @@
 """Shared building blocks for the explainer: narration and a cube rendered from eigencube.py."""
 
 import asyncio
-import inspect
 import hashlib
+import inspect
+import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -73,8 +75,29 @@ async def synthesize(spoken, path, words_path):
         elif chunk["type"] == "WordBoundary":  # Offsets are in units of 100 ns.
             start = chunk["offset"] / 1e7
             words.append((start, start + chunk["duration"] / 1e7, chunk["text"]))
-    path.write_bytes(audio)
-    words_path.write_text(json.dumps(words))  # Written last: its presence marks a complete entry.
+    write_atomically(path, bytes(audio))
+    # Written last: its presence marks a complete entry.
+    write_atomically(words_path, json.dumps(words).encode())
+
+
+def write_atomically(path, data):
+    """Writes a cache file in one step, since chapters render in parallel and may share it."""
+    partial = path.with_name(f"{path.name}.{os.getpid()}.partial")
+    partial.write_bytes(data)
+    partial.replace(path)
+
+
+def write_wav(path, signal, rate):
+    """Writes a mono signal in [-1, 1] as 16-bit audio."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes((signal * 32767).astype(np.int16).tobytes())
+    SPEECH_CACHE.mkdir(parents=True, exist_ok=True)
+    write_atomically(path, buffer.getvalue())
+    return path
 
 
 def music(seconds, rate=44100):
@@ -117,13 +140,20 @@ def music(seconds, rate=44100):
     t = np.arange(len(signal)) / rate
     signal *= np.clip(t / 1.5, 0, 1) * np.clip((seconds - t) / 6.0, 0, 1)
     signal *= 0.5 / max(np.abs(signal).max(), 1e-9)
-    SPEECH_CACHE.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(path), "wb") as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(rate)
-        out.writeframes((signal * 32767).astype(np.int16).tobytes())
-    return path
+    return write_wav(path, signal, rate)
+
+
+def click(rate=44100):
+    """The soft clack of one quarter turn, for the solver's montage: a short burst of noise
+    through a resonance, the way plastic sounds."""
+    version = hashlib.sha1(inspect.getsource(click).encode()).hexdigest()[:8]
+    path = SPEECH_CACHE / f"click-{version}.wav"
+    if path.exists():
+        return path
+    t = np.arange(int(0.04 * rate)) / rate
+    noise = np.random.default_rng(0).uniform(-1, 1, len(t))
+    signal = (0.6 * noise + np.sin(2 * np.pi * 1900 * t)) * np.exp(-t / 0.006)
+    return write_wav(path, 0.5 * signal / np.abs(signal).max(), rate)
 
 
 def duration(path):
