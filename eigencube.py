@@ -154,52 +154,53 @@ class PrioritizedItem:
   item: Any = field(compare=False)
   priority: int
 
-def astar(start, is_goal, apply_move, heuristic = lambda _: 0,
-          get_moves = lambda _: moves, random_weight=0, max_moves=100_000,
-          move_cost = lambda _: 1):
+# A search step is a sequence of moves: a single move, or a learned macro.
+single_move_steps = tuple((move,) for move in moves)
+
+def inverse_step(step): return tuple(inverse_move(move) for move in reversed(step))
+
+def astar(start, is_goal, apply_step, heuristic = lambda _: 0,
+          get_steps = lambda _: single_move_steps, random_weight=0, max_expansions=10_000):
   if is_goal(start): return (start, ())
-  budget = max_moves
+  budget = max_expansions
 
   def reconstruct_solution(dst):
     path, current = [], dst
     while current in came_from:
-      src, move = came_from[current]
-      path.append(move)
+      src, step = came_from[current]
+      path.append(step)
       current = src
     return (dst, tuple(reversed(path)))
 
   while True:
     frontier = [PrioritizedItem(start, 0)]
     came_from, cost_so_far = {}, { start : 0 }
-    moves_simulated = 0
-    budget_exceeded = False
+    expansions = 0
 
-    while frontier:
+    # The budget counts expanded states, not generated ones, so that it measures
+    # search progress independently of how many steps are known.
+    while frontier and expansions < budget:
+      expansions += 1
       src = heapq.heappop(frontier).item
-      last_move = came_from[src][1] if src in came_from else None
-      for move in get_moves(src):
-        # Never immediately undo the move just taken. (These rules relate single moves, not macros.)
-        if last_move in moves and move in moves:
-          if move == inverse_move(last_move): continue
+      last_step = came_from[src][1] if src in came_from else None
+      for step in get_steps(src):
+        if last_step:
+          # Never immediately undo the step just taken.
+          if step == inverse_step(last_step): continue
           # Opposite face moves commute; prune duplicate branches by enforcing canonical order.
-          if last_move[0] > move[0] and (-last_move[0][0], -last_move[0][1], -last_move[0][2]) == move[0]: continue
-        dst, cost = apply_move(move, src), cost_so_far[src] + move_cost(move)
-        moves_simulated += 1
-        budget_exceeded = budget is not None and moves_simulated >= budget
-        if dst in cost_so_far and cost_so_far[dst] <= cost:
-          if budget_exceeded: break
-          continue
-        cost_so_far[dst], came_from[dst] = cost, (src, move)
+          if len(step) == len(last_step) == 1:
+            (last_axis, _), (axis, _) = last_step[0], step[0]
+            if last_axis > axis and tuple(-x for x in last_axis) == axis: continue
+        dst, cost = apply_step(step, src), cost_so_far[src] + len(step)
+        if dst in cost_so_far and cost_so_far[dst] <= cost: continue
+        cost_so_far[dst], came_from[dst] = cost, (src, step)
         if is_goal(dst): return reconstruct_solution(dst)
-        if budget_exceeded: break
         h_weight = random.gauss(1, random_weight) if RANDOMIZE_SEARCH else 1
         priority = cost + h_weight * heuristic(dst)
         heapq.heappush(frontier, PrioritizedItem(dst, priority))
-      if budget_exceeded:
-        break
-    if not budget_exceeded or budget is None or random_weight == 0 or not RANDOMIZE_SEARCH:
+    if not frontier or random_weight == 0 or not RANDOMIZE_SEARCH:
       return None
-    print("search budget of %d moves exceeded; restarting" % budget)
+    print("search budget of %d expansions exceeded; restarting" % budget)
     budget = max(int(1.5 * budget), budget + 1)
 
 @functools.cache
@@ -213,18 +214,21 @@ def is_cube_solved(cube): return all(is_cubelet_solved(c, r) for c, r in cube)
 def num_solved_with_criterion(cube, criterion):
   return sum(is_cubelet_solved(c, r) for c,r in cube if criterion(c))
 
+# Rotates an isolated cubelet by a single-move step, as if no other cubelets were in the way.
+def rotate_freely(step, rotation):
+  (move,) = step
+  return tupled(rotation_matrix(move) @ rotation)
+
 @functools.cache
 def min_moves_to_solved(cubelet, rotation):
   def is_dst(r): return is_cubelet_solved(cubelet, r)
-  def apply_move(m, r): return tupled(rotation_matrix(m) @ r)
-  _, path = astar(rotation, is_dst, apply_move)
+  _, path = astar(rotation, is_dst, rotate_freely)
   return len(path)
 
 @functools.cache
 def min_moves_to_position(cubelet, rotation):
   def is_dst(r): return position(cubelet, r) == cubelet
-  def apply_move(m, r): return tupled(rotation_matrix(m) @ r)
-  _, path = astar(rotation, is_dst, apply_move)
+  _, path = astar(rotation, is_dst, rotate_freely)
   return len(path)
 
 def top_layer_heuristic(cube):
@@ -259,20 +263,25 @@ def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
 def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
 
-# Macros are move sequences that disturb only a few cubelets (commutators, as it
-# turns out). Rather than hard-coding them, we learn them from the solver's own
-# searches and offer them to later searches as single steps.
+# The steps the solver searches over: for each effect on the solved cube, the
+# shortest known move sequence achieving it. Beyond single moves, the solver
+# learns macros from its own searches: sequences that disturb only a few
+# cubelets (commutators, as it turns out). Nothing about them is hard-coded.
 MAX_MACRO_DISTURBANCE = 12
-macros = {}  # the macro's effect on the solved cube -> shortest such macro
+steps = {}
 
 # The 48 symmetries of the cube: signed permutation matrices.
 symmetries = [np.diag(signs) @ np.identity(3)[list(permutation)]
               for permutation in itertools.permutations(range(3))
               for signs in itertools.product((-1, 1), repeat=3)]
 
-def apply_moves_to_cube(sequence, cube):
-  for move in sequence: cube = apply_move_to_cube(move, cube)
-  return cube
+@functools.cache
+def apply_step_to_cubelet_rotation(step, cubelet, rotation):
+  for move in step: rotation = apply_move_to_cubelet_rotation(move, cubelet, rotation)
+  return rotation
+
+def apply_step_to_cube(step, cube):
+  return tuple((c, apply_step_to_cubelet_rotation(step, c, r)) for c, r in cube)
 
 def num_disturbed(cube): return sum(not is_cubelet_solved(c, r) for c, r in cube)
 
@@ -282,25 +291,14 @@ def symmetric_move(symmetry, move):
   return next(m for m in moves if np.array_equal(rotation_matrix(m), rotation) and
               m[0] == tuple(int(x) for x in symmetry @ move[0]))
 
-def learn_macro(sequence):
-  if not 0 < num_disturbed(apply_moves_to_cube(sequence, solved_cube)) <= MAX_MACRO_DISTURBANCE: return
-  inverse = tuple(inverse_move(m) for m in reversed(sequence))
-  for symmetry, variant in itertools.product(symmetries, (sequence, inverse)):
-    macro = tuple(symmetric_move(symmetry, m) for m in variant)
-    effect = apply_moves_to_cube(macro, solved_cube)
-    if effect not in macros or len(macro) < len(macros[effect]): macros[effect] = macro
+def learn_step(sequence):
+  if not 0 < num_disturbed(apply_step_to_cube(sequence, solved_cube)) <= MAX_MACRO_DISTURBANCE: return
+  for symmetry, variant in itertools.product(symmetries, (sequence, inverse_step(sequence))):
+    step = tuple(symmetric_move(symmetry, move) for move in variant)
+    effect = apply_step_to_cube(step, solved_cube)
+    if effect not in steps or len(step) < len(steps[effect]): steps[effect] = step
 
-@functools.cache
-def apply_macro_to_cubelet_rotation(macro, cubelet, rotation):
-  for move in macro: rotation = apply_move_to_cubelet_rotation(move, cubelet, rotation)
-  return rotation
-
-# A search step is either a single move or a macro.
-def moves_of_step(step): return (step,) if step in moves else step
-
-def apply_step_to_cube(step, cube):
-  if step in moves: return apply_move_to_cube(step, cube)
-  return tuple((c, apply_macro_to_cubelet_rotation(step, c, r)) for c, r in cube)
+for step in single_move_steps: learn_step(step)
 
 def is_bottom_edge(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 2
 def is_bottom_corner(cubelet): return cubelet[2] == -1 and norm1(cubelet) == 3
@@ -343,13 +341,12 @@ def solve(cube, report_progress_callback=lambda cube: None):
     for i in range(num_steps):
       report_progress_callback(cube)
       print("%s #%d" % (description, i + 1))
-      steps = moves + list(macros.values())
+      known_steps = tuple(steps.values())
       cube, path = astar(cube, lambda cube: goal(cube, i), apply_step_to_cube, heuristic,
-                         lambda _: steps, random_weight,
-                         move_cost=lambda step: len(moves_of_step(step)))
-      next_moves = sum((moves_of_step(step) for step in path), ())
-      print("-> found solution with %d moves (%d macros known)" % (len(next_moves), len(macros)))
-      learn_macro(next_moves)
+                         lambda _: known_steps, random_weight)
+      next_moves = sum(path, ())
+      print("-> found solution with %d moves (%d steps known)" % (len(next_moves), len(steps)))
+      learn_step(next_moves)
       solution += next_moves
     print(50 * "-")
   print("Solved cube in %d moves." % len(solution))
@@ -358,13 +355,10 @@ def solve(cube, report_progress_callback=lambda cube: None):
 
 def print_stats():
   secs_elapsed = (datetime.now() - STARTUP_TIME).total_seconds()
-  cache_info = apply_move_to_cubelet_rotation.cache_info()
-  moves = (cache_info.hits + cache_info.misses) / len(solved_cube)
+  cache_info = apply_step_to_cubelet_rotation.cache_info()
+  steps_simulated = (cache_info.hits + cache_info.misses) / NUM_CUBELETS
   print("- time elapsed: %.1f sec" % secs_elapsed)
-  print("- moves simulated: %d (%.0f moves/sec) " % (
-    moves,
-    moves / secs_elapsed
-  ))
+  print("- steps simulated: %d (%.0f steps/sec) " % (steps_simulated, steps_simulated / secs_elapsed))
   cache_info = min_moves_to_solved.cache_info()
   print("- min moves to solved calculations: ", cache_info.hits + cache_info.misses)
 
