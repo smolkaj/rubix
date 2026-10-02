@@ -65,7 +65,7 @@ def sticker_list_layout():
 
 class StickerNightmare(Narrated):
     def construct(self):
-        self.set_camera_orientation(**{**CAMERA, "zoom": 1.45})
+        self.set_camera_orientation(**{**CAMERA, "zoom": 1.35})
         cube = CubeMobject(eigencube.shuffle(eigencube.solved_cube, 25, seed=5))
         self.begin_ambient_camera_rotation(rate=0.12)
         with self.voice("Here's a Rubik's cube. Twenty-six little plastic cubelets, fifty-four "
@@ -102,7 +102,7 @@ class StickerNightmare(Narrated):
             arcs = VGroup(*(ArcBetweenPoints(cell.get_center() + 0.15 * UP, target + 0.15 * UP,
                                              angle=-PI / 2.2, color=ACCENT, stroke_width=1.5)
                             for cell, target in moved))
-            self.hud(arcs)
+            self.hud(arcs, overlay=True)
             self.wait(1.2)
             self.play(LaggedStart(*(Create(a) for a in arcs), lag_ratio=0.06), run_time=2.5)
             self.play(*(cell.animate(path_arc=-PI / 2).move_to(target) for cell, target in moved),
@@ -265,6 +265,9 @@ class LinearAlgebraReview(Narrated):
                         "dimensions, every rotation has one: its axis. Hold on to that thought."):
             self.when_said("eigenvector")
             self.play(Write(eigen), run_time=2)
+            self.when_said("A quarter turn")  # Every arrow moves.
+            self.play(Rotate(VGroup(plane, e_x, e_y, v), angle=PI / 2, about_point=ORIGIN),
+                      run_time=2.5)
         self.wait(0.5)
         self.play(*(FadeOut(m) for m in self.mobjects))
 
@@ -298,7 +301,7 @@ class FixedFrame(Narrated):
         # Both arms of the vertical axis, and the turns around them: top and bottom.
         axis = VGroup(arrow(ORIGIN, at(TOP, 2.6), ACCENT, thickness=0.04),
                       arrow(ORIGIN, at((0, 0, -1), 2.6), ACCENT, thickness=0.04))
-        eigen = self.hud(MathTex(r"M\,\mathbf{v} = \mathbf{v}", font_size=48, color=ACCENT)
+        eigen = self.hud(MathTex(r"R\,\mathbf{v} = \mathbf{v}", font_size=48, color=ACCENT)
                          .to_corner(UR))
         with self.voice("In the language of our review: each arm of the cross stays exactly where it "
                         "is, under every turn around it, like these turns of the top and the "
@@ -347,17 +350,19 @@ class FixedFrame(Narrated):
             self.play(Create(c_arrow), FadeIn(c_label))
         self.play(FadeOut(*path))
 
-        others = [((0, 1, 0), 2.6), ((1, 1, 0), 2.1)]
+        # The right center and the top-right edge are both in plain view; labels sit clear of axes.
+        others = [((0, 1, 0), (0, 1.6, -0.75)), ((0, 1, 1), (0, 0.9, 1.85))]
         other_arrows = [position_arrow(c) for c, _ in others]
         other_labels = [self.facing_camera(vector_tex(c, color=POSITION, font_size=36)
-                                           .move_to(at(c, scale))) for c, scale in others]
+                                           .add_background_rectangle(opacity=0.75)
+                                           .move_to(at(spot))) for c, spot in others]
         with self.voice("The coordinates of every cubelet are minus one, zero, or one. A center, "
                         "like this one, sits at zero, one, zero. And an edge, like this one, at "
-                        "one, one, zero."):
-            self.play(*(cube.pieces[c].animate.set_opacity(0.45) for c, _ in others))
-            for a, label, words in zip(other_arrows, other_labels, ["A center", "And an edge"]):
+                        "zero, one, one."):
+            for (c, _), a, label, words in zip(others, other_arrows, other_labels,
+                                              ["A center", "And an edge"]):
                 self.when_said(words)
-                self.play(Create(a), FadeIn(label))
+                self.play(cube.pieces[c].animate.set_opacity(0.45), Create(a), FadeIn(label))
         domain = self.hud(MathTex(r"c \in \{-1, 0, 1\}^3", font_size=44)
                           .next_to(c_label, DOWN, 0.4, aligned_edge=LEFT))
         self.play(Write(domain))
@@ -406,8 +411,9 @@ class CountingStickers(Narrated):
             self.when_said("the same goes")
             self.play(cube.animate.ghosted(cube.pieces))
 
-        norm = self.hud(MathTex(r"\|c\|_1 = |x| + |y| + |z|", r"= \#\,\text{stickers}",
-                                font_size=44).to_corner(UL))
+        norm = self.hud(VGroup(MathTex(r"\|c\|_1 = |x| + |y| + |z|", font_size=44),
+                               MathTex(r"= \#\,\text{stickers}", font_size=44))
+                        .arrange(DOWN, aligned_edge=LEFT).to_corner(UL))
         with self.voice("Add up the three switches, and you get what's called the Manhattan norm of "
                         "c. And it counts the stickers."):
             self.play(FadeOut(switch))
@@ -524,7 +530,14 @@ class ColorsAreVectors(Narrated):
             self.play(*(Create(color_arrows[c]) for c in negatives),
                       *(FadeIn(tips[c]) for c in negatives),
                       LaggedStart(*(Write(p) for p in palette[3:]), lag_ratio=0.4), run_time=2.5)
-
+        # The opposites point away from the camera; look at them from the other side.
+        # The legend and the front labels would crowd the back view, so they step aside meanwhile.
+        front_labels = [tips[c] for c in centers if c not in negatives]
+        self.play(FadeOut(palette), *(FadeOut(t) for t in front_labels))
+        self.move_camera(phi=70 * DEGREES, theta=CAMERA["theta"] + PI, run_time=2.5)
+        self.wait(2)
+        self.move_camera(**CAMERA, run_time=2.5)
+        self.play(FadeIn(palette), *(FadeIn(t) for t in front_labels))
         self.wait(1)
 
 
@@ -681,7 +694,7 @@ class Configuration(Narrated):
             MathTex(r"\text{rotation about the origin} = \text{matrix } R", font_size=32),
             MathTex(r"R\,\vec{v} = \text{rotated } \vec{v}", font_size=32)).arrange(
                 DOWN, aligned_edge=LEFT))
-        rule_box = self.hud(SurroundingRectangle(rule, color=ACCENT, buff=0.15))
+        rule_box = self.hud(SurroundingRectangle(rule, color=ACCENT, buff=0.15), overlay=True)
         VGroup(rule, rule_box).to_corner(UR)
         with self.voice("Remember our rule from the review: a rotation about the origin is a "
                         "matrix. And one turn after another is still just a rotation. So however "
@@ -722,7 +735,8 @@ class Configuration(Narrated):
                                product_tex(quarter, [[x] for x in CORNER],
                                            [[x] for x in quarter @ CORNER],
                                            BASIS_COLORS, [POSITION], [POSITION]).scale(0.7))
-                        .arrange(RIGHT).next_to(r_top, DOWN, 0.35, aligned_edge=LEFT))
+                        .arrange(RIGHT).to_corner(DR))  # Clear of the x axis, lower left.
+        above_captions(p_eq)
         with self.voice("So where is our cubelet, c, now? Take its home address, and rotate it: "
                         "multiply c by R.", pause=0.8):
             self.play(corner.animate.set_opacity(0.45))  # See-through, so the arrow to it shows.
@@ -779,8 +793,8 @@ class Moves(Narrated):
                  "turn?")
 
         v_arrow = arrow(ORIGIN, at(TOP, 2.6), ACCENT, thickness=0.05)
-        v_label = self.facing_camera(MathTex(r"\mathbf{v} = \mathbf{e}_z", color=ACCENT,
-                                             font_size=40).move_to(at(TOP, 2.4) + 1.3 * RIGHT))
+        v_label = self.hud(MathTex(r"\mathbf{v} = \mathbf{e}_z", color=ACCENT, font_size=48)
+                           .to_corner(UR))
         with self.voice("The ones in the top layer, with z equal to one. To say that for any face, "
                         "take the face's axis, v. For the top face, v is e z, pointing up."):
             self.play(cube.animate.ghosted(cube.slice_cubelets(TURN_TOP), 0.15), run_time=1.5)
@@ -948,7 +962,7 @@ class Solved(Narrated):
 
 class Outro(Narrated):
     def construct(self):
-        self.wait(1.5)  # A breath before the recap.
+        self.wait(1.5)  # A breath before the recap (which the README's summary table mirrors).
         recap = VGroup(*(MathTex(r"\text{%s}" % name, r"\;%s\;" % relation, rhs, font_size=36)
                          for name, relation, rhs in [
             ("cubelets", "=", r"\text{vectors } c \in \{-1, 0, 1\}^3"),
@@ -983,9 +997,10 @@ class Outro(Narrated):
         music_start = self.renderer.time
         with self.voice("On top of that model, Eigencube solves the cube layer by layer: an A-star "
                         "search, guided by how many quarter turns each cubelet is from home, plus "
-                        "one classic move sequence to finish. Here it is, solving a scramble."):
+                        "one classic move sequence to finish."):
             self.play(FadeIn(cube, scale=0.8))
             self.begin_ambient_camera_rotation(rate=0.15)
+        with self.voice("Here it is, solving a scramble."):
             for move in solution:
                 self.play(cube.turn(move), run_time=0.09, rate_func=linear)
         assert eigencube.is_cube_solved(cube.state)

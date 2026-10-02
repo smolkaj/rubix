@@ -35,7 +35,7 @@ The payoff of this linear algebra formulation is **radical simplicity**: the ent
 
 The whole encoding, in motion and from first principles: a quick review of the linear algebra it uses, then the cube itself, built up one idea at a time. It is rendered with Manim straight from [`eigencube.py`](eigencube.py) (see [`explainer/`](explainer/)), in the spirit of Essence of Linear Algebra.
 
-The model at a glance:
+The model at a glance (the film's closing recap; keep the two in step):
 
 | | |
 |:--|:--|
@@ -44,7 +44,7 @@ The model at a glance:
 | **Colors** | $\pm\mathbf{e}_x, \pm\mathbf{e}_y, \pm\mathbf{e}_z$: the never-moving centers, each an eigenvector of the turns around it |
 | **Sticker colors** | the non-zero columns of $\mathrm{diag}(c)$ |
 | **State** | one configuration $(c, R)$ per cubelet, with $R$ a rotation matrix |
-| **Move** | the cubelets with $\mathbf{v} \cdot (R\,c) > 0$ turn: $R \leftarrow M R$ |
+| **Move** | the cubelets with $\mathbf{v} \cdot (R\,c) > 0$ turn ( $\mathbf{v}$: the face's axis): $R \leftarrow M R$ ( $M$: the quarter-turn matrix) |
 | **Solved** | $R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$ for every cubelet |
 
 ---
@@ -199,7 +199,7 @@ eigencube/
 │   └── generate_logo.py    # Logo, icons & GitHub social preview generator
 ├── tests/
 │   └── test_eigencube.py   # Unit test suite
-├── img/                # Architectural diagrams & preview snapshots
+├── img/                # Logo, icons, screenshots & blog figures
 │   ├── cube.png
 │   ├── cubelet-types.png
 │   ├── cube-in-plane.jpg

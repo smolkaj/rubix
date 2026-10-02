@@ -130,8 +130,13 @@ class Narrated(ThreeDScene):
     """
 
     def setup(self):
+        # Flat colors: Cairo's lighting would make one sticker color look different on each face.
+        self.renderer.camera.should_apply_shading = False
         self.cues = []
+        self.collisions = []
+        self.labels = []
         self.speaking_until = 0
+        self.spoken_words = []
         # Chapters render in parallel; separate LaTeX work directories keep them from reading each
         # other's half-written output for the same formula.
         config.tex_dir = str(Path(config.media_dir) / "Tex" / type(self).__name__)
@@ -147,6 +152,7 @@ class Narrated(ThreeDScene):
         self.speaking_until = start + seconds
         self.spoken_words = self.cues[-1]["words"]
         yield
+        self.spoken_words = []  # when_said outside a line fails instead of timing against this one.
         remaining = start + seconds + pause - self.renderer.time
         if remaining > 1 / config.frame_rate:
             self.wait(remaining)
@@ -208,17 +214,56 @@ class Narrated(ThreeDScene):
             world = [m for m in self.mobjects if id(m) not in animated and m not in pinned]
             animations = (*animations, *(Animation(m) for m in world))
         super().play(*animations, **kwargs)
+        self.check_labels()
 
-    def hud(self, *mobjects):
-        """Pins mobjects to the screen (not the 3D world) without showing them yet."""
+    def label_boxes(self):
+        """Where each label on screen lands, as (description, lower left, upper right).
+
+        A label is whatever was placed with hud() or facing_camera(), however many of its parts
+        are on screen at the moment."""
+        camera = self.renderer.camera
+        on_screen = set(self.get_mobject_family_members())
+        for label in self.labels:
+            parts = [m for m in label.get_family() if m in on_screen and m.has_points() and
+                     (m.get_fill_opacity() > 0 or m.get_stroke_opacity() > 0)]
+            if not parts:
+                continue
+            shift = 0
+            if label in camera.fixed_orientation_mobjects:
+                # Such a label is drawn where its center projects to, without perspective.
+                center = camera.fixed_orientation_mobjects[label]()
+                shift = camera.project_point(center) - center
+            low = np.min([p.get_corner(DL) for p in parts], axis=0) + shift
+            high = np.max([p.get_corner(UR) for p in parts], axis=0) + shift
+            yield getattr(label, "tex_string", type(label).__name__), low, high
+
+    def check_labels(self, slack=0.03):
+        """Records text that overlaps other text or the caption band; the build fails on any."""
+        boxes = list(self.label_boxes())
+        for i, (name, low, high) in enumerate(boxes):
+            if low[1] < CAPTION_TOP - slack:
+                self.collisions.append((self.renderer.time, name, "the captions"))
+            for other, low2, high2 in boxes[i + 1:]:
+                if (min(high[0], high2[0]) - max(low[0], low2[0]) > slack and
+                        min(high[1], high2[1]) - max(low[1], low2[1]) > slack):
+                    self.collisions.append((self.renderer.time, name, other))
+
+    def hud(self, *mobjects, overlay=False):
+        """Pins mobjects to the screen (not the 3D world) without showing them yet.
+
+        Pinned mobjects must not overlap each other or the captions, unless they are an `overlay`
+        drawn on top of something on purpose."""
         self.add_fixed_in_frame_mobjects(*mobjects)
         self.remove(*mobjects)
+        if not overlay:
+            self.labels += mobjects
         return mobjects[0] if len(mobjects) == 1 else mobjects
 
     def facing_camera(self, mobject):
         """Keeps a label placed in the 3D world turned toward the camera, without showing it yet."""
         self.add_fixed_orientation_mobjects(mobject)
         self.remove(mobject)
+        self.labels.append(mobject)
         return mobject
 
     def axes(self):
@@ -241,6 +286,8 @@ class Narrated(ThreeDScene):
         cues_dir = Path(config.media_dir) / "cues"
         cues_dir.mkdir(parents=True, exist_ok=True)
         (cues_dir / f"{type(self).__name__}.json").write_text(json.dumps(self.cues, indent=1))
+        (cues_dir / f"{type(self).__name__}.collisions.json").write_text(
+            json.dumps(self.collisions, indent=1))
 
 
 def ints(vector):
@@ -333,7 +380,7 @@ def cubelet_mobject(cubelet):
 
 
 class CubeMobject(VGroup):
-    """The 26 visible cubelets, rendered from a eigencube cube state.
+    """The 26 visible cubelets, rendered from an eigencube cube state.
 
     Each cubelet is drawn at home and then transformed by its rotation matrix R
     about the origin -- exactly the encoding the video explains.
@@ -356,9 +403,8 @@ class CubeMobject(VGroup):
 
     def turn(self, move, **kwargs):
         """Animates `move` and advances the underlying eigencube state."""
-        turned = eigencube.apply_move_to_cube(move, self.state)
-        turning = [self.pieces[c] for (c, r), (_, r2) in zip(self.state, turned) if r != r2]
-        self.state = turned
+        turning = [self.pieces[c] for c in self.slice_cubelets(move)]
+        self.state = eigencube.apply_move_to_cube(move, self.state)
         return Turn(self, turning, **move_angle_axis(move), **kwargs)
 
     def ghosted(self, keep=(), opacity=0.08):

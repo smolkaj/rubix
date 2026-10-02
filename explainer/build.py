@@ -6,6 +6,7 @@
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -36,6 +37,7 @@ def render(scene, flags, media):
                        stdout=out, stderr=out, check=True)
     (video,) = media.glob(f"videos/scenes/*/{scene}.mp4")
     check_narration_audible(scene, video, media)
+    check_layout(scene, media)
     return video
 
 
@@ -51,6 +53,15 @@ def check_narration_audible(scene, video, media):
         if peak < -40:
             sys.exit(f"{scene}: narration is silent ({peak} dB) at {cue['start']:.1f}s: "
                      f"{cue['text']!r}")
+
+
+def check_layout(scene, media):
+    """Fails the build if text overlapped other text or the caption band at any point."""
+    collisions = json.loads((media / "cues" / f"{scene}.collisions.json").read_text())
+    for time, name, other in collisions:
+        print(f"{scene} at {time:.1f}s: {name!r} overlaps {other!r}", file=sys.stderr)
+    if collisions:
+        sys.exit(f"{scene}: {len(collisions)} text collision(s)")
 
 
 def cues(media, scene):
@@ -144,9 +155,9 @@ def poster(film, videos, media):
                     "-frames:v", "1", "-vf", "scale=1280:720", str(frame)], check=True)
     image = Image.open(frame).convert("RGB")
     draw = ImageDraw.Draw(image, "RGBA")
-    x, y, r = 640, 360, 64
+    x, y, r = 150, 600, 56  # In the empty lower left, clear of the subject.
     draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 0, 0, 170), outline=(88, 196, 221), width=5)
-    draw.polygon([(x - 22, y - 34), (x - 22, y + 34), (x + 36, y)], fill=(255, 255, 255))
+    draw.polygon([(x - 19, y - 30), (x - 19, y + 30), (x + 32, y)], fill=(255, 255, 255))
     image.save(HERE / "poster.jpg", quality=88)
 
 
@@ -168,7 +179,7 @@ def main():
             sys.exit(f"{scene} has not been rendered at this quality yet; render it too.")
         return existing[0]
 
-    with ThreadPoolExecutor(len(CHAPTERS)) as pool:
+    with ThreadPoolExecutor(min(len(CHAPTERS), os.cpu_count() or 1)) as pool:
         videos = list(pool.map(video, CHAPTERS))
 
     concat = media / "concat.txt"
@@ -178,7 +189,8 @@ def main():
     subtitles.write_text(captions(videos, media))
     picture = sum(duration(v) for v in videos)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(concat),
-                    "-i", str(subtitles), "-map", "0", "-map", "1", "-c:v", "libx264", "-crf", "28", "-preset", "slow",
+                    "-i", str(subtitles), "-map", "0", "-map", "1",
+                    "-c:v", "libx264", "-crf", "28", "-preset", "slow",
                     "-tune", "animation", "-pix_fmt", "yuv420p",
                     # A chapter's audio ends at its last sound, which leaves gaps between chapters.
                     # Players that ignore such gaps would run ahead of the picture, so they are
