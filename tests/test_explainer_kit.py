@@ -49,6 +49,7 @@ class CaptionTest(unittest.TestCase):
 
     # Lines where breaking at any word would split the tuple, at "or | one" and "minus | one".
     FORCED = [
+        # "xx" pads the line so that the caption's even split falls right after "or".
         "xx the minus one, zero, or one and stays there for good.",
         "The tip ends up at minus one, zero and rests there.",
     ]

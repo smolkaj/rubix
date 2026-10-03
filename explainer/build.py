@@ -218,16 +218,18 @@ def burn_in_captions(film, videos, soundtrack, subtitles, media):
              "BackColour=&H30000000,Outline=0.8,Shadow=0,MarginV=10")
     recipe = ["-f", "concat", "-safe", "0", "-i", concat_list(media, "chapters.txt", videos),
               "-i", str(soundtrack), "-map", "0:v", "-map", "1:a",
-              "-vf", f"subtitles={subtitles}:force_style='{style}'",
+              # By name, from its own folder: a full path would need filtergraph escaping.
+              "-vf", f"subtitles={subtitles.name}:force_style='{style}'",
               *PICTURE_CODEC, "-c:a", "copy", "-movflags", "+faststart"]
-    # Keyed by everything it is made from, the recipe included; only the latest one stays.
-    key = hashlib.sha1("\0".join([*recipe, subtitles.read_text(),
-                                   *(str(v.stat().st_mtime_ns) for v in videos)]).encode())
+    # Keyed by everything it is made from: the recipe, the captions, and the chapters (by their
+    # fingerprints, which name what each is made from). Only the latest one stays.
+    key = hashlib.sha1("\0".join([*recipe, subtitles.read_text(), *(
+        (media / "fingerprints" / v.stem).read_text() for v in videos)]).encode())
     made = media / "captioned" / f"{key.hexdigest()}.mp4"
     if not made.exists():
         shutil.rmtree(made.parent, ignore_errors=True)
         made.parent.mkdir()
-        ffmpeg_to(made, recipe)
+        ffmpeg_to(made, recipe, cwd=subtitles.parent)
     captioned = film.with_name(film.stem + "-captioned.mp4")
     shutil.copyfile(made, captioned)
     check_av_lengths(captioned)
@@ -235,18 +237,19 @@ def burn_in_captions(film, videos, soundtrack, subtitles, media):
         sys.exit(f"{captioned} runs {duration(captioned):.2f}s, the film {duration(film):.2f}s")
 
 
-def ffmpeg_to(path, args):
+def ffmpeg_to(path, args, cwd=None):
     """Runs ffmpeg into `path`, which only appears once ffmpeg has finished: an interrupted run
     could otherwise leave a short but valid file that later builds reuse as finished."""
     partial = path.with_name(f"{path.stem}.partial{path.suffix}")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", *args, str(partial)], check=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *args, str(partial)], check=True, cwd=cwd)
     partial.replace(path)
 
 
 def concat_list(media, name, paths):
     """A listing of `paths` for ffmpeg's concat demuxer; returns its path."""
     listing = media / name
-    listing.write_text("".join(f"file '{p}'\n" for p in paths))
+    quoted = (str(p).replace("'", "'\\''") for p in paths)  # The demuxer's quoting rule.
+    listing.write_text("".join(f"file '{p}'\n" for p in quoted))
     return str(listing)
 
 
