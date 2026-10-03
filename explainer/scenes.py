@@ -460,7 +460,9 @@ class FixedFrame(Narrated):
             for (c, _), a, label, words in zip(others, other_arrows, other_labels,
                                               ["A center", "And an edge"]):
                 self.when_said(words)
-                self.play(cube.pieces[c].animate.set_opacity(0.45), Draw(a), FadeIn(label))
+                # See-through first: an overlay arrow drawn meanwhile would cover its stickers.
+                self.play(cube.pieces[c].animate.set_opacity(0.45), run_time=0.4)
+                self.play(Draw(a), FadeIn(label), run_time=0.8)
         self.wait(2)
 
 
@@ -1007,8 +1009,11 @@ class Moves(Narrated):
                         "trick from the review. Watch where the basis vectors land: those are the "
                         "columns."):
             # The axes step aside, so that the turning basis vectors are not confused with them.
+            # The basis is drawn over everything, so the cube turns see-through first: drawn
+            # meanwhile, the arrows would cover the top layer's still-opaque stickers.
             self.play(FadeOut(v_arrow), FadeOut(v_label), FadeOut(axes[0]), FadeOut(*axes[1]),
-                      cube.animate.ghosted(opacity=0.07), Draw(basis), run_time=1.2)
+                      cube.animate.ghosted(opacity=0.07), run_time=0.6)
+            self.play(Draw(basis), run_time=0.8)
             self.play(Write(m_group[0]), FadeIn(m_group[1].get_brackets()))
             self.when_said("Watch")
             self.play(Rotate(basis, **move_angle_axis(TURN_TOP), about_point=ORIGIN), run_time=4)
