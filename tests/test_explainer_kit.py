@@ -1,5 +1,6 @@
 """The explainer film's geometry helpers (skipped where Manim, which only the film needs, is absent)."""
 
+import ast
 import importlib.util
 import re
 import sys
@@ -10,6 +11,7 @@ import numpy as np
 
 HAS_MANIM = importlib.util.find_spec("manim") is not None
 EXPLAINER = Path(__file__).resolve().parent.parent / "explainer"
+sys.path.insert(0, str(EXPLAINER))
 
 
 @unittest.skipUnless(HAS_MANIM, "the explainer's dependencies are not installed")
@@ -18,7 +20,6 @@ class ArrowEndsTest(unittest.TestCase):
     every way the film moves an arrow: turning with a cubelet, applying a matrix, shifting."""
 
     def setUp(self):
-        sys.path.insert(0, str(EXPLAINER))
         import kit
         self.kit = kit
 
@@ -43,28 +44,29 @@ class ArrowEndsTest(unittest.TestCase):
 
 @unittest.skipUnless(HAS_MANIM, "the explainer's dependencies are not installed")
 class CaptionTest(unittest.TestCase):
-    """A spoken tuple ("one, zero, zero") stays on one caption, wherever the line must break."""
+    """No caption breaks inside a spoken tuple ("minus one, zero, or one"), in any line of the
+    film or in lines long enough to force breaks around one."""
 
-    LINES = [
-        "A center, like this one, sits at zero, one, zero. And an edge, like this one, at zero, "
-        "one, one.",
-        "The first is one, zero, zero: that's e x, so green.",
-        "The coordinates of every cubelet are minus one, zero, or one.",
-        "One, minus one, one. Front, left, top: exactly where the corner went.",
+    # Lines where breaking at any word would split the tuple, at "or | one" and "minus | one".
+    FORCED = [
+        "xx the minus one, zero, or one and stays there for good.",
+        "The tip ends up at minus one, zero and rests there.",
     ]
 
     def test_no_caption_breaks_inside_a_tuple(self):
-        sys.path.insert(0, str(EXPLAINER))
         import build
-        number = re.compile(build.SPOKEN_NUMBER + r",?$")
-        for line in self.LINES:
+        film = [node.value for node in ast.walk(ast.parse((EXPLAINER / "scenes.py").read_text()))
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)]
+        lines = [line for line in film + self.FORCED if re.search(build.SPOKEN_TUPLE, line)]
+        self.assertGreater(len(lines), len(self.FORCED))  # The film's own tuples are covered.
+        for line in lines:
             chunks = build.caption_chunks(line)
             self.assertEqual(" ".join(chunks), line)
-            for before, after in zip(chunks, chunks[1:]):
-                self.assertFalse(
-                    number.search(before) and re.match(build.SPOKEN_NUMBER, after),
-                    f"{before!r} | {after!r}")
-            self.assertTrue(all(len(chunk) <= build.CAPTION_WIDTH for chunk in chunks))
+            self.assertTrue(all(len(chunk) <= build.CAPTION_WIDTH for chunk in chunks), chunks)
+            breaks = [sum(len(c) + 1 for c in chunks[:k]) - 1 for k in range(1, len(chunks))]
+            for span in re.finditer(build.SPOKEN_TUPLE, line):
+                inside = [b for b in breaks if span.start() < b < span.end()]
+                self.assertFalse(inside, f"{span[0]!r} split in {chunks}")
 
 
 if __name__ == "__main__":

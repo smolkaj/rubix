@@ -43,11 +43,15 @@ def render(scene, flags, media):
         sys.exit(f"{scene} failed to render; see {log}")
 
 
+# How the film's picture is compressed, for the clean cut and the captioned one alike.
+PICTURE_CODEC = ["-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
+                 "-pix_fmt", "yuv420p"]
+
+
 def encode(video, encoded):
     """A chapter's picture as it goes into the film. Encoded chapter by chapter, as each finishes
     rendering and in parallel with the others, the film's picture is then a plain join."""
-    ffmpeg_to(encoded, ["-i", str(video), "-map", "0:v", "-c:v", "libx264", "-crf", "28",
-                        "-preset", "slow", "-tune", "animation", "-pix_fmt", "yuv420p"])
+    ffmpeg_to(encoded, ["-i", str(video), "-map", "0:v", *PICTURE_CODEC])
 
 
 def fingerprint(scene, flags):
@@ -100,15 +104,16 @@ def srt_time(seconds):
                                     millis % 1000)
 
 
-SPOKEN_NUMBER = r"(?i:\b(?:minus |plus )?(?:zero|one|two|three)\b)"
+SPOKEN_NUMBER = r"(?:minus |plus )?(?:zero|one|two|three)"
+SPOKEN_TUPLE = rf"(?i:\b{SPOKEN_NUMBER}(?:, (?:or |and )?{SPOKEN_NUMBER})+\b)"  # "one, zero, or one"
 
 
 def caption_chunks(text):
     """Sentences, with long ones split at clause boundaries and short ones joined to a neighbor,
     so that each caption is comfortable to read. A spoken tuple ("one, zero, zero") stays on one
     caption."""
-    # Joined by no-break spaces, which neither clause nor word breaks split at.
-    text = re.sub(f"({SPOKEN_NUMBER}),\\s(?=(?:or |and )?{SPOKEN_NUMBER})", "\\1,\u00a0", text)
+    # Its spaces become no-break spaces, which neither clause nor word breaks split at.
+    text = re.sub(SPOKEN_TUPLE, lambda tuple_: tuple_[0].replace(" ", "\u00a0"), text)
     pieces = []
     for sentence in re.findall(r"[^.!?]+[.!?]*", text):
         for clause in re.split(r"(?<=[,:;]) +", sentence.strip()):
@@ -207,13 +212,14 @@ def burn_in_captions(film, videos, soundtrack, subtitles, media):
     track (such as GitHub's). They sit in the band the film keeps free for them (kit.CAPTION_TOP).
     Made from the chapters as rendered, not from the encoded film, so it is compressed once."""
     # Sizes are in units of a 288-pixel-high frame, which libass scales to the video.
-    style = ("FontName=DejaVu Sans,FontSize=12,PrimaryColour=&H00FFFFFF,BorderStyle=1,"
-             "Outline=1.2,Shadow=0,MarginV=12")
+    # On a translucent box (BorderStyle 4, padded by Outline), so they read over grid lines too;
+    # sized for phones as well.
+    style = ("FontName=DejaVu Sans,FontSize=14,PrimaryColour=&H00FFFFFF,BorderStyle=4,"
+             "BackColour=&H30000000,Outline=0.8,Shadow=0,MarginV=10")
     recipe = ["-f", "concat", "-safe", "0", "-i", concat_list(media, "chapters.txt", videos),
               "-i", str(soundtrack), "-map", "0:v", "-map", "1:a",
               "-vf", f"subtitles={subtitles}:force_style='{style}'",
-              "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
-              "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart"]
+              *PICTURE_CODEC, "-c:a", "copy", "-movflags", "+faststart"]
     # Keyed by everything it is made from, the recipe included; only the latest one stays.
     key = hashlib.sha1("\0".join([*recipe, subtitles.read_text(),
                                    *(str(v.stat().st_mtime_ns) for v in videos)]).encode())

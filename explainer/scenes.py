@@ -135,7 +135,8 @@ class StickerNightmare(Narrated):
         self.begin_ambient_camera_rotation(rate=0.12)
         with self.voice("Here's a Rubik's cube. Twenty-six little plastic cubelets, fifty-four "
                         "colored stickers, and about forty-three quintillion ways to mix them up."):
-            self.play(FadeIn(cube, scale=0.8), run_time=1.5)
+            # On screen from the first frame, which is what a player shows before it starts.
+            self.add(cube)
             for move in [(TOP, 1), ((0, 1, 0), -1), (FRONT, 1), ((0, 0, -1), 1)]:
                 self.play(cube.turn(move), run_time=0.7)
         self.stop_ambient_camera_rotation()
