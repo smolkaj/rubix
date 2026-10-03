@@ -46,9 +46,8 @@ def render(scene, flags, media):
 def encode(video, encoded):
     """A chapter's picture as it goes into the film. Encoded chapter by chapter, as each finishes
     rendering and in parallel with the others, the film's picture is then a plain join."""
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-map", "0:v",
-                    "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
-                    "-pix_fmt", "yuv420p", str(encoded)], check=True)
+    ffmpeg_to(encoded, ["-i", str(video), "-map", "0:v", "-c:v", "libx264", "-crf", "28",
+                        "-preset", "slow", "-tune", "animation", "-pix_fmt", "yuv420p"])
 
 
 def fingerprint(scene, flags):
@@ -215,15 +214,27 @@ def burn_in_captions(film, videos, soundtrack, subtitles, media):
               "-vf", f"subtitles={subtitles}:force_style='{style}'",
               "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
               "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart"]
-    # Kept by everything it is made from, the recipe included; only the latest is kept.
+    # Keyed by everything it is made from, the recipe included; only the latest one stays.
     key = hashlib.sha1("\0".join([*recipe, subtitles.read_text(),
                                    *(str(v.stat().st_mtime_ns) for v in videos)]).encode())
     made = media / "captioned" / f"{key.hexdigest()}.mp4"
     if not made.exists():
         shutil.rmtree(made.parent, ignore_errors=True)
         made.parent.mkdir()
-        subprocess.run(["ffmpeg", "-v", "error", "-y", *recipe, str(made)], check=True)
-    shutil.copyfile(made, film.with_name(film.stem + "-captioned.mp4"))
+        ffmpeg_to(made, recipe)
+    captioned = film.with_name(film.stem + "-captioned.mp4")
+    shutil.copyfile(made, captioned)
+    check_av_lengths(captioned)
+    if abs(duration(captioned) - duration(film)) > 0.1:
+        sys.exit(f"{captioned} runs {duration(captioned):.2f}s, the film {duration(film):.2f}s")
+
+
+def ffmpeg_to(path, args):
+    """Runs ffmpeg into `path`, which only appears once ffmpeg has finished: an interrupted run
+    could otherwise leave a short but valid file that later builds reuse as finished."""
+    partial = path.with_name(f"{path.stem}.partial{path.suffix}")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *args, str(partial)], check=True)
+    partial.replace(path)
 
 
 def concat_list(media, name, paths):
@@ -286,24 +297,23 @@ def main():
     picture = sum(duration(v) for v in videos)
     # The soundtrack is mixed from all chapters at once (its loudness is the whole film's), and
     # kept by what it is made from: a change to the picture alone reuses it.
+    # Each audio packet's timing as well as its content: a sound can move without changing.
     sounds = [subprocess.run(["ffmpeg", "-v", "error", "-i", str(v), "-map", "0:a", "-c", "copy",
-                              "-f", "md5", "-"], capture_output=True, text=True,
+                              "-f", "framecrc", "-"], capture_output=True, text=True,
                              check=True).stdout for v in videos]
     soundtrack = media / "soundtracks" / (hashlib.sha1(
         "".join([*sounds, str(picture)]).encode()).hexdigest() + ".m4a")
     if not soundtrack.exists():
         soundtrack.parent.mkdir(exist_ok=True)
-        subprocess.run(["ffmpeg", "-v", "error", "-y",
-                        "-f", "concat", "-safe", "0",
-                        "-i", concat_list(media, "sounds.txt", videos),
-                        "-map", "0:a",
-                        # A chapter's audio ends at its last sound, which leaves gaps between
-                        # chapters. Players that ignore such gaps would run ahead of the picture,
-                        # so they are filled with silence. Then normalized to the loudness usual
-                        # for video online (-16 LUFS).
-                        "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture},"
-                               "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000",
-                        "-c:a", "aac", "-b:a", "160k", str(soundtrack)], check=True)
+        ffmpeg_to(soundtrack, [
+            "-f", "concat", "-safe", "0", "-i", concat_list(media, "sounds.txt", videos),
+            "-map", "0:a",
+            # A chapter's audio ends at its last sound, which leaves gaps between chapters.
+            # Players that ignore such gaps would run ahead of the picture, so they are filled
+            # with silence. Then normalized to the loudness usual for video online (-16 LUFS).
+            "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture},"
+                   "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000",
+            "-c:a", "aac", "-b:a", "160k"])
     subprocess.run(["ffmpeg", "-v", "error", "-y",
                     "-f", "concat", "-safe", "0",
                     "-i", concat_list(media, "pictures.txt", pictures),
