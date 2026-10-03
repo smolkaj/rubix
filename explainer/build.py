@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -27,7 +28,6 @@ CHAPTERS = [scene.__name__ for scene in SCENES]
 CAPTION_WIDTH = 50  # Characters, so that a caption fits on one line in common players.
 FINAL_FPS = 30
 MIN_CAPTION_SECONDS = 0.8
-SPOKEN_NUMBER = r"\b(?:minus |plus )?(?:zero|one|two|three)\b"
 MIN_CAPTION = 24  # Characters; shorter sentences are joined to a neighbor, so they don't flash by.
 
 
@@ -99,6 +99,9 @@ def srt_time(seconds):
     millis = round(seconds * 1000)
     return "%02d:%02d:%02d,%03d" % (millis // 3600000, millis // 60000 % 60, millis // 1000 % 60,
                                     millis % 1000)
+
+
+SPOKEN_NUMBER = r"(?i:\b(?:minus |plus )?(?:zero|one|two|three)\b)"
 
 
 def caption_chunks(text):
@@ -200,6 +203,30 @@ def check_av_lengths(film):
         sys.exit(f"audio ({lengths['audio']}s) and video ({lengths['video']}s) differ in length")
 
 
+def burn_in_captions(film, videos, soundtrack, subtitles, media):
+    """The film with its captions drawn into the picture, for players that can't show a caption
+    track (such as GitHub's). They sit in the band the film keeps free for them (kit.CAPTION_TOP).
+    Made from the chapters as rendered, not from the encoded film, so it is compressed once."""
+    key = hashlib.sha1("".join([*(str(v.stat().st_mtime_ns) for v in videos), soundtrack.name,
+                                 subtitles.read_text()]).encode()).hexdigest()
+    made = media / "captioned" / f"{key}.mp4"
+    if not made.exists():
+        made.parent.mkdir(exist_ok=True)
+        chapters = media / "chapters.txt"
+        chapters.write_text("".join(f"file '{v}'\n" for v in videos))
+        # Sizes are in units of a 288-pixel-high frame, which libass scales to the video.
+        style = ("FontName=DejaVu Sans,FontSize=12,PrimaryColour=&H00FFFFFF,BorderStyle=1,"
+                 "Outline=1.2,Shadow=0,MarginV=12")
+        subprocess.run(["ffmpeg", "-v", "error", "-y",
+                        "-f", "concat", "-safe", "0", "-i", str(chapters),
+                        "-i", str(soundtrack), "-map", "0:v", "-map", "1:a",
+                        "-vf", f"subtitles={subtitles}:force_style='{style}'",
+                        "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
+                        "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart",
+                        str(made)], check=True)
+    shutil.copyfile(made, film.with_name(film.stem + "-captioned.mp4"))
+
+
 def contact_sheet(film, videos, media, tiles=36):
     """A grid of frames across the film, each taken as a spoken line ends: by then, the
     animations it narrates have settled, rather than being caught half-drawn."""
@@ -285,6 +312,7 @@ def main():
     check_av_lengths(film)
     if not args.draft:  # The committed contact sheet tracks the latest final cut.
         contact_sheet(film, videos, media)
+        burn_in_captions(film, videos, soundtrack, subtitles, media)
     print(f"{film}  ({duration(film) / 60:.1f} min)")
 
 

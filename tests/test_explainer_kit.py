@@ -39,5 +39,33 @@ class ArrowEndsTest(unittest.TestCase):
             self.assert_ends(arrow, quarter_turn @ (1.5, 1, 1), quarter_turn @ (2, 1, 1))
 
 
+
+@unittest.skipUnless(HAS_MANIM, "the explainer's dependencies are not installed")
+class CaptionTest(unittest.TestCase):
+    """A spoken tuple ("one, zero, zero") stays on one caption, wherever the line must break."""
+
+    LINES = [
+        "A center, like this one, sits at zero, one, zero. And an edge, like this one, at zero, "
+        "one, one.",
+        "The first is one, zero, zero: that's e x, so green.",
+        "The coordinates of every cubelet are minus one, zero, or one.",
+        "One, minus one, one. Front, left, top: exactly where the corner went.",
+    ]
+
+    def test_no_caption_breaks_inside_a_tuple(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "explainer"))
+        import re
+        import build
+        number = re.compile(build.SPOKEN_NUMBER + r",?$")
+        for line in self.LINES:
+            chunks = build.caption_chunks(line)
+            self.assertEqual(" ".join(chunks), line)
+            for before, after in zip(chunks, chunks[1:]):
+                self.assertFalse(
+                    number.search(before) and re.match(build.SPOKEN_NUMBER, after),
+                    f"{before!r} | {after!r}")
+            self.assertTrue(all(len(chunk) <= build.CAPTION_WIDTH for chunk in chunks))
+
+
 if __name__ == "__main__":
     unittest.main()

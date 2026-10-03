@@ -350,8 +350,9 @@ class LinearAlgebraReview(Narrated):
             self.when_said("But in three")
             keep = {turning, *turning.get_family()}
             self.play(*(FadeOut(m) for m in self.mobjects if m not in keep), run_time=0.5)
-            self.move_camera(phi=60 * DEGREES, theta=-60 * DEGREES, run_time=1.5)
-            axis = SolidArrow(ORIGIN, 2.5 * OUT, ACCENT, thickness=0.04)
+            # Close in, so that the arrows read and the plane's edge stays out of the picture.
+            self.move_camera(phi=60 * DEGREES, theta=-60 * DEGREES, zoom=1.6, run_time=1.5)
+            axis = SolidArrow(ORIGIN, 2 * OUT, ACCENT, thickness=0.04)
             self.when_said("its axis")
             self.play(Draw(axis), run_time=0.8)
             self.play(Rotate(turning, angle=PI / 2, about_point=ORIGIN), run_time=2)
@@ -971,7 +972,7 @@ class Moves(Narrated):
             self.play(Write(derivation), run_time=3)
         with self.voice("That's one for the top layer, zero for the middle, and minus one for the "
                         "bottom."):
-            self.play(FadeOut(axes[0][1]), FadeOut(axes[1][1]))  # The y axis, from under "-1".
+            self.play(FadeOut(axes[0][1]), FadeOut(axes[1][1]))  # The y axis runs where "0" goes.
             for label, words in zip(layer_labels, ["one for", "zero for", "minus one"]):
                 self.when_said(words)
                 self.play(FadeIn(label), run_time=0.6)
@@ -989,8 +990,8 @@ class Moves(Narrated):
             self.when_said("the test is")
             self.play(Write(selector), run_time=2)
         self.play(FadeOut(plane), FadeOut(*layer_labels), FadeOut(dot), FadeOut(derivation),
-                  FadeIn(axes[0][1]), FadeIn(axes[1][1]),
                   selector.animate.to_corner(UL))
+        self.play(FadeIn(axes[0][1]), FadeIn(axes[1][1]), run_time=0.6)  # Once "0" is gone.
 
         turn = eigencube.rotation_matrix(TURN_TOP)
         basis = VGroup(*(overlay_arrow(ORIGIN, at(unit(i), 2.0), color, thickness=0.05)
