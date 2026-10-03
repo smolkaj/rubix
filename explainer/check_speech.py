@@ -13,6 +13,7 @@ With --sync, it instead transcribes the finished film and lists captions that ap
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 import re
@@ -22,7 +23,7 @@ import sys
 import numpy as np
 
 from build import BUILD, CHAPTERS, cues
-from kit import SPEECH_CACHE, speech
+from kit import SPEECH_CACHE, speech, write_atomically
 
 MODEL = "small.en"
 
@@ -32,6 +33,12 @@ HOMOPHONES = {"are": "r", "our": "r", "see": "c", "sea": "c", "kubelet": "cubele
               "easy": "e z"}
 # Differences the recognizer keeps making in lines that sound right by ear (expected, heard).
 ACCEPTED = {("it", "is"), ("its", "it"), ("theirs", "their"), ("solved", "solve")}
+# Captions --sync flags although they are in sync, each confirmed against what was heard around it.
+KNOWN_SYNC_FLAGS = {
+    "In the solved cube,": 'heard as "In the soft cube", right on time',
+    "It was never a list of fifty-four colors.":
+        'after a long pause, "It" is stamped a second before "was" and "never", which match',
+}
 NUMBERS = {w: n for n, w in enumerate(
     "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
     "fifteen sixteen seventeen eighteen nineteen".split())}
@@ -86,8 +93,18 @@ def mismatches(expected, heard):
 def check_sync(model, film, tolerance=0.75, window=30):  # Word times jitter up to ~0.6s.
     """Captions whose start is off from when their first words are heard, and captions whose
     first words were not heard at all within `window` seconds (both count as failures)."""
-    segments, _ = model.transcribe(audio(film), beam_size=5, word_timestamps=True)
-    heard = [(w.start, token) for s in segments for w in s.words for token in words(w.word)]
+    pcm = audio(film)
+    # Visual-only changes leave the audio as it was, and transcribing it again would hear the same.
+    memo = SPEECH_CACHE / f"heard-film-{MODEL}-{hashlib.sha1(pcm.tobytes()).hexdigest()}.json"
+    if not memo.exists():
+        segments, _ = model.transcribe(pcm, beam_size=5, word_timestamps=True)
+        write_atomically(memo, json.dumps([(w.start, w.word) for s in segments
+                                           for w in s.words]).encode())
+    return sync_failures(json.loads(memo.read_text()), film, tolerance, window)
+
+
+def sync_failures(heard_words, film, tolerance=0.75, window=30):
+    heard = [(start, token) for start, word in heard_words for token in words(word)]
     captions = re.findall(r"(\d+:\d+:\d+,\d+) --> .*\n(.*)\n", film.with_suffix(".srt").read_text())
     off, unheard, cursor = 0, 0, 0
     for stamp, text in captions:
@@ -101,14 +118,21 @@ def check_sync(model, film, tolerance=0.75, window=30):  # Word times jitter up 
                    abs(t - start) < window and difflib.SequenceMatcher(None, target, "".join(
                        tok for _, tok in heard[i:i + 8])[:len(target)]).ratio() >= 0.75]
         if not matches:
-            unheard += 1
-            print(f"{start:7.2f}s  not heard nearby: {text!r}")
-            continue
-        cursor, heard_at = min(matches, key=lambda match: abs(match[1] - start))
-        cursor += 1
-        if abs(heard_at - start) > tolerance:
+            problem = "not heard nearby"
+        else:
+            cursor, heard_at = min(matches, key=lambda match: abs(match[1] - start))
+            cursor += 1
+            if abs(heard_at - start) <= tolerance:
+                continue
+            problem = f"heard {heard_at - start:+.2f}s later"
+        if text in KNOWN_SYNC_FLAGS:
+            print(f"{start:7.2f}s  {problem}, known to be fine ({KNOWN_SYNC_FLAGS[text]}): {text!r}")
+        elif matches:
             off += 1
-            print(f"{start:7.2f}s  heard {heard_at - start:+.2f}s later: {text!r}")
+            print(f"{start:7.2f}s  {problem}: {text!r}")
+        else:
+            unheard += 1
+            print(f"{start:7.2f}s  {problem}: {text!r}")
     print(f"{off} of {len(captions)} caption(s) off by more than {tolerance}s; "
           f"{unheard} not heard within {window}s.")
     return off + unheard
@@ -125,24 +149,25 @@ def main():
     if args.sync:
         film = BUILD / ("draft.mp4" if args.draft else "eigencube-explainer.mp4")
         sys.exit(1 if check_sync(model, film) else 0)
-    # What was heard in each line's audio, so that unchanged lines aren't transcribed again. The
-    # audio files are named by their content, and the recognizer is deterministic.
+    # What was heard in each line's audio, keyed by the audio itself, so that unchanged lines
+    # aren't transcribed again (the recognizer is deterministic).
     memo_path = SPEECH_CACHE / f"heard-{MODEL}.json"
     memo = json.loads(memo_path.read_text()) if memo_path.exists() else {}
     flagged = 0
     for scene in CHAPTERS:
         for cue in cues(media, scene):
             path, _, _ = speech(cue["text"])
-            if path.name not in memo:
+            key = hashlib.sha1(path.read_bytes()).hexdigest()
+            if key not in memo:
                 segments, _ = model.transcribe(audio(path), beam_size=5)
-                memo[path.name] = " ".join(s.text.strip() for s in segments)
-            heard = memo[path.name]
+                memo[key] = " ".join(s.text.strip() for s in segments)
+            heard = memo[key]
             diffs = list(mismatches(cue["text"], heard))
             if diffs:
                 flagged += 1
                 print(f"{scene}: {cue['text']!r}\n  heard: {heard!r}\n  " +
                       "; ".join(f"{a!r} -> {b!r}" for a, b in diffs))
-    memo_path.write_text(json.dumps(memo, indent=0))
+    write_atomically(memo_path, json.dumps(memo, indent=0).encode())
     print(f"{flagged} line(s) heard differently.")
     sys.exit(1 if flagged else 0)
 

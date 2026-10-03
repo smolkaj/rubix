@@ -47,9 +47,10 @@ def render(scene, flags, media):
 
 
 def fingerprint(scene, flags):
-    """Everything a chapter's picture and sound are made from: its own code, the code all
-    chapters share (scenes.py without the other chapters), the kit, the model, the logo, and how
-    it is rendered (the Manim version and the render flags)."""
+    """What a chapter's picture and sound are made from, as far as this repository decides it: its
+    own code, the code all chapters share (scenes.py without the other chapters), the kit, the
+    model, the logo, and how it is rendered (the Manim version and the render flags). System
+    tools such as LaTeX, Cairo, fonts and FFmpeg are assumed to stay put."""
     import manim
     module = ast.parse((HERE / "scenes.py").read_text())
     module.body = [node for node in module.body if not (

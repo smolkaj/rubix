@@ -627,7 +627,7 @@ class DiagTrick(Narrated):
     def construct(self):
         # A wider angle than usual, so the arrow out of the front face does not point at the camera.
         self.set_camera_orientation(phi=66 * DEGREES, theta=34 * DEGREES, zoom=1.15)
-        self.show_axes()
+        axes = self.show_axes()
         cube = CubeMobject()
         self.add(cube)
         c_label = self.hud(address_tex(CORNER, color=POSITION, font_size=44)
@@ -712,13 +712,14 @@ class DiagTrick(Narrated):
         rank = self.hud(VGroup(
             MathTex(r"\#\,\text{non-zero columns} = \mathrm{rank}\,\mathrm{diag}(c)", font_size=32),
             MathTex(r"= \|c\|_1 = \#\,\text{stickers}", font_size=32),
-        ).set_color(ACCENT).arrange(DOWN, aligned_edge=RIGHT).next_to(diag_group, DOWN, 0.5,
-                                                                      aligned_edge=RIGHT))
-        with self.voice("A center has just one non-zero column, and the core has none. So the "
-                        "number of non-zero columns, the rank of the matrix, is once again the "
-                        "sticker count."):
+        ).set_color(ACCENT).arrange(DOWN, aligned_edge=RIGHT).next_to(diag_group, DOWN, 0.5)
+            .to_edge(RIGHT))  # Clear of the cube's right face.
+        with self.voice("A center has just one non-zero column. So the number of non-zero "
+                        "columns, the rank of the matrix, is once again the sticker count."):
             self.hud(center_matrix)
+            # The center's one sticker arrow runs along the z axis, which steps aside for it.
             self.play(FadeOut(edge_arrows), cube.animate.ghosted([CENTER], 0.1),
+                      FadeOut(axes[0][2]), FadeOut(axes[1][2]),
                       ReplacementTransform(edge_label, center_label),
                       ReplacementTransform(edge_matrix, center_matrix), run_time=1.2)
             self.play(Draw(center_arrows))
@@ -1142,7 +1143,7 @@ class Outro(Narrated):
             with self.voice(words, pause=0.4):
                 self.play(FadeIn(row, shift=0.3 * RIGHT), run_time=0.9)
         with self.voice("That's the entire model. Everything else falls out of the geometry."):
-            self.play(Circumscribe(recap, color=ACCENT), run_time=1.5)
+            self.play(Circumscribe(recap, color=ACCENT, buff=0.25), run_time=1.5)
         self.play(FadeOut(recap))
 
         self.set_camera_orientation(**{**CAMERA, "zoom": 1.3})
@@ -1167,7 +1168,9 @@ class Outro(Narrated):
         card = self.hud(VGroup(
             logo,
             Text("Watch: Essence of Linear Algebra", font_size=40, weight=BOLD),
-            Text("3Blue1Brown  ·  youtube.com/@3blue1brown", font_size=26, color=ACCENT),
+            VGroup(Text("3Blue1Brown", font_size=26, color=ACCENT),
+                   Text("youtube.com/@3blue1brown", font="DejaVu Sans Mono", font_size=22,
+                        color=ACCENT)).arrange(RIGHT, buff=0.4),
             Text("Code: github.com/smolkaj/eigencube", font="DejaVu Sans Mono", font_size=24,
                  color=GREY_B),
         ).arrange(DOWN, buff=0.3).move_to(0.5 * UP))
