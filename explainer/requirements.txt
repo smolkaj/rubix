@@ -1,0 +1,2 @@
+manim==0.20.1  # Pinned: kit.py relies on some of its internals.
+edge-tts>=7.0

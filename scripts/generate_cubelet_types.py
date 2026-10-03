@@ -10,7 +10,6 @@ from PIL import Image, ImageDraw, ImageFont
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FONTS_DIR = REPO_ROOT / "fonts"
 
-# Canvas size matching cube-anatomy.png
 WIDTH = 1200
 HEIGHT = 380
 SCALE = 2
