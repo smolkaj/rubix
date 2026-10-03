@@ -42,8 +42,14 @@ def render(scene, flags, media):
                                    str(HERE / "scenes.py"), scene], stdout=out, stderr=out)
     if rendered.returncode:
         sys.exit(f"{scene} failed to render; see {log}")
-    (video,) = media.glob(f"videos/scenes/*/{scene}.mp4")
-    return video
+
+
+def encode(video, encoded):
+    """A chapter's picture as it goes into the film. Encoded chapter by chapter, as each finishes
+    rendering and in parallel with the others, the film's picture is then a plain join."""
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-map", "0:v",
+                    "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
+                    "-pix_fmt", "yuv420p", str(encoded)], check=True)
 
 
 def fingerprint(scene, flags):
@@ -77,7 +83,8 @@ def check_narration_audible(scene, video, media):
 
 
 def check_layout(scene, media):
-    """Fails the build if text overlapped other text or the caption band at any point."""
+    """Fails the build if, at the end of any animation, text overlapped what it must not (see
+    Narrated.check_labels)."""
     collisions = json.loads((media / "cues" / f"{scene}.collisions.json").read_text())
     for time, name, other in collisions:
         print(f"{scene} at {time:.1f}s: {name!r} overlaps {other!r}", file=sys.stderr)
@@ -226,46 +233,68 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--draft", action="store_true")
     args = parser.parse_args()
-    flags = ["-ql"] if args.draft else ["--resolution", "1920,1080", "--frame_rate", str(FINAL_FPS)]
+    flags, quality = (["-ql"], "480p15") if args.draft else (
+        ["--resolution", "1920,1080", "--frame_rate", str(FINAL_FPS)], f"1080p{FINAL_FPS}")
     media = BUILD / ("draft" if args.draft else "final")
-    media.mkdir(parents=True, exist_ok=True)
-    (media / "fingerprints").mkdir(exist_ok=True)
+    for stage in ("fingerprints", "encoded"):
+        (media / stage).mkdir(parents=True, exist_ok=True)
 
     def video(scene):
+        """Renders the chapter if its inputs changed, checks it, and encodes its picture."""
+        chapter = media / "videos" / "scenes" / quality / f"{scene}.mp4"
         stamp, current = media / "fingerprints" / scene, fingerprint(scene, flags)
-        existing = list(media.glob(f"videos/scenes/*/{scene}.mp4"))
-        if existing and stamp.exists() and stamp.read_text() == current:
+        encoded = media / "encoded" / f"{scene}.mp4"
+        if chapter.exists() and stamp.exists() and stamp.read_text() == current:
             print(f"{scene} is unchanged; reusing its earlier render", file=sys.stderr)
-            chapter = existing[0]
         else:
-            chapter = render(scene, flags, media)
+            stamp.unlink(missing_ok=True)  # Until it has rendered again, it is stale.
+            render(scene, flags, media)
+            encode(chapter, encoded)
             stamp.write_text(current)
+        if not encoded.exists():  # Rendered before chapters were encoded one by one.
+            encode(chapter, encoded)
         # Checked here, whether rendered just now or earlier: a chapter that failed its checks
         # stays on disk, and must not slip into a later build.
         check_narration_audible(scene, chapter, media)
         check_layout(scene, media)
-        return chapter
+        return chapter, encoded
 
     with ThreadPoolExecutor(min(len(CHAPTERS), os.cpu_count() or 1)) as pool:
-        videos = list(pool.map(video, CHAPTERS))
+        videos, pictures = zip(*pool.map(video, CHAPTERS))
 
-    concat = media / "concat.txt"
-    concat.write_text("".join(f"file '{v}'\n" for v in videos))
+    def concat_list(name, paths):
+        listing = media / name
+        listing.write_text("".join(f"file '{p}'\n" for p in paths))
+        return str(listing)
+
     film = BUILD / ("draft.mp4" if args.draft else "eigencube-explainer.mp4")
     subtitles = film.with_suffix(".srt")
     subtitles.write_text(captions(videos, media))
     picture = sum(duration(v) for v in videos)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(concat),
-                    "-i", str(subtitles), "-map", "0", "-map", "1",
-                    "-c:v", "libx264", "-crf", "28", "-preset", "slow",
-                    "-tune", "animation", "-pix_fmt", "yuv420p",
-                    # A chapter's audio ends at its last sound, which leaves gaps between chapters.
-                    # Players that ignore such gaps would run ahead of the picture, so they are
-                    # filled with silence.
-                    # Then normalized to the loudness usual for video online (-16 LUFS).
-                    "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture},"
-                           "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000", "-c:a", "aac",
-                    "-b:a", "160k",
+    # The soundtrack is mixed from all chapters at once (its loudness is the whole film's), and
+    # kept by what it is made from: a change to the picture alone reuses it.
+    sounds = [subprocess.run(["ffmpeg", "-v", "error", "-i", str(v), "-map", "0:a", "-c", "copy",
+                              "-f", "md5", "-"], capture_output=True, text=True,
+                             check=True).stdout for v in videos]
+    soundtrack = media / "soundtracks" / (hashlib.sha1(
+        "".join([*sounds, str(picture)]).encode()).hexdigest() + ".m4a")
+    if not soundtrack.exists():
+        soundtrack.parent.mkdir(exist_ok=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y",
+                        "-f", "concat", "-safe", "0", "-i", concat_list("sounds.txt", videos),
+                        "-map", "0:a",
+                        # A chapter's audio ends at its last sound, which leaves gaps between
+                        # chapters. Players that ignore such gaps would run ahead of the picture,
+                        # so they are filled with silence. Then normalized to the loudness usual
+                        # for video online (-16 LUFS).
+                        "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture},"
+                               "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000",
+                        "-c:a", "aac", "-b:a", "160k", str(soundtrack)], check=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y",
+                    "-f", "concat", "-safe", "0", "-i", concat_list("pictures.txt", pictures),
+                    "-i", str(soundtrack), "-i", str(subtitles),
+                    "-map", "0:v", "-map", "1:a", "-map", "2",
+                    "-c:v", "copy", "-c:a", "copy",  # Both encoded already.
                     "-c:s", "mov_text", "-metadata:s:s:0", "language=eng",
                     "-movflags", "+faststart", str(film)], check=True)
     check_av_lengths(film)

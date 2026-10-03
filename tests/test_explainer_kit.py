@@ -25,7 +25,7 @@ class ArrowEndsTest(unittest.TestCase):
         np.testing.assert_allclose(rod.get_end(), end, atol=1e-9)
 
     def test_arrow_ends_follow_rotation_and_shift(self):
-        arrow = self.kit.arrow((0, 0, 0), (1, 0, 0), "#FF0000")
+        arrow = self.kit.SolidArrow((0, 0, 0), (1, 0, 0), "#FF0000")
         arrow.rotate(np.pi / 2, axis=(0, 0, 1), about_point=(0, 0, 0)).shift((0, 2, 0))
         self.assert_ends(arrow, (0, 2, 0), (0, 3, 0))
 

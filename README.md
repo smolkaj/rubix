@@ -179,6 +179,7 @@ The test suite covers:
 - Scramble reproducibility and seed determinism.
 - End-to-end multi-phase solver execution on scrambled states.
 - Headless GUI snapshot rendering verification.
+- The explainer film's geometry helpers (skipped unless the film's dependencies are installed).
 
 ---
 
@@ -194,7 +195,8 @@ eigencube/
 │   ├── generate_cubelet_types.py # Cubelet types figure (blog.md)
 │   └── generate_logo.py    # Logo, icons & GitHub social preview generator
 ├── tests/
-│   └── test_eigencube.py   # Unit test suite
+│   ├── test_eigencube.py   # Unit test suite
+│   └── test_explainer_kit.py   # The explainer film's geometry helpers
 ├── img/                # Logo, icons, screenshots & blog figures
 │   ├── cube.png
 │   ├── cubelet-types.png

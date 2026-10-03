@@ -38,8 +38,13 @@ def arm(direction, length, color, thickness=0.04):
     bits of it show through the cube."""
     start, tip = at(direction, 0.5), at(direction, length)
     if min(direction) < 0:
-        return arrow(start, tip, color, thickness=thickness)
+        return SolidArrow(start, tip, color, thickness=thickness)
     return piercing_arrow(start, at(direction, 1.55), tip, color, thickness=thickness)
+
+
+def screen_right(theta):
+    """The direction in the world that points right on screen, for a camera turned by `theta`."""
+    return np.array([-np.sin(theta), np.cos(theta), 0])
 
 
 def vector_2d(direction, color):
@@ -677,7 +682,7 @@ class DiagTrick(Narrated):
         symbols = MathTex(*(r"\mathbf{e}_%s \quad" % axis for axis in "xyz"), font_size=30)
         words = MathTex(*(r"\text{%s} \quad" % color_name(unit(i)) for i in range(3)),
                         font_size=30)
-        VGroup(symbols, words).arrange(DOWN, buff=0.1).next_to(matrix.get_columns()[0], DOWN, 0.35)
+        VGroup(symbols, words).arrange(DOWN, buff=0.1).next_to(matrix, DOWN, 0.15)
         names = self.hud(VGroup(*(VGroup(symbol.set_x(column.get_x()), word.set_x(column.get_x()))
                                   .set_color(color)
                                   for symbol, word, column, color in zip(
@@ -937,9 +942,9 @@ class Moves(Narrated):
                               .next_to(v_label, DOWN, 0.4, aligned_edge=RIGHT))
         # Each label sits level with its layer, just right of the cube's rightmost edge: that edge's
         # midpoint in the layer, moved along the camera's horizontal.
-        screen_right = np.array([-np.sin(theta), np.cos(theta), 0])
+        right = screen_right(theta)
         layer_labels = [self.facing_camera(MathTex(text, color=ACCENT, font_size=40)
-                                           .move_to(at((-1.5, 1.5, z)) + 0.55 * screen_right))
+                                           .move_to(at((-1.5, 1.5, z)) + 0.55 * right))
                         for z, text in [(1, "+1"), (0, "0"), (-1, "-1")]]
         with self.voice("Now take the dot product of v with each cubelet's current position, p. "
                         "Dotting with a unit axis measures how far p reaches along it. Essence of "
@@ -993,7 +998,7 @@ class Moves(Narrated):
         landings = [self.facing_camera(vector_tex(turn[:, i], color=color, font_size=34)
                                        .add_background_rectangle(opacity=0.75)
                                        .move_to(at(turn[:, i], 2.6) + 0.75 * OUT if turn[2, i] == 0
-                                                else at(turn[:, i], 2.0) + 0.75 * screen_right))
+                                                else at(turn[:, i], 2.0) + 0.75 * right))
                     for i, color in enumerate(BASIS_COLORS)]
         for column, a, color, landing, (words, cue) in zip(
                 m_group[1].get_columns(), basis, BASIS_COLORS, landings,
@@ -1079,9 +1084,8 @@ class Solved(Narrated):
             # Clear view of the mark: no axes on top of it, and a camera looking down on it.
             self.play(cube.animate.ghosted([CENTER], 0.12), FadeOut(axes[0]), FadeOut(*axes[1]))
             # The cube also steps right, to make room for the calculation that follows.
-            screen_right = np.array([-np.sin(theta), np.cos(theta), 0])
             self.move_camera(phi=30 * DEGREES, theta=theta, zoom=1.05,
-                             frame_center=-3.4 * screen_right, run_time=1.5)
+                             frame_center=-3.4 * screen_right(theta), run_time=1.5)
             self.when_said("watch it turn")
             self.play(cube.turn(TURN_TOP), run_time=2.5)
         spun = np.array(dict(cube.state)[CENTER])
@@ -1091,8 +1095,9 @@ class Solved(Narrated):
                                      column_colors(CENTER), column_colors(CENTER)).scale(0.6),
                          MathTex(r"\checkmark", font_size=32))
         product[2].set_color(GREEN)
-        self.hud(VGroup(r_center, product.arrange(RIGHT)).arrange(DOWN, aligned_edge=LEFT, buff=0.3)
-                 .next_to(criterion, DOWN, 0.5, aligned_edge=LEFT))
+        worked = self.hud(VGroup(r_center, product.arrange(RIGHT))
+                          .arrange(DOWN, aligned_edge=LEFT, buff=0.3)
+                          .next_to(criterion, DOWN, 0.5, aligned_edge=LEFT))
         with self.voice("Its rotation is a quarter turn, not the identity. But apply it to diag of "
                         "c: only the last column is non-zero, and the turn leaves it in place. So "
                         "we get diag of c right back, and the test passes."):
@@ -1107,7 +1112,8 @@ class Solved(Narrated):
         code = self.hud(above_captions(code_listing("is_cubelet_solved").scale(0.7)
                                        .to_corner(DL)))
         with self.voice("And in code, the whole test is three lines, straight from the math."):
-            self.play(FadeIn(code, shift=0.2 * UP))
+            # The worked example makes room; the criterion stays, next to its code.
+            self.play(FadeOut(worked), FadeIn(code, shift=0.2 * UP))
         self.wait(1)
 
 

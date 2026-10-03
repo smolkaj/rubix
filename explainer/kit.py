@@ -303,9 +303,10 @@ class Narrated(ThreeDScene):
                 boxes.append((corners.min(axis=0), corners.max(axis=0)))
         return (np.vstack(points) if points else np.zeros((0, 3))), boxes
 
-    def check_labels(self, slack=0.03):
-        """Records text that overlaps other text, the caption band, an arrow or an opaque
-        sticker; the build fails on any."""
+    def check_labels(self, slack=0.03, gap=0.1):
+        """Records text that overlaps an arrow, an opaque sticker or the caption band, or comes
+        within `gap` of other text (touching reads as overlapping: a border on a bracket's foot
+        closes it off); the build fails on any."""
         boxes = list(self.label_boxes())
         arrow_points, stickers = self.obstacles()
         for name, low, high in boxes:
@@ -329,8 +330,8 @@ class Narrated(ThreeDScene):
             if low[1] < CAPTION_TOP - slack:
                 self.collisions.append((self.renderer.time, name, "the captions"))
             for other, low2, high2 in boxes[i + 1:]:
-                if (min(high[0], high2[0]) - max(low[0], low2[0]) > slack and
-                        min(high[1], high2[1]) - max(low[1], low2[1]) > slack):
+                if (min(high[0], high2[0]) - max(low[0], low2[0]) > -gap and
+                        min(high[1], high2[1]) - max(low[1], low2[1]) > -gap):
                     self.collisions.append((self.renderer.time, name, other))
 
     def hud(self, *mobjects, overlay=False):
@@ -460,8 +461,6 @@ class SolidArrow(Rod):
         self.set_color(color)
 
 
-arrow = SolidArrow
-
 
 class OutlinedArrow(VGroup):
     """A black outline arrow, and the arrow it outlines (drawn on top, with the same pieces)."""
@@ -470,8 +469,8 @@ class OutlinedArrow(VGroup):
 def overlay_arrow(start, end, color, thickness=0.03):
     """An arrow drawn over everything in the 3D world, with a thin black outline so that it stays
     visible wherever it crosses the cube or other arrows."""
-    outline = arrow(start, end, BLACK, thickness=2.4 * thickness, segments=6, tip=1.35)
-    return OutlinedArrow(outline, arrow(start, end, color, thickness=thickness, segments=6)
+    outline = SolidArrow(start, end, BLACK, thickness=2.4 * thickness, segments=6, tip=1.35)
+    return OutlinedArrow(outline, SolidArrow(start, end, color, thickness=thickness, segments=6)
                          ).set_shade_in_3d(False)
 
 
@@ -507,7 +506,7 @@ def piercing_arrow(start, surface, end, color, thickness=0.03):
     over the cube, outlined (the camera always sees the arrow's way out); the stretch inside is
     depth-sorted as usual."""
     inside = Rod(np.array(start, dtype=float), np.array(surface, dtype=float), color=color,
-                    thickness=thickness, resolution=(20, 6))
+                 thickness=thickness, resolution=(20, 6))
     return VGroup(inside, overlay_arrow(surface, end, color, thickness))
 
 
