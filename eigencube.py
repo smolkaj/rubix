@@ -134,7 +134,7 @@ def apply_move_to_cube(move, cube):
   )
 
 def shuffle(cube, iterations=100_000, seed=42):
-  if seed: random.seed(seed)
+  if seed is not None: random.seed(seed)
   for _ in range(iterations):
     move = moves[random.randrange(len(moves))]
     cube = apply_move_to_cube(move, cube)
@@ -255,10 +255,6 @@ def bottom_layer_corner_heuristic(cube):
            for c, r in cube if c[2] == -1) ** (1/p)
   return d1/n1 + d2/n2 + d3/n3
 
-def whole_cube_heuristic(cube):
-  p, n = 0.5, 4
-  return sum(min_moves_to_solved(c, r)**p for c, r in cube) ** (1/p) / n
-
 def is_top_edge(cubelet): return cubelet[2] == 1 and norm1(cubelet) == 2
 def is_top_cubelet(cubelet): return cubelet[2] == 1
 def is_top_or_middle_cubelet(cubelet): return cubelet[2] >= 0
@@ -325,15 +321,32 @@ def bottom_corner_positions_goal(cube, i): return (
   num_solved_with_criterion(cube, is_top_or_middle_cubelet) == 17 and
   num_solved_with_criterion(cube, is_bottom_edge) == 4 and
   num_bottom_corners_positioned(cube) >= i + 1)
-def bottom_corner_twists_goal(cube, i): return NUM_CUBELETS - num_disturbed(cube) >= 23 + i
 
 phases = (  # (description, number of steps, goal, heuristic, random weight)
   ("solving top layer", 9, top_layer_goal, top_layer_heuristic, 0.25),
   ("solving middle layer", 8, middle_layer_goal, middle_layer_heuristic, 0.25),
   ("solving bottom cross", 8, bottom_cross_goal, bottom_layer_edge_heuristic, 0.25),
   ("positioning bottom corners", 4, bottom_corner_positions_goal, bottom_layer_corner_heuristic, 0.3),
-  ("twisting bottom corners", 4, bottom_corner_twists_goal, whole_cube_heuristic, 0.3),
 )
+
+# Twists each bottom corner in place with a fixed routine, then aligns the bottom layer.
+def solve_endgame(cube, report_progress_callback):
+  left, top, bottom = ((0, -1, 0), 1), ((0, 0, 1), 1), ((0, 0, -1), 1)
+  twist = 2 * (inverse_move(left), inverse_move(top), left, top)
+  solution = ()
+
+  def is_front_corner_oriented(cube):
+    c, r = next((c, r) for c, r in cube if position(c, r) == (1, -1, -1))
+    return any(is_cubelet_solved(c, apply_step_to_cubelet_rotation(k * (bottom,), c, r)) for k in range(4))
+
+  for _ in range(4):
+    report_progress_callback(cube)
+    while not is_front_corner_oriented(cube):
+      cube, solution = apply_step_to_cube(twist, cube), solution + twist
+    cube, solution = apply_move_to_cube(bottom, cube), solution + (bottom,)
+  while not is_cube_solved(cube):
+    cube, solution = apply_move_to_cube(bottom, cube), solution + (bottom,)
+  return (cube, solution)
 
 def solve(cube, report_progress_callback=lambda cube: None):
   solution = ()
@@ -349,6 +362,8 @@ def solve(cube, report_progress_callback=lambda cube: None):
       learn_step(next_moves)
       solution += next_moves
     print(50 * "-")
+  cube, endgame_moves = solve_endgame(cube, report_progress_callback)
+  solution += endgame_moves
   print("Solved cube in %d moves." % len(solution))
   print("is_cube_solved: ", is_cube_solved(cube))
   return solution

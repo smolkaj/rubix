@@ -131,6 +131,16 @@ class TestEigencube(unittest.TestCase):
         self.assertNotEqual(cube_a, cube_c)
         self.assertFalse(is_cube_solved(cube_a))
 
+    def test_every_seed_reproduces_its_scramble(self):
+        """Every seed, including falsy 0, must pin the scramble regardless of prior random state."""
+        import random
+        from eigencube import shuffle
+        for seed in range(5):
+            cube_a = shuffle(solved_cube, iterations=20, seed=seed)
+            random.random()  # Advance the global generator between the two shuffles.
+            cube_b = shuffle(solved_cube, iterations=20, seed=seed)
+            self.assertEqual(cube_a, cube_b, f"seed={seed} is not reproducible")
+
     def test_descriptions(self):
         """Verify describe_position, describe_move, and describe_cubelet_type."""
         from eigencube import describe_position, describe_move, describe_cubelet_type
@@ -484,14 +494,13 @@ class TestLearnedSteps(unittest.TestCase):
         self.assertEqual(self.steps, self.saved_steps)
 
     def test_corner_twist_phase_solves_pure_twists(self):
-        """The final phase solves a cube whose only defect is two twisted corners."""
-        from eigencube import learn_step, num_disturbed
+        """The endgame solves a cube whose only defect is two twisted corners."""
+        from eigencube import num_disturbed
         left, top, bottom = ((0, -1, 0), 1), ((0, 0, 1), 1), ((0, 0, -1), 1)
         twist_one_corner = 2 * (inverse_move(left), inverse_move(top), left, top)
         twist_two_corners = twist_one_corner + (bottom,) + twist_one_corner * 2 + (inverse_move(bottom),)
         cube = apply_step_to_cube(twist_two_corners, solved_cube)
         self.assertEqual(num_disturbed(cube), 2)
-        learn_step(twist_two_corners)  # Pre-learned, so the test stays fast.
         solution = solve(cube)
         self.assertTrue(is_cube_solved(apply_step_to_cube(tuple(solution), cube)))
 

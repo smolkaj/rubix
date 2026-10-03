@@ -276,7 +276,7 @@ Phase 3: Bottom Cross (4 edge orientations & positions)
 Phase 4: Bottom Corner Positions (4 corners, ignoring twist)
        |
        v
-Phase 5: Bottom Corner Twists
+Phase 5: Bottom Corner Twists (fixed routine)
        |
        v
  [Solved Cube]
@@ -289,12 +289,14 @@ A\* needs a sense of direction so it doesn't search aimlessly. Rather than stori
 - **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
 
 ### Learned Macros: Discovering Commutators
-Late in the solve, moving one more cubelet without disturbing the solved ones takes 8–20 moves: blind search at that depth is expensive. Human solvers memorize commutators for this; Eigencube **learns** them instead, with zero hand-coded move sequences:
+Late in the solve, moving one more cubelet without disturbing the solved ones takes 8–20 moves: blind search at that depth is expensive. Human solvers memorize commutators for this; Eigencube **learns** them instead:
 - **Discovery:** Whenever a step's solution disturbs only a few cubelets of a solved cube (`MAX_MACRO_DISTURBANCE`), it is remembered as a *macro*. No notion of a commutator is built in; they emerge because they are exactly the sequences that disturb little.
 - **Symmetry:** Each macro is generalized to all 48 cube symmetries (signed permutation matrices $Q$, acting by conjugation $Q M Q^T$) and to its inverse.
 - **Reuse:** A\* searches over *steps*: a table holding, for each effect, the shortest known move sequence—seeded with the 12 single moves and grown by every learned macro. Each step is priced at its true move count. Once the right macros are known, deep steps collapse to a handful of steps.
 
-The first solve in a fresh process pays to discover its macros; since the final corner twists are found by search alone, it can take from seconds to many minutes. Subsequent solves in the same process—e.g., in the GUI—typically finish in about a second.
+The first solve in a fresh process pays to discover its macros. Subsequent solves in the same process—e.g., in the GUI—typically finish in about a second.
+
+Only the final corner twists still use a fixed routine (`solve_endgame`). Searching for them works too, but before a twisting macro is known, that search can take many minutes: a twist only arises once nearly everything else is solved, so it cannot be learned any earlier.
 
 ### Search Performance & Randomized Restarts
 - **Throughput:** Simulates ~30,000 steps/sec via vector dot products and memoized transposition caching.
