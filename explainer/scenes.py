@@ -199,11 +199,11 @@ class StickerNightmare(Narrated):
             self.play(FadeIn(logo, scale=0.8), Write(title), run_time=1.5)
             self.play(FadeIn(subtitle, shift=0.2 * UP))
 
-        with self.voice("It's called Eigencube. The model and solver are written in Python, "
-                        "with no lookup tables at all. Let's see how it "
+        with self.voice("It's called Eigencube. The whole model, plus a solver, fits in under four "
+                        "hundred lines of Python, with no lookup tables at all. Let's see how it "
                         "works."):
             facts = self.hud(VGroup(
-                Text("eigencube.py  ·  linear algebra  ·  no lookup tables",
+                Text("eigencube.py  ·  < 400 lines  ·  no lookup tables",
                      font="DejaVu Sans Mono", font_size=24, color=GREY_B),
                 Text("github.com/smolkaj/eigencube", font="DejaVu Sans Mono", font_size=24,
                      color=ACCENT),
