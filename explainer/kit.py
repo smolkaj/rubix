@@ -420,19 +420,32 @@ def at(cubelet, scale=1.0):
     return SPACING * scale * np.array(cubelet, dtype=float)
 
 
+class SolidArrow(Line3D):
+    """Manim's Arrow3D, but with a head of 32 faces rather than 1,024.
+
+    Arrow3D builds its head at the default surface resolution: over 90% of each arrow's
+    drawing, for a tip a few pixels across. A cone's sides are straight, so one face along
+    them looks the same, and arrow-heavy frames render four times as fast."""
+
+    def __init__(self, start, end, color, thickness, height, base_radius, segments):
+        start, end = np.array(start, dtype=float), np.array(end, dtype=float)
+        direction = (end - start) / np.linalg.norm(end - start)
+        # Short segments along the shaft, so that each depth-sorts where it actually is.
+        super().__init__(start, end - height * direction, thickness=thickness, color=color,
+                         resolution=(segments, 6))
+        self.cone = Cone(direction=direction, base_radius=base_radius, height=height,
+                         resolution=(1, 32)).shift(end)
+        self.end_point = VectorizedPoint(end)
+        self.add(self.end_point, self.cone)
+        self.set_color(color)
+
+    def get_end(self):
+        return self.end_point.get_center()
+
+
 def arrow(start, end, color, thickness=0.03, segments=12, tip=1.0):
-    # Short segments along the shaft, so that each depth-sorts where it actually is.
-    shaft = Arrow3D(np.array(start, dtype=float), np.array(end, dtype=float), color=color,
-                    thickness=thickness, height=0.22 * tip, base_radius=0.07 * tip,
-                    resolution=(segments, 6))
-    # Manim builds the head at the default 32 x 32 faces: 1,024 polygons for a tip a few pixels
-    # across, and over 90% of each arrow's drawing. A cone's sides are straight, so one face
-    # along them looks the same, and arrow-heavy frames render four times as fast.
-    head = Cone(direction=shaft.direction, base_radius=0.07 * tip, height=0.22 * tip,
-                resolution=(1, 32)).shift(np.array(end, dtype=float))
-    shaft.remove(shaft.cone)
-    shaft.cone = head
-    return shaft.add(head).set_color(color)
+    return SolidArrow(start, end, color, thickness, height=0.22 * tip, base_radius=0.07 * tip,
+                      segments=segments)
 
 
 class OutlinedArrow(VGroup):

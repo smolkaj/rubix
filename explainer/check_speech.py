@@ -13,6 +13,8 @@ With --sync, it instead transcribes the finished film and lists captions that ap
 
 import argparse
 import difflib
+import json
+import os
 import re
 import subprocess
 import sys
@@ -20,7 +22,9 @@ import sys
 import numpy as np
 
 from build import BUILD, CHAPTERS, cues
-from kit import speech
+from kit import SPEECH_CACHE, speech
+
+MODEL = "small.en"
 
 # Spellings a recognizer may legitimately choose for what the narration says.
 HOMOPHONES = {"are": "r", "our": "r", "see": "c", "sea": "c", "kubelet": "cubelet",
@@ -116,22 +120,29 @@ def main():
     parser.add_argument("--sync", action="store_true")
     args = parser.parse_args()
     from faster_whisper import WhisperModel
-    model = WhisperModel("small.en", device="cpu", compute_type="int8")
+    model = WhisperModel(MODEL, device="cpu", compute_type="int8", cpu_threads=os.cpu_count())
     media = BUILD / ("draft" if args.draft else "final")
     if args.sync:
         film = BUILD / ("draft.mp4" if args.draft else "eigencube-explainer.mp4")
         sys.exit(1 if check_sync(model, film) else 0)
+    # What was heard in each line's audio, so that unchanged lines aren't transcribed again. The
+    # audio files are named by their content, and the recognizer is deterministic.
+    memo_path = SPEECH_CACHE / f"heard-{MODEL}.json"
+    memo = json.loads(memo_path.read_text()) if memo_path.exists() else {}
     flagged = 0
     for scene in CHAPTERS:
         for cue in cues(media, scene):
             path, _, _ = speech(cue["text"])
-            segments, _ = model.transcribe(audio(path), beam_size=5)
-            heard = " ".join(s.text.strip() for s in segments)
+            if path.name not in memo:
+                segments, _ = model.transcribe(audio(path), beam_size=5)
+                memo[path.name] = " ".join(s.text.strip() for s in segments)
+            heard = memo[path.name]
             diffs = list(mismatches(cue["text"], heard))
             if diffs:
                 flagged += 1
                 print(f"{scene}: {cue['text']!r}\n  heard: {heard!r}\n  " +
                       "; ".join(f"{a!r} -> {b!r}" for a, b in diffs))
+    memo_path.write_text(json.dumps(memo, indent=0))
     print(f"{flagged} line(s) heard differently.")
     sys.exit(1 if flagged else 0)
 

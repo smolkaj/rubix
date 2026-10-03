@@ -100,7 +100,7 @@ def rotation_rule(font_size):
     """The review's rule, which the film recalls word for word whenever it leans on it."""
     return VGroup(*(MathTex(line, font_size=font_size) for line in [
         r"\text{a rotation about the origin} \;=\; \text{a matrix } R",
-        r"R\,\vec{u} \;=\; \vec{u}\text{, rotated}",
+        r"R\,\vec{u} \;=\; \vec{u}\,' \quad (\vec{u} \text{ rotated})",
     ])).arrange(DOWN, aligned_edge=LEFT, buff=0.3 * font_size / 40)
 
 
@@ -315,7 +315,7 @@ class LinearAlgebraReview(Narrated):
         rule = rotation_rule(font_size=34)
         box = SurroundingRectangle(rule, color=ACCENT, buff=0.3).set_fill(BLACK, opacity=0.9)
         # Below the x axis, so that the rotated e_y, which ends up pointing left, stays in view.
-        rule_card = self.label(VGroup(box, rule).move_to(1.25 * DOWN))
+        rule_card = self.label(VGroup(box, rule).move_to(1.0 * DOWN))
         with self.voice("So here's our rule for the rest of the video, now in three dimensions. A "
                         "rotation about the origin is a matrix, and multiplying a vector by that "
                         "matrix gives you the rotated vector. If you want to see why that works, "
@@ -327,13 +327,16 @@ class LinearAlgebraReview(Narrated):
         eigen = MathTex(r"\text{eigenvector, eigenvalue 1:}\;\; \text{a vector the transformation "
                         r"leaves in place}",
                         font_size=36, color=ACCENT)
-        self.label(eigen.add_background_rectangle().next_to(rule_card, DOWN, 0.3))
+        # Boxed like the rule card, and kept above the grid as it turns: Cairo otherwise draws
+        # whatever is being animated on top.
+        eigen_box = SurroundingRectangle(eigen, color=ACCENT, buff=0.15).set_fill(BLACK, 0.9)
+        self.label(VGroup(eigen_box, eigen).next_to(rule_card, DOWN, 0.2).set_z_index(1))
         with self.voice("One last word we'll need. If a transformation leaves a vector exactly where "
                         "it was, that vector is called an eigenvector, with eigenvalue one. A "
                         "quarter turn of the plane leaves no arrow in place. But in three "
                         "dimensions, every rotation has one: its axis. Hold on to that thought."):
             self.when_said("eigenvector")
-            self.play(Write(eigen), run_time=2)
+            self.play(FadeIn(eigen_box), Write(eigen), run_time=2)
             self.when_said("A quarter turn")  # Every arrow moves.
             self.play(FadeOut(rule_card), run_time=0.6)
             self.play(Rotate(VGroup(plane, e_x, e_y, v), angle=PI / 2, about_point=ORIGIN),
@@ -432,11 +435,11 @@ class FixedFrame(Narrated):
         with self.voice("The coordinates of every cubelet are minus one, zero, or one. A center, "
                         "like this one, sits at zero, one, zero. And an edge, like this one, at "
                         "zero, one, one."):
+            self.play(Write(domain))
             for (c, _), a, label, words in zip(others, other_arrows, other_labels,
                                               ["A center", "And an edge"]):
                 self.when_said(words)
                 self.play(cube.pieces[c].animate.set_opacity(0.45), Draw(a), FadeIn(label))
-            self.play(Write(domain))
         self.wait(2)
 
 
@@ -1015,6 +1018,7 @@ class Moves(Narrated):
         with self.voice("One dot product to select, one matrix product to turn. And since every "
                         "entry is zero, one, or minus one, the arithmetic stays exact, no matter "
                         "how many moves you make."):
+            self.play(FadeOut(m_group))  # It's the top turn's matrix; other faces turn next.
             self.turn_while_speaking(cube, [TURN_FRONT, ((0, 1, 0), 1), ((0, 0, -1), -1),
                                             ((-1, 0, 0), 1)], run_time=0.9)
         code = self.hud(above_captions(code_listing("apply_move_to_cubelet_rotation").scale(0.65)

@@ -46,15 +46,18 @@ def render(scene, flags, media):
     return video
 
 
-def fingerprint(scene):
+def fingerprint(scene, flags):
     """Everything a chapter's picture and sound are made from: its own code, the code all
-    chapters share (scenes.py without the other chapters), the kit, the model and the logo."""
+    chapters share (scenes.py without the other chapters), the kit, the model, the logo, and how
+    it is rendered (the Manim version and the render flags)."""
+    import manim
     module = ast.parse((HERE / "scenes.py").read_text())
     module.body = [node for node in module.body if not (
         isinstance(node, ast.ClassDef) and node.name in CHAPTERS and node.name != scene)]
     inputs = [ast.unparse(module).encode(), (HERE / "kit.py").read_bytes(),
               (HERE.parent / "eigencube.py").read_bytes(),
-              (HERE.parent / "img" / "logo.svg").read_bytes()]
+              (HERE.parent / "img" / "logo.svg").read_bytes(),
+              " ".join([manim.__version__, *flags]).encode()]
     return hashlib.sha256(b"\0".join(inputs)).hexdigest()
 
 
@@ -228,7 +231,7 @@ def main():
     (media / "fingerprints").mkdir(exist_ok=True)
 
     def video(scene):
-        stamp, current = media / "fingerprints" / scene, fingerprint(scene)
+        stamp, current = media / "fingerprints" / scene, fingerprint(scene, flags)
         existing = list(media.glob(f"videos/scenes/*/{scene}.mp4"))
         if existing and stamp.exists() and stamp.read_text() == current:
             print(f"{scene} is unchanged; reusing its earlier render", file=sys.stderr)
