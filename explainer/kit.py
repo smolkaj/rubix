@@ -461,7 +461,6 @@ class SolidArrow(Rod):
         self.set_color(color)
 
 
-
 class OutlinedArrow(VGroup):
     """A black outline arrow, and the arrow it outlines (drawn on top, with the same pieces)."""
 
@@ -505,8 +504,10 @@ def piercing_arrow(start, surface, end, color, thickness=0.03):
     stretch of arrow sticking out in front of it, and would cover it. That stretch therefore draws
     over the cube, outlined (the camera always sees the arrow's way out); the stretch inside is
     depth-sorted as usual."""
+    # Eight segments sort finely enough against cubelets twice their length; 20 looked no
+    # different frame by frame, and cost 40% more to draw.
     inside = Rod(np.array(start, dtype=float), np.array(surface, dtype=float), color=color,
-                 thickness=thickness, resolution=(20, 6))
+                 thickness=thickness, resolution=(8, 6))
     return VGroup(inside, overlay_arrow(surface, end, color, thickness))
 
 

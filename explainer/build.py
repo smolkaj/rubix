@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -25,8 +26,6 @@ from scenes import SCENES  # noqa: E402
 
 CHAPTERS = [scene.__name__ for scene in SCENES]
 CAPTION_WIDTH = 50  # Characters, so that a caption fits on one line in common players.
-# The moment the README shows as the film's thumbnail: a chapter and the start of a spoken line.
-POSTER = ("DiagTrick", "Each column is one sticker")
 FINAL_FPS = 30
 MIN_CAPTION_SECONDS = 0.8
 MIN_CAPTION = 24  # Characters; shorter sentences are joined to a neighbor, so they don't flash by.
@@ -44,12 +43,15 @@ def render(scene, flags, media):
         sys.exit(f"{scene} failed to render; see {log}")
 
 
+# How the film's picture is compressed, for the clean cut and the captioned one alike.
+PICTURE_CODEC = ["-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
+                 "-pix_fmt", "yuv420p"]
+
+
 def encode(video, encoded):
     """A chapter's picture as it goes into the film. Encoded chapter by chapter, as each finishes
     rendering and in parallel with the others, the film's picture is then a plain join."""
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-map", "0:v",
-                    "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
-                    "-pix_fmt", "yuv420p", str(encoded)], check=True)
+    ffmpeg_to(encoded, ["-i", str(video), "-map", "0:v", *PICTURE_CODEC])
 
 
 def fingerprint(scene, flags):
@@ -102,12 +104,19 @@ def srt_time(seconds):
                                     millis % 1000)
 
 
+SPOKEN_NUMBER = r"(?:minus |plus )?(?:zero|one|two|three)"
+SPOKEN_TUPLE = rf"(?i:\b{SPOKEN_NUMBER}(?:, (?:or |and )?{SPOKEN_NUMBER})+\b)"  # "one, zero, or one"
+
+
 def caption_chunks(text):
     """Sentences, with long ones split at clause boundaries and short ones joined to a neighbor,
-    so that each caption is comfortable to read."""
+    so that each caption is comfortable to read. A spoken tuple ("one, zero, zero") stays on one
+    caption."""
+    # Its spaces become no-break spaces, which neither clause nor word breaks split at.
+    text = re.sub(SPOKEN_TUPLE, lambda tuple_: tuple_[0].replace(" ", "\u00a0"), text)
     pieces = []
     for sentence in re.findall(r"[^.!?]+[.!?]*", text):
-        for clause in re.split(r"(?<=[,:;])\s+", sentence.strip()):
+        for clause in re.split(r"(?<=[,:;]) +", sentence.strip()):
             # Still too long: break between words, into lines of even length. Filling each line
             # greedily would strand the clause's last word or two on a line of their own.
             while len(clause) > CAPTION_WIDTH:
@@ -140,7 +149,7 @@ def caption_chunks(text):
                          key=lambda i: abs(i - len(joined) / 2), default=None)
             if middle is not None:
                 chunks[-2:] = [joined[:middle], joined[middle + 1:]]
-    return chunks
+    return [chunk.replace("\u00a0", " ") for chunk in chunks]
 
 
 def timed_chunks(cue):
@@ -198,6 +207,49 @@ def check_av_lengths(film):
         sys.exit(f"audio ({lengths['audio']}s) and video ({lengths['video']}s) differ in length")
 
 
+def burn_in_captions(film, videos, soundtrack, subtitles, media):
+    """The film with its captions drawn into the picture, for players that can't show a caption
+    track (such as GitHub's). They sit in the band the film keeps free for them (kit.CAPTION_TOP).
+    Made from the chapters as rendered, not from the encoded film, so it is compressed once."""
+    # Sizes are in units of a 288-pixel-high frame, which libass scales to the video.
+    # On a translucent box (BorderStyle 4, padded by Outline), so they read over grid lines too;
+    # sized for phones as well.
+    style = ("FontName=DejaVu Sans,FontSize=14,PrimaryColour=&H00FFFFFF,BorderStyle=4,"
+             "BackColour=&H30000000,Outline=0.8,Shadow=0,MarginV=10")
+    recipe = ["-f", "concat", "-safe", "0", "-i", concat_list(media, "chapters.txt", videos),
+              "-i", str(soundtrack), "-map", "0:v", "-map", "1:a",
+              "-vf", f"subtitles={subtitles}:force_style='{style}'",
+              *PICTURE_CODEC, "-c:a", "copy", "-movflags", "+faststart"]
+    # Keyed by everything it is made from, the recipe included; only the latest one stays.
+    key = hashlib.sha1("\0".join([*recipe, subtitles.read_text(),
+                                   *(str(v.stat().st_mtime_ns) for v in videos)]).encode())
+    made = media / "captioned" / f"{key.hexdigest()}.mp4"
+    if not made.exists():
+        shutil.rmtree(made.parent, ignore_errors=True)
+        made.parent.mkdir()
+        ffmpeg_to(made, recipe)
+    captioned = film.with_name(film.stem + "-captioned.mp4")
+    shutil.copyfile(made, captioned)
+    check_av_lengths(captioned)
+    if abs(duration(captioned) - duration(film)) > 0.1:
+        sys.exit(f"{captioned} runs {duration(captioned):.2f}s, the film {duration(film):.2f}s")
+
+
+def ffmpeg_to(path, args):
+    """Runs ffmpeg into `path`, which only appears once ffmpeg has finished: an interrupted run
+    could otherwise leave a short but valid file that later builds reuse as finished."""
+    partial = path.with_name(f"{path.stem}.partial{path.suffix}")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *args, str(partial)], check=True)
+    partial.replace(path)
+
+
+def concat_list(media, name, paths):
+    """A listing of `paths` for ffmpeg's concat demuxer; returns its path."""
+    listing = media / name
+    listing.write_text("".join(f"file '{p}'\n" for p in paths))
+    return str(listing)
+
+
 def contact_sheet(film, videos, media, tiles=36):
     """A grid of frames across the film, each taken as a spoken line ends: by then, the
     animations it narrates have settled, rather than being caught half-drawn."""
@@ -210,23 +262,6 @@ def contact_sheet(film, videos, media, tiles=36):
                     "select='%s',scale=384:216,tile=6x6" % "+".join(f"eq(n,{n})" for n in frames),
                     "-fps_mode", "passthrough", "-frames:v", "1", "-q:v", "4",
                     str(HERE / "contact-sheet.jpg")], check=True)
-
-
-def poster(film, videos, media):
-    """The README's thumbnail: one frame of the film with a play button on it."""
-    from PIL import Image, ImageDraw
-    chapter, line = POSTER
-    cue = next(c for c in cues(media, chapter) if c["text"].startswith(line))
-    at = sum(duration(v) for v in videos[:CHAPTERS.index(chapter)]) + cue["start"] + 1
-    frame = BUILD / "poster.png"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(at), "-i", str(film),
-                    "-frames:v", "1", "-vf", "scale=1280:720", str(frame)], check=True)
-    image = Image.open(frame).convert("RGB")
-    draw = ImageDraw.Draw(image, "RGBA")
-    x, y, r = 150, 600, 56  # In the empty lower left, clear of the subject.
-    draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 0, 0, 170), outline=(88, 196, 221), width=5)
-    draw.polygon([(x - 19, y - 30), (x - 19, y + 30), (x + 32, y)], fill=(255, 255, 255))
-    image.save(HERE / "poster.jpg", quality=88)
 
 
 def main():
@@ -251,7 +286,7 @@ def main():
             render(scene, flags, media)
             encode(chapter, encoded)
             stamp.write_text(current)
-        if not encoded.exists():  # Rendered before chapters were encoded one by one.
+        if not encoded.exists():  # A missing cache file is simply made again.
             encode(chapter, encoded)
         # Checked here, whether rendered just now or earlier: a chapter that failed its checks
         # stays on disk, and must not slip into a later build.
@@ -262,45 +297,41 @@ def main():
     with ThreadPoolExecutor(min(len(CHAPTERS), os.cpu_count() or 1)) as pool:
         videos, pictures = zip(*pool.map(video, CHAPTERS))
 
-    def concat_list(name, paths):
-        listing = media / name
-        listing.write_text("".join(f"file '{p}'\n" for p in paths))
-        return str(listing)
-
     film = BUILD / ("draft.mp4" if args.draft else "eigencube-explainer.mp4")
     subtitles = film.with_suffix(".srt")
     subtitles.write_text(captions(videos, media))
     picture = sum(duration(v) for v in videos)
     # The soundtrack is mixed from all chapters at once (its loudness is the whole film's), and
     # kept by what it is made from: a change to the picture alone reuses it.
+    # Each audio packet's timing as well as its content: a sound can move without changing.
     sounds = [subprocess.run(["ffmpeg", "-v", "error", "-i", str(v), "-map", "0:a", "-c", "copy",
-                              "-f", "md5", "-"], capture_output=True, text=True,
+                              "-f", "framecrc", "-"], capture_output=True, text=True,
                              check=True).stdout for v in videos]
     soundtrack = media / "soundtracks" / (hashlib.sha1(
         "".join([*sounds, str(picture)]).encode()).hexdigest() + ".m4a")
     if not soundtrack.exists():
         soundtrack.parent.mkdir(exist_ok=True)
-        subprocess.run(["ffmpeg", "-v", "error", "-y",
-                        "-f", "concat", "-safe", "0", "-i", concat_list("sounds.txt", videos),
-                        "-map", "0:a",
-                        # A chapter's audio ends at its last sound, which leaves gaps between
-                        # chapters. Players that ignore such gaps would run ahead of the picture,
-                        # so they are filled with silence. Then normalized to the loudness usual
-                        # for video online (-16 LUFS).
-                        "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture},"
-                               "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000",
-                        "-c:a", "aac", "-b:a", "160k", str(soundtrack)], check=True)
+        ffmpeg_to(soundtrack, [
+            "-f", "concat", "-safe", "0", "-i", concat_list(media, "sounds.txt", videos),
+            "-map", "0:a",
+            # A chapter's audio ends at its last sound, which leaves gaps between chapters.
+            # Players that ignore such gaps would run ahead of the picture, so they are filled
+            # with silence. Then normalized to the loudness usual for video online (-16 LUFS).
+            "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture},"
+                   "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000",
+            "-c:a", "aac", "-b:a", "160k"])
     subprocess.run(["ffmpeg", "-v", "error", "-y",
-                    "-f", "concat", "-safe", "0", "-i", concat_list("pictures.txt", pictures),
+                    "-f", "concat", "-safe", "0",
+                    "-i", concat_list(media, "pictures.txt", pictures),
                     "-i", str(soundtrack), "-i", str(subtitles),
                     "-map", "0:v", "-map", "1:a", "-map", "2",
                     "-c:v", "copy", "-c:a", "copy",  # Both encoded already.
                     "-c:s", "mov_text", "-metadata:s:s:0", "language=eng",
                     "-movflags", "+faststart", str(film)], check=True)
     check_av_lengths(film)
-    if not args.draft:  # The committed contact sheet and poster track the latest final cut.
+    if not args.draft:  # The committed contact sheet tracks the latest final cut.
         contact_sheet(film, videos, media)
-        poster(film, videos, media)
+        burn_in_captions(film, videos, soundtrack, subtitles, media)
     print(f"{film}  ({duration(film) / 60:.1f} min)")
 
 

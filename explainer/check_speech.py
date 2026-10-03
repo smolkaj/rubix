@@ -133,9 +133,12 @@ def sync_failures(heard_words, film, tolerance=0.75, window=30):
         else:
             unheard += 1
             print(f"{start:7.2f}s  {problem}: {text!r}")
+    stale = set(KNOWN_SYNC_FLAGS) - {text for _, text in captions}
+    for text in sorted(stale):  # A failure too: the entry no longer vouches for anything.
+        print(f"KNOWN_SYNC_FLAGS lists a caption the film no longer has: {text!r}")
     print(f"{off} of {len(captions)} caption(s) off by more than {tolerance}s; "
           f"{unheard} not heard within {window}s.")
-    return off + unheard
+    return off + unheard + len(stale)
 
 
 def main():
