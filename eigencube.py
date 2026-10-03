@@ -133,7 +133,7 @@ def apply_move_to_cube(move, cube):
   )
 
 def shuffle(cube, iterations=100_000, seed=42):
-  if seed: random.seed(seed)
+  if seed is not None: random.seed(seed)
   for _ in range(iterations):
     move = moves[random.randrange(len(moves))]
     cube = apply_move_to_cube(move, cube)
@@ -376,10 +376,8 @@ if __name__ == "__main__":
   if arg in ("-h", "--help"):
     print("Usage: python eigencube.py [seed | --benchmark]")
   elif arg == "--benchmark":
-    for seed in range(100):
-      print("== SEED:", seed, "==========================================")
-      solve(shuffle(solved_cube, iterations=100_000, seed=seed))
-      print_stats()
+    from eigencube_benchmark import main
+    sys.exit(main(sys.argv[2:]))
   else:
     seed = int(arg)
     print("Solving scrambled cube (seed=%d)..." % seed)

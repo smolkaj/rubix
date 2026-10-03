@@ -22,7 +22,7 @@ Run the command-line solver:
 # Single scramble solve
 python eigencube.py [seed]
 
-# 100-seed benchmark
+# Fixed-seed benchmark (options and report format: README.md)
 python eigencube.py --benchmark
 ```
 
@@ -42,9 +42,4 @@ SDL_VIDEODRIVER=dummy python3 -m unittest discover tests
 
 All development must strictly adhere to the repository's canonical [Invariants & Design Principles](README.md#invariants--design-principles).
 
-Key automated checks:
-- **Strict line count invariant:** `eigencube.py` must strictly remain under 400 lines of code (`wc -l eigencube.py < 400`). Verify with:
-  ```bash
-  [ $(wc -l < eigencube.py) -lt 400 ] && echo "OK" || echo "FAIL: Exceeds 400 lines"
-  ```
-- **Headless testability:** All GUI modules must support headless imports and execution (`init_display()` must remain lazy and respect `SDL_VIDEODRIVER=dummy`).
+Run the syntax and test checks in [AGENTS.md](AGENTS.md) before review.

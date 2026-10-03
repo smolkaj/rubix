@@ -130,6 +130,16 @@ class TestEigencube(unittest.TestCase):
         self.assertNotEqual(cube_a, cube_c)
         self.assertFalse(is_cube_solved(cube_a))
 
+    def test_explicit_seeds_ignore_prior_random_activity(self):
+        import random
+        from eigencube import shuffle
+        for seed in (0, 1, -1, 42):
+            random.seed(100)
+            first = shuffle(solved_cube, iterations=20, seed=seed)
+            random.seed(200)
+            second = shuffle(solved_cube, iterations=20, seed=seed)
+            self.assertEqual(first, second, f"seed {seed} depends on ambient randomness")
+
     def test_descriptions(self):
         """Verify describe_position, describe_move, and describe_cubelet_type."""
         from eigencube import describe_position, describe_move, describe_cubelet_type
@@ -411,4 +421,3 @@ class TestEigencube(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

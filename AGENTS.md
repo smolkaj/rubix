@@ -75,5 +75,5 @@ Whenever investigating or fixing a bug observed by a user or in production:
 All agent work must strictly preserve the repository's canonical [Invariants & Design Principles](README.md#invariants--design-principles) as well as the core development tenets:
 
 - **Single source of truth:** Code, specifications, and design principles must each have exactly one canonical representation. Reject duplicated definitions or copy-pasted guidelines across files.
-- **Simplicity above all:** Eigencube is a minimalistic Rubik's cube solver (~300 lines of Python code) and visualizer. Reject accidental complexity, heavy external frameworks, or speculative abstractions.
+- **Simplicity above all:** Eigencube is a minimalistic Rubik's cube solver and visualizer. Reject accidental complexity, heavy external frameworks, or speculative abstractions.
 - **Churn is free:** When a coherent simplification calls for a refactor, follow it through every affected file and call site. Diff size is not a reason to leave debt behind. The standard is a materially simpler, more understandable system.

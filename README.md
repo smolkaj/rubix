@@ -1,28 +1,44 @@
 <p align="center">
-  <img src="img/logo.svg" alt="Eigencube logo: a cube whose fixed centers keep their colors, with the rotation axis rising from the top center" width="160">
+  <img src="img/logo.svg" alt="Eigencube logo: a cube with its rotation axis rising from the top center" width="160">
 </p>
 
 <h1 align="center">Eigencube</h1>
 
-> A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**.
+A Rubik's Cube model, solver, and visualizer built from vectors, rotation matrices, and dot products.
 
-Most Rubik's cube solvers rely on complex combinatorial bookkeeping: tracking 54 color stickers mapped across flat arrays, maintaining lookup tables for permutations, or precomputing massive 100MB pattern databases.
+Each cubelet has a home coordinate and a rotation matrix. The same representation describes its position, its sticker directions, which face turns affect it, and whether it is solved. [`eigencube.py`](eigencube.py) implements the model and a multi-phase solver without external puzzle libraries or precomputed pattern databases.
 
-**Eigencube takes a different path.** By framing the puzzle in discrete 3-dimensional Euclidean space using linear algebra, the entire physics, state, and solution of the Rubik's Cube reduce to **vectors, rotation matrices, and dot products**.
+Eigencube is an educational project: the goal is code you can read as a mathematical specification. The solver finds solutions; it does not promise shortest solutions or a fixed solve time. Webcam scanning is experimental and is not connected to the visualizer.
 
-The payoff of this linear algebra formulation is **radical simplicity**: the entire puzzle model, transformations, and multi-phase solver in [`eigencube.py`](eigencube.py) fit in **under 400 lines of readable Python**—with zero external puzzle libraries, zero lookup tables, and zero precomputed pattern databases.
+## Try it
 
-> [!NOTE]
-> **Shoutout:** The core insight for Eigencube was directly sparked by Grant Sanderson’s ([3Blue1Brown](https://www.3blue1brown.com)) masterclass YouTube series, [**Essence of Linear Algebra**](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab). The series’ emphasis on geometric intuition—treating matrices as transformations of coordinate space and tracking where standard basis vectors land—inspired ditching messy combinatorial sticker permutations in favor of discrete 3D rotation matrices, vectors, and inner products. Massive praise and props to Grant for making linear algebra so intuitive, visual, and delightful!
+Requires Python 3.10+.
 
----
+```bash
+git clone https://github.com/smolkaj/eigencube.git
+cd eigencube
+python3 -m venv eigencube_env
+source eigencube_env/bin/activate
+pip install -r requirements.txt
+python eigencube_gui.py
+```
 
-## The Math Behind the Magic
+Click **Shuffle** to scramble the cube and **Solve** to compute a solution in the background. Use the arrow keys to step forward or backward through the moves; holding a key speeds up playback.
+
+![Eigencube visualizer](img/gui-preview.png)
+
+For the command-line solver:
+
+```bash
+python eigencube.py       # seed 42
+python eigencube.py 123   # another reproducible scramble
+```
+
+## The model
 
 https://github.com/user-attachments/assets/5630e7e8-6458-42cd-a1d8-5ffd148936ac
 
-<!-- This table mirrors the film's closing recap (Outro in explainer/scenes.py); keep the two in step. -->
-### The model at a glance
+The [16-minute animated explainer](explainer/README.md) walks through the encoding. Its cube geometry and code listings come directly from the implementation. The geometric approach was inspired by Grant Sanderson's [Essence of Linear Algebra](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab).
 
 | Concept | In linear algebra |
 |:--|:--|
@@ -35,180 +51,71 @@ https://github.com/user-attachments/assets/5630e7e8-6458-42cd-a1d8-5ffd148936ac
 | **Move** | the cubelets with $\mathbf{v} \cdot (R\,c) > 0$ turn ($\mathbf{v}$: the face's axis): $R \leftarrow M R$ ($M$: the quarter-turn matrix) |
 | **Solved** | $R \cdot \mathrm{diag}(c) = \mathrm{diag}(c)$ for every cubelet |
 
----
 
-## Solver Architecture
+## How the solver works
 
-Finding the optimal solution to an arbitrary Rubik's cube is NP-hard, and God's Number (20 moves) requires massive precomputed pattern databases.
+The solver uses heuristic search to reach progressively stricter goals:
 
-[`eigencube.py`](eigencube.py) implements a **hierarchical multi-phase A\* search** that mimics human layer-by-layer reduction, staying strictly under 400 lines without precomputed databases:
+1. Solve the top edges, then the rest of the top and middle layers.
+2. Orient and place the bottom edges.
+3. Place the bottom corners.
+4. Twist the corners and align the bottom face using a fixed endgame routine.
 
-```
-[Scrambled Cube]
-       |
-       v
-Phase 1: Top Layer & Centers (17 cubelets)
-       |
-       v
-Phase 2: Middle Layer Edges (4 cubelets)
-       |
-       v
-Phase 3: Bottom Cross (4 edge orientations & positions)
-       |
-       v
-Phase 4: Bottom Corners (4 corner placements & twists)
-       |
-       v
-Phase 5: Endgame Permutation Alignment
-       |
-       v
- [Solved Cube]
-```
+Heuristics combine distances for individual cubelets, calculated on demand and cached. Search priorities use randomized weights; unsuccessful searches restart with increasing move budgets. The phase goals retain completed layers at phase boundaries, while intermediate search moves may disturb them.
 
-### Guiding the Search: Distance Estimation
-A\* needs a sense of direction so it doesn't search aimlessly. Rather than storing gigabytes of precomputed lookup tables, Eigencube calculates a quick distance estimate on the fly:
-- **Individual cubelet distance (`min_moves_to_solved`):** Calculates how many 90° turns an isolated cubelet needs to reach its solved coordinate and orientation if no other cubelets were in the way.
-- **Layer distance:** Combines the individual estimates of the active layer's target cubelets into a single distance score, pulling the search toward states where more cubelets are closer to home.
-- **State caching:** Evaluates successor states with memoized transposition caching (`@functools.cache`).
+These are practical search choices, rather than an optimality guarantee. Runtime and solution length depend on the scramble and machine; use the benchmark to measure them.
 
-### Search Performance & Randomized Restarts
-- **Throughput:** Simulates ~50,000 moves/sec via vector dot products and memoized transposition caching.
-- **Move-Budgeted Restarts:** To escape deep local plateaus in complex scrambles without storing massive precomputed pattern tables, A\* incorporates subtle priority randomization (`RANDOMIZE_SEARCH = True`) bounded by deterministic move budgets (`max_moves=100_000` with gentle $1.5\times$ expansion). Instead of wall-clock timers and OS signals, searches cut losses after exploring ~100k moves (~2s) and retry with fresh randomized weights without discarding prior layer progress. Typical scrambles solve in 5–25 seconds.
-
----
-
-## Getting Started
-
-### Prerequisites
-- Python 3.10+
-- Virtual environment (`venv`)
-
-### Installation
+## Benchmark
 
 ```bash
-# Clone the repository
-git clone https://github.com/smolkaj/eigencube.git
-cd eigencube
+# Ten fixed seeds (0–9), 100 scramble moves each, 60-second timeout per trial
+python eigencube.py --benchmark --output benchmark.json
 
-# Create and activate a virtual environment
-python3 -m venv eigencube_env
-source eigencube_env/bin/activate
-
-# Install dependencies (numpy, pygame, opencv-python, Pillow)
-pip install -r requirements.txt
+# Choose seeds, scramble length, and timeout explicitly
+python eigencube.py --benchmark --seeds 0 42 123 --scramble-moves 100 --timeout 120
 ```
 
----
+Each trial runs in a fresh process with cold caches and a seeded random generator. The benchmark replays the returned moves and verifies that the resulting cube is solved. It prints each trial's status, solve time, and solution length, then summarizes median, 95th-percentile, and maximum solve times and minimum, median, and maximum move counts.
 
-## Usage
+Solve timing excludes imports, scrambling, and verification; the timeout covers the entire worker process. Timeouts, errors, and incorrect solutions are reported separately and cause a nonzero exit status. Summary statistics cover successful trials only; p95 uses the nearest-rank method. The optional JSON report includes all trials, Python and NumPy versions, platform, and benchmark settings. Keep those settings with any published measurements. Fixed seeds reproduce the scramble and search randomness within the same implementation and environment; elapsed times still vary.
 
-### 1. Interactive Pygame Visualizer
-
-Launch the 2D cube net visualizer:
-
-```bash
-python eigencube_gui.py
-```
-
-- **Shuffle:** Click the **Shuffle** button to apply a 999-move scramble.
-- **Solve:** Click the **Solve** button to run the A\* solver with a real-time progress bar.
-- **Playback:**
-  - `Right Arrow`: Step forward through the solution moves (hold to fast-forward at 15×).
-  - `Left Arrow`: Step backward through the solution moves (rewind).
-
-### 2. Command-Line Solver
-
-Solve a scrambled cube directly from the terminal:
-
-```bash
-# Solve a 100,000-move scramble with default seed (42)
-python eigencube.py
-
-# Solve with a specific random seed
-python eigencube.py 123
-
-# Run benchmark across 100 random scrambles
-python eigencube.py --benchmark
-```
-
-### 3. Programmatic Python API
-
-Use `eigencube` as a lightweight puzzle simulation and solving library:
+## Python API
 
 ```python
-from eigencube import solved_cube, shuffle, solve, describe_move, is_cube_solved, apply_move_to_cube
+from eigencube import (
+    solved_cube, shuffle, solve, apply_move_to_cube, is_cube_solved,
+)
 
-# Create a scrambled cube
-scrambled = shuffle(solved_cube, iterations=1000, seed=42)
-print("Is solved?", is_cube_solved(scrambled))  # False
-
-# Compute solution moves
-solution = solve(scrambled)
-print(f"Solved in {len(solution)} moves:")
+cube = shuffle(solved_cube, iterations=100, seed=42)
+solution = solve(cube)
 for move in solution:
-    print(" -", describe_move(move))
-
-# Apply solution and verify final state
-final_cube = scrambled
-for move in solution:
-    final_cube = apply_move_to_cube(move, final_cube)
-print("Is solved?", is_cube_solved(final_cube))  # True
+    cube = apply_move_to_cube(move, cube)
+assert is_cube_solved(cube)
 ```
 
----
+Cube states are immutable tuples. `solve` returns moves without modifying its input, and accepts an optional progress callback receiving intermediate states. The API assumes a valid cube state; the example creates one by applying legal moves.
 
-## Testing
-
-Run the test suite:
+## Development
 
 ```bash
 python3 -m unittest discover tests
 ```
 
-The test suite covers:
-- Representation invariants (cubelet counts, $L_1$ norms, canonical positions).
-- Rotation matrix algebra (orthogonality $R^T R = I$, $\det(R) = 1$, axis preservation).
-- Scramble reproducibility and seed determinism.
-- End-to-end multi-phase solver execution on scrambled states.
-- Headless GUI snapshot rendering verification.
-- The explainer film's geometry helpers (skipped unless the film's dependencies are installed).
+Tests cover cube and rotation invariants, move identities, search budgets, solver execution, the benchmark, and headless GUI rendering. Explainer geometry tests require its optional dependencies. See [HACKING.md](HACKING.md) for environment and headless execution instructions.
 
----
+The main files are:
 
-## Codebase Structure
-
-```
-eigencube/
-├── eigencube.py            # Core solver & linear algebra model (< 400 lines)
-├── eigencube_gui.py        # Pygame GUI with animated moves & step playback
-├── eigencube_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
-├── explainer/              # Animated video explainer of the encoding (Manim)
-├── scripts/
-│   ├── generate_cubelet_types.py # Cubelet types figure (blog.md)
-│   └── generate_logo.py    # Logo, icons & GitHub social preview generator
-├── tests/
-│   ├── test_eigencube.py   # Unit test suite
-│   └── test_explainer_kit.py   # The explainer film's geometry helpers
-├── img/                # Logo, icons, screenshots & blog figures
-│   ├── cube.png
-│   ├── cubelet-types.png
-│   ├── cube-in-plane.jpg
-│   ├── gui-preview.png
-│   ├── logo.svg            # Logo; generate_logo.py also writes the icons below
-│   ├── apple-touch-icon.png
-│   ├── favicon.ico
-│   ├── icon.png            # GUI window icon
-│   └── social-preview.png
-├── requirements.txt    # numpy, pygame, opencv-python, Pillow
-└── README.md
-```
-
----
+- [`eigencube.py`](eigencube.py): cube model, moves, and solver.
+- [`eigencube_gui.py`](eigencube_gui.py): Pygame cube net and solution playback.
+- [`eigencube_benchmark.py`](eigencube_benchmark.py): isolated solver trials and reports.
+- [`eigencube_scanner.py`](eigencube_scanner.py): standalone webcam color-classification prototype.
+- [`explainer/`](explainer/README.md): animated explanation built from the model.
+- [`scripts/generate_logo.py`](scripts/generate_logo.py): logo, icons, and social preview.
 
 ## Invariants & Design Principles
 
 - **A Functional Pearl (Maximally elegant, simple, and educational):** Eigencube is designed in the tradition of a *functional pearl*—an elegant, instructive gem where the code is an executable mathematical specification. Code clarity, linear algebra transparency, and pedagogical beauty always trump micro-optimizations or clever programming tricks.
 - **Self-documenting, transparent code:** Code should read as self-explanatory prose. Reject cryptic abbreviations, single-letter domain shorthand, or dense tuple indexing. Prefer clear, descriptive names (`left`, `top`, `bottom` rather than `L`, `U`, `D`) so anyone can understand the logic without an external decoder ring.
 - **Zero ambient magic:** No obscure puzzle encodings or heavyweight dependencies. Pure NumPy vector and matrix arithmetic.
-- **Strict code compactness:** The complete solver and domain model in `eigencube.py` strictly stays below 400 lines of clean, readable Python.
+- **Clarity over line count:** Keep the model and solver small and understandable. There is no hard line limit; prefer readable code over compression.
 - **Headless-friendly:** GUI components decouple display initializers so importing `eigencube_gui` works seamlessly in headless CI/CD environments.
