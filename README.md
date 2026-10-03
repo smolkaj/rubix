@@ -184,21 +184,18 @@ eigencube/
 ├── eigencube_scanner.py    # Computer vision scanner for physical cubes (OpenCV)
 ├── explainer/              # Animated video explainer of the encoding (Manim)
 ├── scripts/
-│   ├── generate_cubelet_types.py # Cubelet types figure (blog.md)
 │   └── generate_logo.py    # Logo, icons & GitHub social preview generator
 ├── tests/
 │   ├── test_eigencube.py   # Unit test suite
 │   └── test_explainer_kit.py   # The explainer film's geometry helpers
-├── img/                # Logo, icons, screenshots & blog figures
-│   ├── cube.png
-│   ├── cubelet-types.png
-│   ├── cube-in-plane.jpg
-│   ├── gui-preview.png
+├── img/                # Logo, icons & the GUI's snapshot
+│   ├── gui-preview.png     # Written by eigencube_gui.render_frame_to_image
 │   ├── logo.svg            # Logo; generate_logo.py also writes the icons below
 │   ├── apple-touch-icon.png
 │   ├── favicon.ico
 │   ├── icon.png            # GUI window icon
 │   └── social-preview.png
+├── fonts/              # Roboto, for the GUI and the logo generator
 ├── requirements.txt    # numpy, pygame, opencv-python, Pillow
 └── README.md
 ```
