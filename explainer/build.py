@@ -25,10 +25,9 @@ from scenes import SCENES  # noqa: E402
 
 CHAPTERS = [scene.__name__ for scene in SCENES]
 CAPTION_WIDTH = 50  # Characters, so that a caption fits on one line in common players.
-# The moment the README shows as the film's thumbnail: a chapter and the start of a spoken line.
-POSTER = ("DiagTrick", "Each column is one sticker")
 FINAL_FPS = 30
 MIN_CAPTION_SECONDS = 0.8
+SPOKEN_NUMBER = r"\b(?:minus |plus )?(?:zero|one|two|three)\b"
 MIN_CAPTION = 24  # Characters; shorter sentences are joined to a neighbor, so they don't flash by.
 
 
@@ -104,10 +103,13 @@ def srt_time(seconds):
 
 def caption_chunks(text):
     """Sentences, with long ones split at clause boundaries and short ones joined to a neighbor,
-    so that each caption is comfortable to read."""
+    so that each caption is comfortable to read. A spoken tuple ("one, zero, zero") stays on one
+    caption."""
+    # Joined by no-break spaces, which neither clause nor word breaks split at.
+    text = re.sub(f"({SPOKEN_NUMBER}),\\s(?=(?:or |and )?{SPOKEN_NUMBER})", "\\1,\u00a0", text)
     pieces = []
     for sentence in re.findall(r"[^.!?]+[.!?]*", text):
-        for clause in re.split(r"(?<=[,:;])\s+", sentence.strip()):
+        for clause in re.split(r"(?<=[,:;]) +", sentence.strip()):
             # Still too long: break between words, into lines of even length. Filling each line
             # greedily would strand the clause's last word or two on a line of their own.
             while len(clause) > CAPTION_WIDTH:
@@ -140,7 +142,7 @@ def caption_chunks(text):
                          key=lambda i: abs(i - len(joined) / 2), default=None)
             if middle is not None:
                 chunks[-2:] = [joined[:middle], joined[middle + 1:]]
-    return chunks
+    return [chunk.replace("\u00a0", " ") for chunk in chunks]
 
 
 def timed_chunks(cue):
@@ -212,23 +214,6 @@ def contact_sheet(film, videos, media, tiles=36):
                     str(HERE / "contact-sheet.jpg")], check=True)
 
 
-def poster(film, videos, media):
-    """The README's thumbnail: one frame of the film with a play button on it."""
-    from PIL import Image, ImageDraw
-    chapter, line = POSTER
-    cue = next(c for c in cues(media, chapter) if c["text"].startswith(line))
-    at = sum(duration(v) for v in videos[:CHAPTERS.index(chapter)]) + cue["start"] + 1
-    frame = BUILD / "poster.png"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(at), "-i", str(film),
-                    "-frames:v", "1", "-vf", "scale=1280:720", str(frame)], check=True)
-    image = Image.open(frame).convert("RGB")
-    draw = ImageDraw.Draw(image, "RGBA")
-    x, y, r = 150, 600, 56  # In the empty lower left, clear of the subject.
-    draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 0, 0, 170), outline=(88, 196, 221), width=5)
-    draw.polygon([(x - 19, y - 30), (x - 19, y + 30), (x + 32, y)], fill=(255, 255, 255))
-    image.save(HERE / "poster.jpg", quality=88)
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--draft", action="store_true")
@@ -251,7 +236,7 @@ def main():
             render(scene, flags, media)
             encode(chapter, encoded)
             stamp.write_text(current)
-        if not encoded.exists():  # Rendered before chapters were encoded one by one.
+        if not encoded.exists():  # A missing cache file is simply made again.
             encode(chapter, encoded)
         # Checked here, whether rendered just now or earlier: a chapter that failed its checks
         # stays on disk, and must not slip into a later build.
@@ -298,9 +283,8 @@ def main():
                     "-c:s", "mov_text", "-metadata:s:s:0", "language=eng",
                     "-movflags", "+faststart", str(film)], check=True)
     check_av_lengths(film)
-    if not args.draft:  # The committed contact sheet and poster track the latest final cut.
+    if not args.draft:  # The committed contact sheet tracks the latest final cut.
         contact_sheet(film, videos, media)
-        poster(film, videos, media)
     print(f"{film}  ({duration(film) / 60:.1f} min)")
 
 

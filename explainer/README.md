@@ -48,6 +48,7 @@ python build.py           # final 1080p30 cut -> build/eigencube-explainer.mp4 (
 # Either one renders only the chapters whose code changed since their last render.
 pip install faster-whisper && python check_speech.py   # check pronunciation of the latest cut
 python check_speech.py --sync   # check that captions match when their words are heard
-# Publish the new cut where the README's poster links to (also refresh poster.jpg in git):
+# Publish the new cut: as the release asset, with its captions...
 gh release upload explainer build/eigencube-explainer.mp4 build/eigencube-explainer.srt --clobber
+# ...and in the README's player, which GitHub only takes as a file dropped into its web editor.
 ```

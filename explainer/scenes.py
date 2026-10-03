@@ -344,8 +344,17 @@ class LinearAlgebraReview(Narrated):
             self.play(FadeIn(eigen_box), Write(eigen), run_time=2)
             self.when_said("A quarter turn")  # Every arrow moves.
             self.play(FadeOut(rule_card), run_time=0.6)
-            self.play(Rotate(VGroup(plane, e_x, e_y, v), angle=PI / 2, about_point=ORIGIN),
-                      run_time=2.5)
+            turning = VGroup(plane, e_x, e_y, v)
+            self.play(Rotate(turning, angle=PI / 2, about_point=ORIGIN), run_time=2.5)
+            # In three dimensions: the plane tilts into view, and turns about an axis that stays.
+            self.when_said("But in three")
+            keep = {turning, *turning.get_family()}
+            self.play(*(FadeOut(m) for m in self.mobjects if m not in keep), run_time=0.5)
+            self.move_camera(phi=60 * DEGREES, theta=-60 * DEGREES, run_time=1.5)
+            axis = SolidArrow(ORIGIN, 2.5 * OUT, ACCENT, thickness=0.04)
+            self.when_said("its axis")
+            self.play(Draw(axis), run_time=0.8)
+            self.play(Rotate(turning, angle=PI / 2, about_point=ORIGIN), run_time=2)
         self.wait(0.5)
         self.play(*(FadeOut(m) for m in self.mobjects))
 
@@ -374,7 +383,7 @@ class FixedFrame(Narrated):
                         "anywhere. The cross is fixed. Forever."):
             self.play(cube.animate.ghosted(cross, 0.3), run_time=0.6)
             made = self.turn_while_speaking(cube, DEMO_MOVES)
-        self.undo(cube, made)
+        self.undo(cube, made, run_time=0.15)  # Quickly: nothing is said meanwhile.
 
         # Both arms of the vertical axis, and the turns around them: top and bottom.
         axis = VGroup(arm(TOP, 3.6, ACCENT), arm((0, 0, -1), 3.4, ACCENT))
@@ -940,11 +949,13 @@ class Moves(Narrated):
         derivation = self.hud(MathTex(r"\mathbf{v} \cdot p &= %s \cdot (x,\, y,\, z) \\ "
                                       r"&= 0x + 0y + 1z = z" % vector_tex_string(TOP), font_size=36)
                               .next_to(v_label, DOWN, 0.4, aligned_edge=RIGHT))
-        # Each label sits level with its layer, just right of the cube's rightmost edge: that edge's
-        # midpoint in the layer, moved along the camera's horizontal.
+        # Each label sits level with its layer: at the middle of the layer's stripe on the right
+        # face (perspective spaces the face's front edge wider than its back edge), moved along the
+        # camera's horizontal to just past the cube.
         right = screen_right(theta)
+        past_cube = at((-1.5, 0, 0)) @ right + 0.55
         layer_labels = [self.facing_camera(MathTex(text, color=ACCENT, font_size=40)
-                                           .move_to(at((-1.5, 1.5, z)) + 0.55 * right))
+                                           .move_to(at((0, 1.5, z)) + past_cube * right))
                         for z, text in [(1, "+1"), (0, "0"), (-1, "-1")]]
         with self.voice("Now take the dot product of v with each cubelet's current position, p. "
                         "Dotting with a unit axis measures how far p reaches along it. Essence of "
