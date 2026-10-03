@@ -1,10 +1,14 @@
-"""Renders every chapter in parallel, then stitches them into one captioned film.
+"""Renders the chapters in parallel, then stitches them into one captioned film.
 
     python build.py            # 1080p30 final cut -> build/eigencube-explainer.mp4
     python build.py --draft    # fast 480p15 preview -> build/draft.mp4
+
+Only chapters whose inputs changed since their last render are rendered again.
 """
 
 import argparse
+import ast
+import hashlib
 import json
 import os
 import re
@@ -39,9 +43,19 @@ def render(scene, flags, media):
     if rendered.returncode:
         sys.exit(f"{scene} failed to render; see {log}")
     (video,) = media.glob(f"videos/scenes/*/{scene}.mp4")
-    check_narration_audible(scene, video, media)
-    check_layout(scene, media)
     return video
+
+
+def fingerprint(scene):
+    """Everything a chapter's picture and sound are made from: its own code, the code all
+    chapters share (scenes.py without the other chapters), the kit, the model and the logo."""
+    module = ast.parse((HERE / "scenes.py").read_text())
+    module.body = [node for node in module.body if not (
+        isinstance(node, ast.ClassDef) and node.name in CHAPTERS and node.name != scene)]
+    inputs = [ast.unparse(module).encode(), (HERE / "kit.py").read_bytes(),
+              (HERE.parent / "eigencube.py").read_bytes(),
+              (HERE.parent / "img" / "logo.svg").read_bytes()]
+    return hashlib.sha256(b"\0".join(inputs)).hexdigest()
 
 
 def check_narration_audible(scene, video, media):
@@ -207,27 +221,26 @@ def poster(film, videos, media):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--draft", action="store_true")
-    parser.add_argument("scenes", nargs="*", choices=CHAPTERS, metavar="CHAPTER",
-                        help=f"render only these chapters (default: all): {', '.join(CHAPTERS)}")
     args = parser.parse_args()
     flags = ["-ql"] if args.draft else ["--resolution", "1920,1080", "--frame_rate", str(FINAL_FPS)]
     media = BUILD / ("draft" if args.draft else "final")
     media.mkdir(parents=True, exist_ok=True)
-    source_mtime = max(path.stat().st_mtime for path in [
-        *HERE.glob("*.py"), HERE.parent / "eigencube.py", HERE.parent / "img" / "logo.svg"])
+    (media / "fingerprints").mkdir(exist_ok=True)
 
     def video(scene):
-        if not args.scenes or scene in args.scenes:
-            return render(scene, flags, media)
+        stamp, current = media / "fingerprints" / scene, fingerprint(scene)
         existing = list(media.glob(f"videos/scenes/*/{scene}.mp4"))
-        if not existing:
-            sys.exit(f"{scene} has not been rendered at this quality yet; render it too.")
-        # A final cut is what gets published, so it must not stitch in chapters (or the gates
-        # they passed) from older code. Drafts may, to keep iteration fast.
-        if not args.draft and existing[0].stat().st_mtime < source_mtime:
-            sys.exit(f"{scene} was rendered before the film's code last changed; render it too.")
-        print(f"reusing the earlier render of {scene}", file=sys.stderr)
-        return existing[0]
+        if existing and stamp.exists() and stamp.read_text() == current:
+            print(f"{scene} is unchanged; reusing its earlier render", file=sys.stderr)
+            chapter = existing[0]
+        else:
+            chapter = render(scene, flags, media)
+            stamp.write_text(current)
+        # Checked here, whether rendered just now or earlier: a chapter that failed its checks
+        # stays on disk, and must not slip into a later build.
+        check_narration_audible(scene, chapter, media)
+        check_layout(scene, media)
+        return chapter
 
     with ThreadPoolExecutor(min(len(CHAPTERS), os.cpu_count() or 1)) as pool:
         videos = list(pool.map(video, CHAPTERS))

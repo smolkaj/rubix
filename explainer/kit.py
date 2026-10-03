@@ -422,9 +422,17 @@ def at(cubelet, scale=1.0):
 
 def arrow(start, end, color, thickness=0.03, segments=12, tip=1.0):
     # Short segments along the shaft, so that each depth-sorts where it actually is.
-    return Arrow3D(np.array(start, dtype=float), np.array(end, dtype=float), color=color,
-                   thickness=thickness, height=0.22 * tip, base_radius=0.07 * tip,
-                   resolution=(segments, 6))
+    shaft = Arrow3D(np.array(start, dtype=float), np.array(end, dtype=float), color=color,
+                    thickness=thickness, height=0.22 * tip, base_radius=0.07 * tip,
+                    resolution=(segments, 6))
+    # Manim builds the head at the default 32 x 32 faces: 1,024 polygons for a tip a few pixels
+    # across, and over 90% of each arrow's drawing. A cone's sides are straight, so one face
+    # along them looks the same, and arrow-heavy frames render four times as fast.
+    head = Cone(direction=shaft.direction, base_radius=0.07 * tip, height=0.22 * tip,
+                resolution=(1, 32)).shift(np.array(end, dtype=float))
+    shaft.remove(shaft.cone)
+    shaft.cone = head
+    return shaft.add(head).set_color(color)
 
 
 class OutlinedArrow(VGroup):

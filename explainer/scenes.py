@@ -16,6 +16,14 @@ def sticker_arrows(cubelet, length=1.7 * SPACING):
                     for n in np.diag(cubelet).T if n.any()))
 
 
+def assert_twisted_home(state):
+    """What the film says of our corner after a top and a front turn: R c = c, yet it isn't
+    solved, since R diag(c) != diag(c)."""
+    rotation = dict(state)[CORNER]
+    assert eigencube.position(CORNER, rotation) == CORNER
+    assert not eigencube.is_cubelet_solved(CORNER, rotation)
+
+
 def sticker_colors(cubelet):
     """The colors of sticker_arrows(cubelet), in order (to highlight each in its own color)."""
     return [STICKER[ints(n)] for n in np.diag(cubelet).T if n.any()]
@@ -92,7 +100,7 @@ def rotation_rule(font_size):
     """The review's rule, which the film recalls word for word whenever it leans on it."""
     return VGroup(*(MathTex(line, font_size=font_size) for line in [
         r"\text{a rotation about the origin} \;=\; \text{a matrix } R",
-        r"R\,\vec{v} \;=\; \vec{v}\text{, rotated}",
+        r"R\,\vec{u} \;=\; \vec{u}\text{, rotated}",
     ])).arrange(DOWN, aligned_edge=LEFT, buff=0.3 * font_size / 40)
 
 
@@ -170,8 +178,9 @@ class StickerNightmare(Narrated):
             tables.arrange_in_grid(4, 3, buff=(0.6, 0.25)).to_edge(UP, buff=0.6)
             self.hud(tables)
             self.play(LaggedStart(*(FadeIn(t) for t in tables), lag_ratio=0.15), run_time=3)
-            extra = self.hud(Text("+ corner twists, edge flips, sticker groupings ...",
+            extra = self.hud(Text("+ which stickers share a corner, corner twists, edge flips",
                                   font_size=24, color=GREY_A).next_to(listing, DOWN, 0.7))
+            self.when_said("bookkeeping")
             self.play(Write(extra))
 
         logo = SVGMobject(str(HERE.parent / "img" / "logo.svg")).scale(1.1)
@@ -241,7 +250,7 @@ class LinearAlgebraReview(Narrated):
 
         steps = VGroup(vector_2d(RIGHT, X_COLOR).shift(RIGHT),
                        vector_2d(UP, Y_COLOR).shift(2 * RIGHT))
-        combination = MathTex(r"\vec{v}", "=", r"2\,\mathbf{e}_x", "+", r"1\,\mathbf{e}_y",
+        combination = MathTex(r"\vec{u}", "=", r"2\,\mathbf{e}_x", "+", r"1\,\mathbf{e}_y",
                               font_size=48).to_corner(UR).add_background_rectangle()
         combination[3].set_color(X_COLOR)  # Indices count the background rectangle first.
         combination[5].set_color(Y_COLOR)
@@ -872,6 +881,7 @@ class Configuration(Narrated):
                         "applied to diag of c, does not give back diag of c."):
             self.play(FadeOut(s_eq))
             self.play(cube.turn(TURN_FRONT), run_time=2)
+            assert_twisted_home(cube.state)
             self.play(ReplacementTransform(r_top, r_twist))
             self.when_said("R c equals c")
             self.play(FadeIn(twisted[0]))
@@ -981,13 +991,14 @@ class Moves(Narrated):
                                        .move_to(at(turn[:, i], 2.6) + 0.75 * OUT if turn[2, i] == 0
                                                 else at(turn[:, i], 2.0) + 0.75 * screen_right))
                     for i, color in enumerate(BASIS_COLORS)]
-        for column, a, color, landing, words in zip(
+        for column, a, color, landing, (words, cue) in zip(
                 m_group[1].get_columns(), basis, BASIS_COLORS, landings,
-                ["e x lands on minus e y: zero, minus one, zero.",
-                 "e y lands on e x: one, zero, zero.",
-                 "And e z stays put: zero, zero, one. It's the axis of the turn: our eigenvector "
-                 "again."]):
+                [("e x lands on minus e y: zero, minus one, zero.", "lands on"),
+                 ("e y lands on e x: one, zero, zero.", "lands on"),
+                 ("And e z stays put: zero, zero, one. It's the axis of the turn: our eigenvector "
+                  "again.", "stays put")]):
             with self.voice(words, pause=0.25):
+                self.when_said(cue)
                 self.play(FadeIn(landing), Indicate(a, color=color), run_time=0.8)
                 self.play(FadeIn(column, shift=0.3 * DOWN), run_time=0.8)
 
@@ -1026,6 +1037,7 @@ class Solved(Narrated):
             TURN_TOP, eigencube.solved_cube))
         cube = CubeMobject(state)
         self.add(cube)
+        assert_twisted_home(state)
         rotation = dict(state)[CORNER]
         self.play(cube.animate.ghosted([CORNER], 0.12))
         arrows = sticker_arrows(CORNER).apply_matrix(np.array(rotation, dtype=float),
@@ -1145,6 +1157,7 @@ class Outro(Narrated):
         assert eigencube.is_cube_solved(cube.state)
         self.stop_ambient_camera_rotation()
         self.move_camera(**CAMERA, run_time=1.5)
+        self.wait(1.5)  # Let the solved cube land.
 
         logo = SVGMobject(str(HERE.parent / "img" / "logo.svg")).scale(0.8)
         card = self.hud(VGroup(

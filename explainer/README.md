@@ -45,7 +45,7 @@ Requires Python 3.10+, [Manim's system dependencies](https://docs.manim.communit
 pip install -r requirements.txt
 python build.py --draft   # fast 480p15 preview -> build/draft.mp4
 python build.py           # final 1080p30 cut -> build/eigencube-explainer.mp4 (+ .srt)
-python build.py --draft Moves Solved   # re-render only some chapters
+# Either one renders only the chapters whose code changed since their last render.
 pip install faster-whisper && python check_speech.py   # check pronunciation of the latest cut
 python check_speech.py --sync   # check that captions match when their words are heard
 # Publish the new cut where the README's poster links to (also refresh poster.jpg in git):
