@@ -244,6 +244,11 @@ class Narrated(ThreeDScene):
         # cubelets out of the cube and into the group.
         # When only screen-pinned text changes, the static world stays one cached background.
         pinned = self.renderer.camera.fixed_in_frame_mobjects
+        # Fading out what isn't on screen would first put it back, for the length of the fade.
+        on_screen = set(self.get_mobject_family_members())
+        for fade in (a for a in animations if isinstance(a, FadeOut)):
+            if any(m not in on_screen for m in fade.mobject.family_members_with_points()):
+                raise ValueError(f"FadeOut of something not (all) on screen: {fade.mobject}")
 
         def in_world(animation):
             mobject = getattr(animation, "mobject", None)
