@@ -207,24 +207,30 @@ def burn_in_captions(film, videos, soundtrack, subtitles, media):
     """The film with its captions drawn into the picture, for players that can't show a caption
     track (such as GitHub's). They sit in the band the film keeps free for them (kit.CAPTION_TOP).
     Made from the chapters as rendered, not from the encoded film, so it is compressed once."""
-    key = hashlib.sha1("".join([*(str(v.stat().st_mtime_ns) for v in videos), soundtrack.name,
-                                 subtitles.read_text()]).encode()).hexdigest()
-    made = media / "captioned" / f"{key}.mp4"
+    # Sizes are in units of a 288-pixel-high frame, which libass scales to the video.
+    style = ("FontName=DejaVu Sans,FontSize=12,PrimaryColour=&H00FFFFFF,BorderStyle=1,"
+             "Outline=1.2,Shadow=0,MarginV=12")
+    recipe = ["-f", "concat", "-safe", "0", "-i", concat_list(media, "chapters.txt", videos),
+              "-i", str(soundtrack), "-map", "0:v", "-map", "1:a",
+              "-vf", f"subtitles={subtitles}:force_style='{style}'",
+              "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
+              "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart"]
+    # Kept by everything it is made from, the recipe included; only the latest is kept.
+    key = hashlib.sha1("\0".join([*recipe, subtitles.read_text(),
+                                   *(str(v.stat().st_mtime_ns) for v in videos)]).encode())
+    made = media / "captioned" / f"{key.hexdigest()}.mp4"
     if not made.exists():
-        made.parent.mkdir(exist_ok=True)
-        chapters = media / "chapters.txt"
-        chapters.write_text("".join(f"file '{v}'\n" for v in videos))
-        # Sizes are in units of a 288-pixel-high frame, which libass scales to the video.
-        style = ("FontName=DejaVu Sans,FontSize=12,PrimaryColour=&H00FFFFFF,BorderStyle=1,"
-                 "Outline=1.2,Shadow=0,MarginV=12")
-        subprocess.run(["ffmpeg", "-v", "error", "-y",
-                        "-f", "concat", "-safe", "0", "-i", str(chapters),
-                        "-i", str(soundtrack), "-map", "0:v", "-map", "1:a",
-                        "-vf", f"subtitles={subtitles}:force_style='{style}'",
-                        "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-tune", "animation",
-                        "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart",
-                        str(made)], check=True)
+        shutil.rmtree(made.parent, ignore_errors=True)
+        made.parent.mkdir()
+        subprocess.run(["ffmpeg", "-v", "error", "-y", *recipe, str(made)], check=True)
     shutil.copyfile(made, film.with_name(film.stem + "-captioned.mp4"))
+
+
+def concat_list(media, name, paths):
+    """A listing of `paths` for ffmpeg's concat demuxer; returns its path."""
+    listing = media / name
+    listing.write_text("".join(f"file '{p}'\n" for p in paths))
+    return str(listing)
 
 
 def contact_sheet(film, videos, media, tiles=36):
@@ -274,11 +280,6 @@ def main():
     with ThreadPoolExecutor(min(len(CHAPTERS), os.cpu_count() or 1)) as pool:
         videos, pictures = zip(*pool.map(video, CHAPTERS))
 
-    def concat_list(name, paths):
-        listing = media / name
-        listing.write_text("".join(f"file '{p}'\n" for p in paths))
-        return str(listing)
-
     film = BUILD / ("draft.mp4" if args.draft else "eigencube-explainer.mp4")
     subtitles = film.with_suffix(".srt")
     subtitles.write_text(captions(videos, media))
@@ -293,7 +294,8 @@ def main():
     if not soundtrack.exists():
         soundtrack.parent.mkdir(exist_ok=True)
         subprocess.run(["ffmpeg", "-v", "error", "-y",
-                        "-f", "concat", "-safe", "0", "-i", concat_list("sounds.txt", videos),
+                        "-f", "concat", "-safe", "0",
+                        "-i", concat_list(media, "sounds.txt", videos),
                         "-map", "0:a",
                         # A chapter's audio ends at its last sound, which leaves gaps between
                         # chapters. Players that ignore such gaps would run ahead of the picture,
@@ -303,7 +305,8 @@ def main():
                                "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000",
                         "-c:a", "aac", "-b:a", "160k", str(soundtrack)], check=True)
     subprocess.run(["ffmpeg", "-v", "error", "-y",
-                    "-f", "concat", "-safe", "0", "-i", concat_list("pictures.txt", pictures),
+                    "-f", "concat", "-safe", "0",
+                    "-i", concat_list(media, "pictures.txt", pictures),
                     "-i", str(soundtrack), "-i", str(subtitles),
                     "-map", "0:v", "-map", "1:a", "-map", "2",
                     "-c:v", "copy", "-c:a", "copy",  # Both encoded already.

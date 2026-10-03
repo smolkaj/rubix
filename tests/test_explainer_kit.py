@@ -1,6 +1,7 @@
 """The explainer film's geometry helpers (skipped where Manim, which only the film needs, is absent)."""
 
 import importlib.util
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 HAS_MANIM = importlib.util.find_spec("manim") is not None
+EXPLAINER = Path(__file__).resolve().parent.parent / "explainer"
 
 
 @unittest.skipUnless(HAS_MANIM, "the explainer's dependencies are not installed")
@@ -16,7 +18,7 @@ class ArrowEndsTest(unittest.TestCase):
     every way the film moves an arrow: turning with a cubelet, applying a matrix, shifting."""
 
     def setUp(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "explainer"))
+        sys.path.insert(0, str(EXPLAINER))
         import kit
         self.kit = kit
 
@@ -39,7 +41,6 @@ class ArrowEndsTest(unittest.TestCase):
             self.assert_ends(arrow, quarter_turn @ (1.5, 1, 1), quarter_turn @ (2, 1, 1))
 
 
-
 @unittest.skipUnless(HAS_MANIM, "the explainer's dependencies are not installed")
 class CaptionTest(unittest.TestCase):
     """A spoken tuple ("one, zero, zero") stays on one caption, wherever the line must break."""
@@ -53,8 +54,7 @@ class CaptionTest(unittest.TestCase):
     ]
 
     def test_no_caption_breaks_inside_a_tuple(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "explainer"))
-        import re
+        sys.path.insert(0, str(EXPLAINER))
         import build
         number = re.compile(build.SPOKEN_NUMBER + r",?$")
         for line in self.LINES:

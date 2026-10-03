@@ -350,12 +350,17 @@ class LinearAlgebraReview(Narrated):
             self.when_said("But in three")
             keep = {turning, *turning.get_family()}
             self.play(*(FadeOut(m) for m in self.mobjects if m not in keep), run_time=0.5)
+            # The flat arrows' black outlines would cut gaps into the grid's axes in perspective.
+            for flat in (e_x, e_y, v):
+                flat.set_stroke(width=0, background=True)
             # Close in, so that the arrows read and the plane's edge stays out of the picture.
             self.move_camera(phi=60 * DEGREES, theta=-60 * DEGREES, zoom=1.6, run_time=1.5)
             axis = SolidArrow(ORIGIN, 2 * OUT, ACCENT, thickness=0.04)
             self.when_said("its axis")
             self.play(Draw(axis), run_time=0.8)
-            self.play(Rotate(turning, angle=PI / 2, about_point=ORIGIN), run_time=2)
+            # A half turn: the vector ends pointing sideways, opposite to where it started, where a
+            # quarter turn would leave it pointing down the screen, as if along the axis.
+            self.play(Rotate(turning, angle=PI, about_point=ORIGIN), run_time=2.5)
         self.wait(0.5)
         self.play(*(FadeOut(m) for m in self.mobjects))
 
@@ -954,9 +959,9 @@ class Moves(Narrated):
         # face (perspective spaces the face's front edge wider than its back edge), moved along the
         # camera's horizontal to just past the cube.
         right = screen_right(theta)
-        past_cube = at((-1.5, 0, 0)) @ right + 0.55
+        to_past_cube = at((-1.5, 0, 0)) @ right + 0.55  # From the stripe's middle, sideways.
         layer_labels = [self.facing_camera(MathTex(text, color=ACCENT, font_size=40)
-                                           .move_to(at((0, 1.5, z)) + past_cube * right))
+                                           .move_to(at((0, 1.5, z)) + to_past_cube * right))
                         for z, text in [(1, "+1"), (0, "0"), (-1, "-1")]]
         with self.voice("Now take the dot product of v with each cubelet's current position, p. "
                         "Dotting with a unit axis measures how far p reaches along it. Essence of "
