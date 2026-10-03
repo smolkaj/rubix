@@ -6,7 +6,7 @@
 
 > A **Functional Pearl**: A minimalistic Rubik's Cube solver in **under 400 lines of Python**, powered by **linear algebra**.
 
-https://github.com/user-attachments/assets/b681ab3d-d168-4243-b5c1-c2ec7c425a9a
+https://github.com/user-attachments/assets/17c609ec-3adf-4eeb-b4e9-7d90617dfbfb
 
 Most Rubik's cube solvers rely on complex combinatorial bookkeeping: tracking 54 color stickers mapped across flat arrays, maintaining lookup tables for permutations, or precomputing massive 100MB pattern databases.
 

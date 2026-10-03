@@ -70,5 +70,25 @@ class CaptionTest(unittest.TestCase):
                 self.assertFalse(inside, f"{span[0]!r} split in {chunks}")
 
 
+
+@unittest.skipUnless(HAS_MANIM, "the explainer's dependencies are not installed")
+class FadeOutGuardTest(unittest.TestCase):
+    """Fading out what isn't on screen would first put it back for the fade; the film's scenes
+    refuse to."""
+
+    def test_fading_out_what_is_off_screen_fails(self):
+        import tempfile
+        import kit
+        from manim import FadeOut, Square, tempconfig
+        with tempfile.TemporaryDirectory() as media, \
+                tempconfig({"dry_run": True, "media_dir": media}):
+            scene = kit.Narrated()
+            scene.setup()  # What rendering would do first.
+            shown, gone = Square(), Square()
+            scene.add(shown)
+            scene.play(FadeOut(shown))  # On screen: fine.
+            with self.assertRaises(ValueError):
+                scene.play(FadeOut(gone))
+
 if __name__ == "__main__":
     unittest.main()
