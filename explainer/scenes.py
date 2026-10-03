@@ -92,7 +92,7 @@ def rotation_rule(font_size):
     """The review's rule, which the film recalls word for word whenever it leans on it."""
     return VGroup(*(MathTex(line, font_size=font_size) for line in [
         r"\text{a rotation about the origin} \;=\; \text{a matrix } R",
-        r"R\,\vec{v} \;=\; \text{the rotated vector } \vec{v}",
+        r"R\,\vec{v} \;=\; \vec{v}\text{, rotated}",
     ])).arrange(DOWN, aligned_edge=LEFT, buff=0.3 * font_size / 40)
 
 
@@ -361,7 +361,9 @@ class FixedFrame(Narrated):
 
         # Both arms of the vertical axis, and the turns around them: top and bottom.
         axis = VGroup(arm(TOP, 3.6, ACCENT), arm((0, 0, -1), 3.4, ACCENT))
-        eigen = self.hud(MathTex(r"M\,\mathbf{v} = \mathbf{v}", font_size=48, color=ACCENT)
+        # In words: the symbols for a face turn (M) and its axis (v) only arrive with the moves.
+        eigen = self.hud(VGroup(*(Tex(line, font_size=40, color=ACCENT) for line in [
+            "an eigenvector of", "every turn around it"])).arrange(DOWN, aligned_edge=RIGHT)
                          .to_corner(UR))
         with self.voice("In the language of our review: each arm of the cross stays exactly where it "
                         "is, under every turn around it, like these turns of the top and the "
@@ -766,9 +768,12 @@ class Configuration(Narrated):
             self.play(Draw(arrows))
             corner.add(arrows)
             self.when_said("moves pile up")
-            scramble = [TURN_TOP, ((0, 1, 0), 1), TURN_FRONT]
+            # Every move carries our corner somewhere new, and none brings it home: home and
+            # twisted is the reveal for later in this chapter.
+            scramble = [TURN_TOP, ((0, -1, 0), 1), (FRONT, -1)]
             for move in scramble:
                 self.play(cube.turn(move), run_time=1.3)
+                assert eigencube.position(CORNER, dict(cube.state)[CORNER]) != CORNER
 
         rule = self.hud(rotation_rule(font_size=28))
         rule_box = self.hud(SurroundingRectangle(rule, color=ACCENT, buff=0.15), overlay=True)
@@ -970,9 +975,11 @@ class Moves(Narrated):
             self.play(Write(m_group[0]), FadeIn(m_group[1].get_brackets()))
             self.when_said("Watch")
             self.play(Rotate(basis, **move_angle_axis(TURN_TOP), about_point=ORIGIN), run_time=4)
+        # Each label just past its arrow's tip: above the flat ones, beside the upright one.
         landings = [self.facing_camera(vector_tex(turn[:, i], color=color, font_size=34)
                                        .add_background_rectangle(opacity=0.75)
-                                       .move_to(at(turn[:, i], 2.6) + 0.75 * OUT))
+                                       .move_to(at(turn[:, i], 2.6) + 0.75 * OUT if turn[2, i] == 0
+                                                else at(turn[:, i], 2.0) + 0.75 * screen_right))
                     for i, color in enumerate(BASIS_COLORS)]
         for column, a, color, landing, words in zip(
                 m_group[1].get_columns(), basis, BASIS_COLORS, landings,

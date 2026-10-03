@@ -83,8 +83,14 @@ def caption_chunks(text):
     pieces = []
     for sentence in re.findall(r"[^.!?]+[.!?]*", text):
         for clause in re.split(r"(?<=[,:;])\s+", sentence.strip()):
-            while len(clause) > CAPTION_WIDTH:  # Still too long: break between words.
-                cut = clause.rfind(" ", 0, CAPTION_WIDTH)
+            # Still too long: break between words, into lines of even length. Filling each line
+            # greedily would strand the clause's last word or two on a line of their own.
+            while len(clause) > CAPTION_WIDTH:
+                target = len(clause) / -(-len(clause) // CAPTION_WIDTH)
+                spaces = [i for i, ch in enumerate(clause[:CAPTION_WIDTH + 1]) if ch == " "]
+                if not spaces:
+                    sys.exit(f"no place to break this caption: {clause!r}")
+                cut = min(spaces, key=lambda i: abs(i - target))
                 pieces.append(clause[:cut])
                 clause = clause[cut + 1:]
             pieces.append(clause)
@@ -96,15 +102,19 @@ def caption_chunks(text):
             chunks[-1] = joined
         else:
             chunks.append(piece)
-    # A short tail joins its predecessor; if the two don't fit on one line, they share it evenly.
+    # A short tail joins its predecessor; if the two don't fit on one line, they share it evenly,
+    # breaking after punctuation where there is any, so as not to split a phrase.
     if len(chunks) > 1 and len(chunks[-1]) < MIN_CAPTION:
         joined = f"{chunks[-2]} {chunks[-1]}"
         if len(joined) <= CAPTION_WIDTH:
             chunks[-2:] = [joined]
         else:
-            middle = min((i for i, ch in enumerate(joined) if ch == " "),
-                         key=lambda i: abs(i - len(joined) / 2))
-            chunks[-2:] = [joined[:middle], joined[middle + 1:]]
+            spaces = [i for i, ch in enumerate(joined) if ch == " "]
+            breaks = [i for i in spaces if joined[i - 1] in ",;:.!?"] or spaces
+            middle = min((i for i in breaks if max(i, len(joined) - i - 1) <= CAPTION_WIDTH),
+                         key=lambda i: abs(i - len(joined) / 2), default=None)
+            if middle is not None:
+                chunks[-2:] = [joined[:middle], joined[middle + 1:]]
     return chunks
 
 
@@ -203,8 +213,8 @@ def main():
     flags = ["-ql"] if args.draft else ["--resolution", "1920,1080", "--frame_rate", str(FINAL_FPS)]
     media = BUILD / ("draft" if args.draft else "final")
     media.mkdir(parents=True, exist_ok=True)
-    source_mtime = max(path.stat().st_mtime
-                       for path in [*HERE.glob("*.py"), HERE.parent / "eigencube.py"])
+    source_mtime = max(path.stat().st_mtime for path in [
+        *HERE.glob("*.py"), HERE.parent / "eigencube.py", HERE.parent / "img" / "logo.svg"])
 
     def video(scene):
         if not args.scenes or scene in args.scenes:
@@ -235,7 +245,9 @@ def main():
                     # A chapter's audio ends at its last sound, which leaves gaps between chapters.
                     # Players that ignore such gaps would run ahead of the picture, so they are
                     # filled with silence.
-                    "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture}", "-c:a", "aac",
+                    # Then normalized to the loudness usual for video online (-16 LUFS).
+                    "-af", f"aresample=async=1:first_pts=0,apad=whole_dur={picture},"
+                           "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000", "-c:a", "aac",
                     "-b:a", "160k",
                     "-c:s", "mov_text", "-metadata:s:s:0", "language=eng",
                     "-movflags", "+faststart", str(film)], check=True)

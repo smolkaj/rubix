@@ -4,7 +4,7 @@ A 16-minute animated explainer of the Eigencube encoding, in the style of 3Blue1
 [Essence of Linear Algebra](https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab)
 (the series that sparked Eigencube in the first place).
 
-The rendered film (1080p, ~30 MB, English captions embedded) is a build artifact rather than a checked-in file, since it would be several times the size of the rest of the repository; `python build.py` reproduces it.
+The rendered film (1080p, ~35 MB, English captions embedded) is a build artifact rather than a checked-in file, since it would be several times the size of the rest of the repository; `python build.py` reproduces it.
 
 ![Contact sheet of the film](contact-sheet.jpg)
 

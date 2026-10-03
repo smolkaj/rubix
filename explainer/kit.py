@@ -280,8 +280,8 @@ class Narrated(ThreeDScene):
                    points.min(axis=0), points.max(axis=0))
 
     def obstacles(self, samples=24):
-        """What text must not cover, on screen: points along visible arrows, and the outlines of
-        opaque stickers."""
+        """What text must not cover, on screen: points along visible arrows (3D and flat), and the
+        outlines of opaque stickers."""
         camera, points, boxes = self.renderer.camera, [], []
         for m in self.get_mobject_family_members():
             if isinstance(m, Line3D) and m.get_fill_opacity() > 0.3:
@@ -291,6 +291,11 @@ class Narrated(ThreeDScene):
                 reach = max((np.vstack([p.points for p in m.get_family() if p.has_points()])
                              - start) @ direction)
                 line = start + np.linspace(0, reach, samples)[:, None] * direction
+                pinned = m in camera.fixed_in_frame_mobjects
+                points.append(line if pinned else camera.project_points(line))
+            elif isinstance(m, Arrow) and m.get_stroke_opacity() > 0.3:  # The flat review's.
+                line = m.get_start() + np.linspace(0, 1, samples)[:, None] * (m.get_end() -
+                                                                         m.get_start())
                 pinned = m in camera.fixed_in_frame_mobjects
                 points.append(line if pinned else camera.project_points(line))
             elif getattr(m, "is_sticker", False) and m.get_fill_opacity() > 0.9:
