@@ -38,6 +38,11 @@ KNOWN_SYNC_FLAGS = {
     "In the solved cube,": 'heard as "In the soft cube", right on time',
     "It was never a list of fifty-four colors.":
         'after a long pause, "It" is stamped a second before "was" and "never", which match',
+    # Whisper drops this sentence from the whole film's transcript, but transcribing 150-166 s on
+    # its own hears it right on these captions (157.7 s, 159.7 s).
+    "If you want to see why that works,": "dropped from the whole film's transcript only",
+    "Essence of Linear Algebra is the place to go.":
+        "dropped from the whole film's transcript only",
 }
 NUMBERS = {w: n for n, w in enumerate(
     "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
